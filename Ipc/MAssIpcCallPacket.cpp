@@ -30,8 +30,10 @@ size_t MAssIpcCallPacket::IsNeedMoreDataSize(const std::shared_ptr<MAssIpcCallTr
 	if( m_packet_size!=c_invalid_packet_size )
 	{
 		size_t available = in_data->ReadBytesAvailable();
-		size_t need_more_data_size = (available-(m_packet_size+c_net_call_packet_type_size));
-		return need_more_data_size;
+		size_t need_size = (m_packet_size+c_net_call_packet_type_size);
+		if( available < need_size )
+			return need_size-available;
+		return 0;
 	}
 
 	return sizeof(m_packet_size)+c_net_call_packet_type_size;
