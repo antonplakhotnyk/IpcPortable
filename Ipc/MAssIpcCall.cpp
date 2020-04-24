@@ -1,6 +1,7 @@
 #include "MAssIpcCall.h"
 #include "Integration/MAssMacros.h"
 
+using namespace MAssIpcCallInternal;
 
 MAssIpcCall::MAssIpcCall(const std::shared_ptr<MAssCallThreadTransport>& inter_thread_nullable)
 	:m_int(new Internals)
@@ -19,9 +20,10 @@ void MAssIpcCall::DeserializeNameSignature(MAssIpcCallDataStream* call_info, std
 	(*call_info)>>(*proc_name)>>(*send_return)>>(*return_type)>>(*params_type);
 }
 
-void MAssIpcCall::Internals::InvokeLocal(std::unique_ptr<std::vector<uint8_t> > call_info_data) const
+MAssIpcCall::Internals::CreateCallJobRes MAssIpcCall::Internals::CreateCallJob(std::unique_ptr<std::vector<uint8_t> > call_info_data) const
 {
-	std::shared_ptr<MAssIpcCallInternal::CallJob> call_job(new MAssIpcCallInternal::CallJob(m_transport,m_inter_thread_nullable,std::move(call_info_data)));
+	CreateCallJobRes res = {};
+	std::shared_ptr<MAssIpcCallInternal::CallJob> call_job(new MAssIpcCallInternal::CallJob(m_transport, m_inter_thread_nullable, std::move(call_info_data)));
 
 	{
 		std::string return_type;
@@ -29,13 +31,16 @@ void MAssIpcCall::Internals::InvokeLocal(std::unique_ptr<std::vector<uint8_t> > 
 		std::string proc_name;
 
 		DeserializeNameSignature(&call_job->m_call_info_data_str, &proc_name, &call_job->m_send_return, &return_type, &params_type);
+		res.send_return = call_job->m_send_return;
 
 		m_proc_map.FindCallInfo(proc_name, params_type, &call_job->m_call_info);
 		if( !bool(call_job->m_call_info) )
 		{
+			res.message = return_type+" "+proc_name+"("+params_type+")";
+			res.error = ErrorType::no_matching_call_name_parameters;
 			if( m_OnInvalidRemoteCall )
-				m_OnInvalidRemoteCall(ErrorType::no_matching_call_name_parameters, return_type+" "+proc_name+"("+params_type+")");
-			return;
+				m_OnInvalidRemoteCall(res.error, res.message);
+			return res;
 		}
 
 		if( !return_type.empty() )
@@ -43,27 +48,43 @@ void MAssIpcCall::Internals::InvokeLocal(std::unique_ptr<std::vector<uint8_t> > 
 			const std::string& return_type_call = call_job->m_call_info->GetSignature_RetType();
 			if( return_type != return_type_call )
 			{
+				res.message = return_type+" "+proc_name+"("+params_type+")";
+				res.error = ErrorType::no_matching_call_return_type;
 				if( m_OnInvalidRemoteCall )
-					m_OnInvalidRemoteCall(ErrorType::no_matching_call_return_type, return_type+" "+proc_name+"("+params_type+")");
-				return;
+					m_OnInvalidRemoteCall(res.error, res.message);
+				return res;
 			}
 		}
 	}
 
-	if( m_inter_thread_nullable )
-		m_inter_thread_nullable->CallFromThread(call_job->m_call_info->ThreadId(), call_job);
-	else
-		call_job->Invoke();
+	res.obj = call_job;
+	return res;
+}
 
-// 	{
-// 		if( *send_return )
-// 		{
-// 			MAssIpcCallDataStream result_str(result);
-// 			call_info->Invoke(&result_str, &call_info_data_str);
-// 		}
-// 		else
-// 			call_info->Invoke(NULL, &call_info_data_str);
-// 	}
+void MAssIpcCall::Internals::InvokeLocal(std::unique_ptr<std::vector<uint8_t> > call_info_data) const
+{
+	CreateCallJobRes call_job = CreateCallJob(std::move(call_info_data));
+
+	if(call_job.obj)
+	{
+		if( m_inter_thread_nullable )
+			m_inter_thread_nullable->CallFromThread(call_job.obj->m_call_info->m_thread_id, call_job.obj);
+		else
+			call_job.obj->Invoke();
+	}
+	else
+	{// fail to call
+		if( call_job.send_return )
+		{
+			std::vector<uint8_t> result;
+			MAssIpcCallDataStream result_str(&result);
+			MAssIpcCallPacket::PacketHeaderAllocate(&result, MAssIpcCallPacket::pt_return_fail_call);
+			result_str<<call_job.error;
+			result_str<<call_job.message;
+			MAssIpcCallPacket::PacketHeaderUpdateSize(&result);
+			m_transport->Write(result.data(), result.size());
+		}
+	}
 }
 
 void MAssIpcCall::InvokeRemote(const std::vector<uint8_t>& call_info_data, std::vector<uint8_t>* result) const
@@ -112,6 +133,29 @@ size_t MAssIpcCall::Internals::ProcessTransport(std::vector<uint8_t>* result)
 				InvokeLocal(std::move(in_data));
 			}
 			break;
+			case MAssIpcCallPacket::pt_return_fail_call:
+			{
+				std::vector<uint8_t> fail_result;
+				MAssIpcCallDataStream fail_result_str(&fail_result);
+				auto data_size = m_packet_parser.FinishReceivePacketSize();
+				m_packet_parser.ReadData(m_transport, &fail_result, data_size);
+				MAssIpcCall::ErrorType error = ErrorType::unknown_error;
+				std::string message;
+				fail_result_str>>error;
+				fail_result_str>>message;
+
+				if( error == ErrorType::no_matching_call_name_parameters )
+					error = ErrorType::respond_no_matching_call_name_parameters;
+				else if( error == ErrorType::no_matching_call_return_type )
+					error = ErrorType::respond_no_matching_call_return_type;
+				else
+					error = ErrorType::unknown_error;
+
+				if( bool(m_OnInvalidRemoteCall) )
+					m_OnInvalidRemoteCall(error, message);
+				return 0;
+			}
+			break;
 			case MAssIpcCallPacket::pt_enumerate_return:
 			case MAssIpcCallPacket::pt_return:
 			{
@@ -128,12 +172,12 @@ size_t MAssIpcCall::Internals::ProcessTransport(std::vector<uint8_t>* result)
 
 				std::vector<uint8_t> result_now;
 				MAssIpcCall_EnumerateData res = m_proc_map.EnumerateHandlers();
-				MAssIpcCall::PacketHeaderAllocate(&result_now, MAssIpcCallPacket::pt_enumerate_return);
+				MAssIpcCallPacket::PacketHeaderAllocate(&result_now, MAssIpcCallPacket::pt_enumerate_return);
 				{
 					MAssIpcCallDataStream data_raw(&result_now);
 					data_raw<<res;
 				}
-				MAssIpcCall::PacketHeaderUpdateSize(&result_now);
+				MAssIpcCallPacket::PacketHeaderUpdateSize(&result_now);
 				m_transport->Write(result_now.data(), result_now.size());
 			}
 			break;
@@ -155,8 +199,8 @@ MAssIpcCall_EnumerateData MAssIpcCall::EnumerateRemote() const
 	std::vector<uint8_t> call_info_data;
 	std::vector<uint8_t> result;
 
-	MAssIpcCall::PacketHeaderAllocate(&call_info_data, MAssIpcCallPacket::pt_enumerate);
-	MAssIpcCall::PacketHeaderUpdateSize(&call_info_data);
+	MAssIpcCallPacket::PacketHeaderAllocate(&call_info_data, MAssIpcCallPacket::pt_enumerate);
+	MAssIpcCallPacket::PacketHeaderUpdateSize(&call_info_data);
 
 	InvokeRemote(call_info_data, &result);
 
@@ -195,19 +239,6 @@ void MAssIpcCall::SerializeCallSignature(MAssIpcCallDataStream* call_info, const
 	(*call_info)<<proc_name<<send_return<<return_type<<params_type;
 }
 
-void MAssIpcCall::PacketHeaderAllocate(std::vector<uint8_t>* packet_data, MAssIpcCallPacket::PacketType pt)
-{
-	MAssIpcCallDataStream out_data_raw(packet_data);
-	out_data_raw<<uint32_t(0)<<uint32_t(pt);
-}
-
-void MAssIpcCall::PacketHeaderUpdateSize(std::vector<uint8_t>* packet_data)
-{
-	mass_return_if_equal(packet_data->size()<MAssIpcCallPacket::c_net_call_packet_header_size, true);
-	uint32_t* packet_data_size = reinterpret_cast<uint32_t*>(packet_data->data());
-	*packet_data_size = packet_data->size() - MAssIpcCallPacket::c_net_call_packet_header_size;
-}
-
 char MAssIpcCall::GetTypeNameSeparator()
 {
 	return MAssIpcCallInternal::separator;
@@ -219,3 +250,14 @@ void MAssIpcCall::SetErrorHandler(TErrorHandler OnInvalidRemoteCall)
 }
 
 //-------------------------------------------------------
+
+MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const MAssIpcCall::ErrorType& v)
+{
+	stream<<std::underlying_type<MAssIpcCall::ErrorType>::type(v);
+	return stream;
+}
+
+MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, MAssIpcCall::ErrorType& v)
+{
+	return stream >> reinterpret_cast<std::underlying_type<MAssIpcCall::ErrorType>::type&>(v);
+}

@@ -122,7 +122,6 @@ typedef std::vector<MAssIpcCall_ProcDescription> MAssIpcCall_EnumerateData;
 
 MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const MAssIpcCall_EnumerateData& v);
 MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, MAssIpcCall_EnumerateData& v);
-
 MASS_IPC_TYPE_SIGNATURE(MAssIpcCall_EnumerateData);
 
 // template<class TType> 
@@ -130,3 +129,4 @@ MASS_IPC_TYPE_SIGNATURE(MAssIpcCall_EnumerateData);
 // template<> struct MAssIpcType<std::string> { static const char* Name() { return "std::string"; }; };;
 
 //-------------------------------------------------------
+

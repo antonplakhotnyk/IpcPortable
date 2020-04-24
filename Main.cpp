@@ -146,6 +146,8 @@ void Main_IpcClient()
 
 // 	call.AddHandler("ClientProc", DelegateW<void(uint8_t, uint32_t)>().BindS(&ClientProc));
 
+	call.SetErrorHandler(MAssIpcCall::TErrorHandler(&OnInvalidRemoteCall));
+
 	std::shared_ptr<IpcTransportMemory> transport_buffer(new IpcTransportMemory);
 
 	std::shared_ptr<IpcTransportMemory> complementar_buffer = transport_buffer->CreateComplementar();
@@ -159,9 +161,12 @@ void Main_IpcClient()
 	uint32_t c = 89012345;
 	bool br2 = call.WaitInvokeRet<bool>("IsLinkUp_Sta");
 	std::string res2 = call.WaitInvokeRet<std::string>("Ipc_Proc1",a, b, c);
+	std::string res3 = call.WaitInvokeRet<std::string>("NotExistProc", a, b, c);
 	uint8_t& a1 = a;
 	call.WaitInvoke("Ipc_Proc3", a1, b, c);
 	call.AsyncInvoke("Ipc_Proc3", a, b, c);
+	MAssIpcCall_EnumerateData enum_data = call.EnumerateRemote();
+	MAssIpcCall_EnumerateData enum_data2 = call.EnumerateRemote();
 	bool br = call.WaitInvokeRet<bool>("IsLinkUp_Sta");
 	std::string res = call.WaitInvokeRet<std::string>("Ipc_Proc1",a, b, c);
 

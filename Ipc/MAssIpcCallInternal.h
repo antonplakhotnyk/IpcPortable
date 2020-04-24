@@ -8,6 +8,7 @@
 #include "MAssIpcCallPacket.h"
 #include "MAssIpcCallTransport.h"
 
+
 namespace MAssIpcCallInternal
 {
 
@@ -17,17 +18,13 @@ class CallInfo
 {
 public:
 
-	CallInfo(MAssThread::Id thread_id):m_thread_id(thread_id){};
+	CallInfo(MAssThread::Id thread_id);
 
 	virtual void Invoke(MAssIpcCallDataStream* res, MAssIpcCallDataStream* params) const = 0;
 	virtual bool IsCallable() const = 0;
 	virtual const char* GetSignature_RetType() const = 0;
-	MAssThread::Id ThreadId() const
-	{
-		return m_thread_id;
-	}
 
-private:
+public:
 
 	const MAssThread::Id m_thread_id;
 };
@@ -37,15 +34,9 @@ class ResultJob: public MAssCallThreadTransport::Job
 {
 public:
 
-	ResultJob(const std::shared_ptr<MAssIpcCallTransport>& transport)
-		:m_transport(transport)
-	{
-	};
+	ResultJob(const std::shared_ptr<MAssIpcCallTransport>& transport);
 
-	void Invoke() override
-	{
-		MAssIpcCallPacket::SendData(m_result, MAssIpcCallPacket::pt_return, m_transport);
-	}
+	void Invoke() override;
 
 	std::vector<uint8_t> m_result;
 
@@ -60,28 +51,8 @@ class CallJob: public MAssCallThreadTransport::Job
 public:
 
 	CallJob(const std::shared_ptr<MAssIpcCallTransport>& transport, const std::shared_ptr<MAssCallThreadTransport>& inter_thread,
-			std::unique_ptr<std::vector<uint8_t> > call_info_data)
-		: m_call_info_data_str(call_info_data->data(), call_info_data->size())
-		, m_call_info_data(std::move(call_info_data))
-		, m_result_thread_id(inter_thread ? inter_thread->GetCurrentThreadId() : MAssThread::c_no_thread)
-		, m_transport(transport)
-		, m_inter_thread(inter_thread)
-	{
-	}
-
-	void Invoke() override
-	{
-		std::shared_ptr<ResultJob> result_job(new ResultJob(m_transport));
-		MAssIpcCallDataStream result_str(&result_job->m_result);
-		m_call_info->Invoke(&result_str, &m_call_info_data_str);
-		if( m_send_return )
-		{
-			if( m_inter_thread )
-				m_inter_thread->CallFromThread(m_result_thread_id, result_job);
-			else
-				result_job->Invoke();
-		}
-	}
+			std::unique_ptr<std::vector<uint8_t> > call_info_data);
+	void Invoke() override;
 
 	MAssIpcCallDataStream				m_call_info_data_str;
 	std::shared_ptr<const CallInfo>	m_call_info;
@@ -100,29 +71,8 @@ class ProcMap
 {
 public:
 
-	void FindCallInfo(const std::string& name, std::string& signature, std::shared_ptr<const CallInfo>* call_info) const
-	{
-		auto it_procs = m_name_procs.find(name);
-		if( it_procs==m_name_procs.end() )
-			return;
-
-		auto it_signature = it_procs->second.m_signature_call.find(signature);
-		if( it_signature==it_procs->second.m_signature_call.end() )
-			return;
-
-		*call_info = it_signature->second.call_info;
-	}
-
-	MAssIpcCall_EnumerateData EnumerateHandlers()
-	{
-		MAssIpcCall_EnumerateData res;
-
-		for( auto it_np = m_name_procs.begin(); it_np!=m_name_procs.end(); it_np++ )
-			for( auto it_sc = it_np->second.m_signature_call.begin(); it_sc!=it_np->second.m_signature_call.end(); it_sc++ )
-				res.push_back({it_np->first, it_sc->second.call_info->GetSignature_RetType(), it_sc->first, it_sc->second.comment});
-
-		return res;
-	}
+	void FindCallInfo(const std::string& name, std::string& signature, std::shared_ptr<const CallInfo>* call_info) const;
+	MAssIpcCall_EnumerateData EnumerateHandlers();
 
 public:
 

@@ -1,5 +1,8 @@
 #include "MAssIpcCallPacket.h"
 #include "MAssIpcCallDataStream.h"
+#include "Integration/MAssMacros.h"
+
+using namespace MAssIpcCallInternal;
 
 
 MAssIpcCallPacket::MAssIpcCallPacket()
@@ -64,14 +67,28 @@ void MAssIpcCallPacket::ReadData(const std::shared_ptr<MAssIpcCallTransport>& in
 		in_data->Read(&(*data_replace)[0], data_size);
 }
 
-void MAssIpcCallPacket::SendData(const std::vector<uint8_t>& out_data_buf, PacketType type, std::shared_ptr<MAssIpcCallTransport> out_data)
+void MAssIpcCallPacket::PacketHeaderAllocate(std::vector<uint8_t>* packet_data, MAssIpcCallPacket::PacketType pt)
 {
-	std::vector<uint8_t> out_data_raw_buf;
-	MAssIpcCallDataStream out_data_raw(&out_data_raw_buf);
-
-	out_data_raw<<uint32_t(out_data_buf.size())<<uint32_t(type);
-	if( !out_data_buf.empty() )
-		out_data_raw.WriteRawData(&out_data_buf[0], out_data_buf.size());
-	
-	out_data->Write(&out_data_raw_buf[0], out_data_raw_buf.size());
+	MAssIpcCallDataStream out_data_raw(packet_data);
+	out_data_raw<<uint32_t(0)<<uint32_t(pt);
 }
+
+void MAssIpcCallPacket::PacketHeaderUpdateSize(std::vector<uint8_t>* packet_data)
+{
+	mass_return_if_equal(packet_data->size()<MAssIpcCallPacket::c_net_call_packet_header_size, true);
+	uint32_t* packet_data_size = reinterpret_cast<uint32_t*>(packet_data->data());
+	*packet_data_size = packet_data->size() - MAssIpcCallPacket::c_net_call_packet_header_size;
+}
+
+
+// void MAssIpcCallPacket::SendData(const std::vector<uint8_t>& out_data_buf, PacketType type, std::shared_ptr<MAssIpcCallTransport> out_data)
+// {
+// 	std::vector<uint8_t> out_data_raw_buf;
+// 	MAssIpcCallDataStream out_data_raw(&out_data_raw_buf);
+// 
+// 	out_data_raw<<uint32_t(out_data_buf.size())<<uint32_t(type);
+// 	if( !out_data_buf.empty() )
+// 		out_data_raw.WriteRawData(&out_data_buf[0], out_data_buf.size());
+// 	
+// 	out_data->Write(&out_data_raw_buf[0], out_data_raw_buf.size());
+// }

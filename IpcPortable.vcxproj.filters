@@ -36,6 +36,9 @@
     <ClCompile Include="Ipc\MAssIpcCallPacket.cpp">
       <Filter>Ipc</Filter>
     </ClCompile>
+    <ClCompile Include="Ipc\MAssIpcCallInternal.cpp">
+      <Filter>Ipc</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h">

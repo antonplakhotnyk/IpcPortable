@@ -14,10 +14,13 @@ public:
 
 	friend class MAssIpcCall_AutoTest;
 
-	enum struct ErrorType
+	enum struct ErrorType: uint8_t
 	{
+		unknown_error,
 		no_matching_call_name_parameters,
 		no_matching_call_return_type,
+		respond_no_matching_call_name_parameters,
+		respond_no_matching_call_return_type,
 	};
 
 	typedef std::function<void(ErrorType et, std::string message)> TErrorHandler;
@@ -56,14 +59,13 @@ public:
 	MAssIpcCall_EnumerateData EnumerateRemote() const;
 	MAssIpcCall_EnumerateData EnumerateLocal() const;
 
-	static void SerializeCallSignature(MAssIpcCallDataStream* call_info, const std::string& proc_name,
-									   bool send_return, const std::string& return_type,
-									   const std::string& params_type);
-	static void PacketHeaderAllocate(std::vector<uint8_t>* packet_data, MAssIpcCallPacket::PacketType pt);
-	static void PacketHeaderUpdateSize(std::vector<uint8_t>* packet_data);
 	static char GetTypeNameSeparator();
 
 private:
+
+	static void SerializeCallSignature(MAssIpcCallDataStream* call_info, const std::string& proc_name,
+									   bool send_return, const std::string& return_type,
+									   const std::string& params_type);
 
 	template<class TRet, class... TArgs>
 	void InvokeUnified(const std::string& proc_name, std::vector<uint8_t>* result_buf_wait_return, TArgs&... args);
@@ -83,14 +85,24 @@ private:
 		size_t ProcessTransport(std::vector<uint8_t>* result);
 
 		MAssIpcCallInternal::ProcMap				m_proc_map;
-		MAssIpcCallPacket							m_packet_parser;
+		MAssIpcCallInternal::MAssIpcCallPacket		m_packet_parser;
 		std::shared_ptr<MAssIpcCallTransport>		m_transport;
 		std::shared_ptr<MAssCallThreadTransport>	m_inter_thread_nullable;
-		TErrorHandler							m_OnInvalidRemoteCall;
+		TErrorHandler								m_OnInvalidRemoteCall;
 
 	private:
 
 		void InvokeLocal(std::unique_ptr<std::vector<uint8_t> > call_info_data) const;
+
+		struct CreateCallJobRes
+		{
+			std::shared_ptr<MAssIpcCallInternal::CallJob> obj;
+			bool send_return = false;
+			ErrorType error = ErrorType::unknown_error;
+			std::string message;
+		};
+
+		CreateCallJobRes CreateCallJob(std::unique_ptr<std::vector<uint8_t> > call_info_data) const;
 
 	};
 
@@ -134,10 +146,10 @@ void MAssIpcCall::InvokeUnified(const std::string& proc_name, std::vector<uint8_
 	std::vector<uint8_t> call_info_data_buf;
 	MAssIpcCallDataStream call_info(&call_info_data_buf);
 	{
-		MAssIpcCall::PacketHeaderAllocate(&call_info_data_buf, MAssIpcCallPacket::pt_call);
+		MAssIpcCallInternal::MAssIpcCallPacket::PacketHeaderAllocate(&call_info_data_buf, MAssIpcCallInternal::MAssIpcCallPacket::pt_call);
 		MAssIpcCall::SerializeCallSignature(&call_info, proc_name, (result_buf_wait_return!=nullptr), return_type, params_type);
 		MAssIpcCallInternal::SerializeArgs(&call_info, args...);
-		MAssIpcCall::PacketHeaderUpdateSize(&call_info_data_buf);
+		MAssIpcCallInternal::MAssIpcCallPacket::PacketHeaderUpdateSize(&call_info_data_buf);
 	}
 
 	InvokeRemote(call_info_data_buf, result_buf_wait_return);
@@ -151,7 +163,7 @@ TRet MAssIpcCall::WaitInvokeRet(const std::string& proc_name, TArgs&... args)
 	std::vector<uint8_t> result_buf;
 	InvokeUnified<TRet>(proc_name, &result_buf, args...);
 	{
-		TRet res;
+		TRet res = {};
 		if( !result_buf.empty() )
 		{
 			MAssIpcCallDataStream result(&result_buf[0], result_buf.size());
@@ -173,3 +185,7 @@ void MAssIpcCall::AsyncInvoke(const std::string& proc_name, TArgs&... args)
 {
 	InvokeUnified<void>(proc_name, nullptr, args...);
 }
+
+MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const MAssIpcCall::ErrorType& v);
+MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, MAssIpcCall::ErrorType& v);
+MASS_IPC_TYPE_SIGNATURE(MAssIpcCall::ErrorType);
