@@ -65,7 +65,7 @@ private:
 
 	template<class TRet, class... TArgs>
 	void InvokeUnified(const std::string& proc_name, std::vector<uint8_t>* result_buf_wait_return, TArgs&... args);
-	void InvokeRemote(const std::vector<uint8_t>& call_info_data, std::vector<uint8_t>* result, MAssIpcCallPacket::PacketType type) const;
+	void InvokeRemote(const std::vector<uint8_t>& call_info_data, std::vector<uint8_t>* result) const;
 
 	void AddProcSignature(const std::string& proc_name, std::string& params_type, const std::shared_ptr<MAssIpcCallInternal::CallInfo>& call_info, const std::string& comment);
 
@@ -132,11 +132,13 @@ void MAssIpcCall::InvokeUnified(const std::string& proc_name, std::vector<uint8_
 	std::vector<uint8_t> call_info_data_buf;
 	MAssIpcCallDataStream call_info(&call_info_data_buf);
 	{
+		MAssIpcCall::PacketHeaderAllocate(&call_info_data_buf, MAssIpcCallPacket::pt_call);
 		MAssIpcCall::SerializeCallSignature(&call_info, proc_name, (result_buf_wait_return!=nullptr), return_type, params_type);
 		MAssIpcCallInternal::SerializeArgs(&call_info, args...);
+		MAssIpcCall::PacketHeaderUpdateSize(&call_info_data_buf);
 	}
 
-	InvokeRemote(call_info_data_buf, result_buf_wait_return, MAssIpcCallPacket::pt_call);
+	InvokeRemote(call_info_data_buf, result_buf_wait_return);
 }
 
 template<class TRet, class... TArgs>

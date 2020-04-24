@@ -66,10 +66,10 @@ void MAssIpcCall::Internals::InvokeLocal(std::unique_ptr<std::vector<uint8_t> > 
 // 	}
 }
 
-void MAssIpcCall::InvokeRemote(const std::vector<uint8_t>& call_info_data, std::vector<uint8_t>* result, MAssIpcCallPacket::PacketType type) const
+void MAssIpcCall::InvokeRemote(const std::vector<uint8_t>& call_info_data, std::vector<uint8_t>* result) const
 {
 	mass_return_if_equal(bool(m_int->m_transport), false);
-	MAssIpcCallPacket::SendData(call_info_data, type, m_int->m_transport);
+	m_int->m_transport->Write(call_info_data.data(), call_info_data.size());
 
 	if(result)
 	{
@@ -107,7 +107,8 @@ size_t MAssIpcCall::Internals::ProcessTransport(std::vector<uint8_t>* result)
 			case MAssIpcCallPacket::pt_call:
 			{
 				std::unique_ptr<std::vector<uint8_t> > in_data(new std::vector<uint8_t>);
-				m_packet_parser.ReadData(m_transport, in_data.get());
+				auto data_size = m_packet_parser.FinishReceivePacketSize();
+				m_packet_parser.ReadData(m_transport, in_data.get(), data_size);
 				InvokeLocal(std::move(in_data));
 			}
 			break;
@@ -115,12 +116,16 @@ size_t MAssIpcCall::Internals::ProcessTransport(std::vector<uint8_t>* result)
 			case MAssIpcCallPacket::pt_return:
 			{
 				mass_return_x_if_equal(result, nullptr, 0);
-				m_packet_parser.ReadData(m_transport, result);
+				auto data_size = m_packet_parser.FinishReceivePacketSize();
+				m_packet_parser.ReadData(m_transport, result, data_size);
 				return 0;
 			}
 			break;
 			case MAssIpcCallPacket::pt_enumerate:
 			{
+				auto data_size = m_packet_parser.FinishReceivePacketSize();
+				mass_return_x_if_not_equal(data_size, 0, 0);// invalid packet
+
 				std::vector<uint8_t> result_now;
 				MAssIpcCall_EnumerateData res = m_proc_map.EnumerateHandlers();
 				MAssIpcCall::PacketHeaderAllocate(&result_now, MAssIpcCallPacket::pt_enumerate_return);
@@ -153,7 +158,7 @@ MAssIpcCall_EnumerateData MAssIpcCall::EnumerateRemote() const
 	MAssIpcCall::PacketHeaderAllocate(&call_info_data, MAssIpcCallPacket::pt_enumerate);
 	MAssIpcCall::PacketHeaderUpdateSize(&call_info_data);
 
-	InvokeRemote(call_info_data, &result, MAssIpcCallPacket::pt_enumerate);
+	InvokeRemote(call_info_data, &result);
 
 	MAssIpcCall_EnumerateData res;
 	MAssIpcCallDataStream data_raw(&result);
