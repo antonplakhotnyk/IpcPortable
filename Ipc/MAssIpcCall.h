@@ -12,6 +12,8 @@ class MAssIpcCall
 {
 public:
 
+	friend class MAssIpcCall_AutoTest;
+
 	enum struct ErrorType
 	{
 		no_matching_call_name_parameters,
