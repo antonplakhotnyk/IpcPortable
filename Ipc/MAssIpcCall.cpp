@@ -153,18 +153,16 @@ size_t MAssIpcCall::Internals::ProcessTransport(std::vector<uint8_t>* result)
 
 				if( bool(m_OnInvalidRemoteCall) )
 					m_OnInvalidRemoteCall(error, message);
-				return 0;
 			}
-			break;
+			return 0;
 			case MAssIpcCallPacket::pt_enumerate_return:
 			case MAssIpcCallPacket::pt_return:
 			{
 				mass_return_x_if_equal(result, nullptr, 0);
 				auto data_size = m_packet_parser.FinishReceivePacketSize();
 				m_packet_parser.ReadData(m_transport, result, data_size);
-				return 0;
 			}
-			break;
+			return 0;
 			case MAssIpcCallPacket::pt_enumerate:
 			{
 				auto data_size = m_packet_parser.FinishReceivePacketSize();
@@ -237,11 +235,6 @@ void MAssIpcCall::SerializeCallSignature(MAssIpcCallDataStream* call_info, const
 									 const std::string& params_type)
 {
 	(*call_info)<<proc_name<<send_return<<return_type<<params_type;
-}
-
-char MAssIpcCall::GetTypeNameSeparator()
-{
-	return MAssIpcCallInternal::separator;
 }
 
 void MAssIpcCall::SetErrorHandler(TErrorHandler OnInvalidRemoteCall)
