@@ -225,7 +225,12 @@ struct ProcSignature<TRet(*)(TArgs... args)>
 {
 	static inline void GetParams(std::string* params_type)
 	{
-		int unpack[]{0,((*params_type += MAssIpcType<TArgs>::NameValue(), *params_type += separator, CheckSeparatorInName<MAssIpcType<TArgs>::name_value>() ),0)...};
+		int unpack[]{0,((*params_type += MAssIpcType<TArgs>::NameValue(), *params_type += separator
+#if !(_MSC_VER==1916)// Visual Studio 2017 compiler crashes trying compile this
+						 , CheckSeparatorInName<MAssIpcType<TArgs>::name_value>() 
+#endif
+
+						 ),0)...};
 		unpack;
 	};
 
