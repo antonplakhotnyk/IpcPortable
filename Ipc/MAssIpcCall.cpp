@@ -23,7 +23,7 @@ void MAssIpcCall::DeserializeNameSignature(MAssIpcCallDataStream* call_info, std
 MAssIpcCall::Internals::CreateCallJobRes MAssIpcCall::Internals::CreateCallJob(const std::shared_ptr<MAssIpcCallTransport>& transport, std::unique_ptr<std::vector<uint8_t> > call_info_data) const
 {
 	CreateCallJobRes res = {};
-	std::shared_ptr<MAssIpcCallInternal::CallJob> call_job(new MAssIpcCallInternal::CallJob(transport, m_inter_thread_nullable.lock(), std::move(call_info_data)));
+	std::shared_ptr<MAssIpcCallInternal::CallJob> call_job(new MAssIpcCallInternal::CallJob(transport, m_inter_thread_nullable, std::move(call_info_data)));
 
 	{
 		std::string return_type;
@@ -33,7 +33,7 @@ MAssIpcCall::Internals::CreateCallJobRes MAssIpcCall::Internals::CreateCallJob(c
 		DeserializeNameSignature(&call_job->m_call_info_data_str, &proc_name, &call_job->m_send_return, &return_type, &params_type);
 		res.send_return = call_job->m_send_return;
 
-		m_proc_map.FindCallInfo(proc_name, params_type, &call_job->m_call_info);
+		call_job->m_call_info = m_proc_map.FindCallInfo(proc_name, params_type);
 		if( !bool(call_job->m_call_info) )
 		{
 			res.message = return_type+" "+proc_name+"("+params_type+")";
@@ -69,13 +69,7 @@ void MAssIpcCall::Internals::InvokeLocal(std::unique_ptr<std::vector<uint8_t> > 
 	CreateCallJobRes call_job = CreateCallJob(transport, std::move(call_info_data));
 
 	if(call_job.obj)
-	{
-		auto inter_thread_nullable = m_inter_thread_nullable.lock();
-		if( inter_thread_nullable )
-			inter_thread_nullable->CallFromThread(call_job.obj->m_call_info->m_thread_id, call_job.obj);
-		else
-			call_job.obj->Invoke();
-	}
+		call_job.obj->Invoke();
 	else
 	{// fail to call
 		if( call_job.send_return )

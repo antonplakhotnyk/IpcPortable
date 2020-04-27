@@ -13,7 +13,7 @@ CallInfo::CallInfo(MAssThread::Id thread_id)
 
 //-------------------------------------------------------
 
-ResultJob::ResultJob(const std::shared_ptr<MAssIpcCallTransport>& transport)
+ResultJob::ResultJob(const std::weak_ptr<MAssIpcCallTransport>& transport)
 	:m_transport(transport)
 {
 	MAssIpcCallPacket::PacketHeaderAllocate(&m_result, MAssIpcCallPacket::pt_return);
@@ -22,20 +22,28 @@ ResultJob::ResultJob(const std::shared_ptr<MAssIpcCallTransport>& transport)
 void ResultJob::Invoke()
 {
 	mass_return_if_equal(m_result.size()>=MAssIpcCallPacket::c_net_call_packet_header_size, false);
+	auto transport = m_transport.lock();
+	mass_return_if_equal(bool(transport), false);
 	MAssIpcCallPacket::PacketHeaderUpdateSize(&m_result);
-	m_transport->Write(m_result.data(), m_result.size());
+	transport->Write(m_result.data(), m_result.size());
 }
 
 //-------------------------------------------------------
 
-CallJob::CallJob(const std::shared_ptr<MAssIpcCallTransport>& transport, const std::shared_ptr<MAssCallThreadTransport>& inter_thread,
+CallJob::CallJob(const std::weak_ptr<MAssIpcCallTransport>& transport, const std::weak_ptr<MAssCallThreadTransport>& inter_thread,
 				 std::unique_ptr<std::vector<uint8_t> > call_info_data)
 	: m_call_info_data_str(call_info_data->data(), call_info_data->size())
 	, m_call_info_data(std::move(call_info_data))
-	, m_result_thread_id(inter_thread ? inter_thread->GetCurrentThreadId() : MAssThread::c_no_thread)
+	, m_result_thread_id(MakeResultThreadId(inter_thread))
 	, m_transport(transport)
 	, m_inter_thread(inter_thread)
 {
+}
+
+MAssThread::Id CallJob::MakeResultThreadId(const std::weak_ptr<MAssCallThreadTransport>& inter_thread)
+{
+	auto inter_thread_strong = inter_thread.lock();
+	return inter_thread_strong ? inter_thread_strong->GetCurrentThreadId() : MAssThread::c_no_thread;
 }
 
 void CallJob::Invoke()
@@ -45,8 +53,9 @@ void CallJob::Invoke()
 	m_call_info->Invoke(&result_str, &m_call_info_data_str);
 	if( m_send_return )
 	{
-		if( m_inter_thread )
-			m_inter_thread->CallFromThread(m_result_thread_id, result_job);
+		auto inter_thread = m_inter_thread.lock();
+		if( inter_thread )
+			inter_thread->CallFromThread(m_result_thread_id, result_job);
 		else
 			result_job->Invoke();
 	}
@@ -54,17 +63,17 @@ void CallJob::Invoke()
 
 //-------------------------------------------------------
 
-void ProcMap::FindCallInfo(const std::string& name, std::string& signature, std::shared_ptr<const CallInfo>* call_info) const
+std::shared_ptr<const CallInfo> ProcMap::FindCallInfo(const std::string& name, std::string& signature) const
 {
 	auto it_procs = m_name_procs.find(name);
 	if( it_procs==m_name_procs.end() )
-		return;
+		return {};
 
 	auto it_signature = it_procs->second.m_signature_call.find(signature);
 	if( it_signature==it_procs->second.m_signature_call.end() )
-		return;
+		return {};
 
-	*call_info = it_signature->second.call_info;
+	return it_signature->second.call_info;
 }
 
 MAssIpcCall_EnumerateData ProcMap::EnumerateHandlers()
