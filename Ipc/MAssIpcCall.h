@@ -28,9 +28,9 @@ public:
 
 	MAssIpcCall(const MAssIpcCall&)=default;
 	MAssIpcCall& operator=(const MAssIpcCall&) = default;
-	MAssIpcCall(const std::shared_ptr<MAssCallThreadTransport>& inter_thread_nullable);
+	MAssIpcCall(const std::weak_ptr<MAssCallThreadTransport>& inter_thread_nullable);
 
-	void SetTransport(const std::shared_ptr<MAssIpcCallTransport>& transport);
+	void SetTransport(const std::weak_ptr<MAssIpcCallTransport>& transport);
 
 	template<class TRet, class... TArgs>
 	TRet WaitInvokeRet(const std::string& proc_name, TArgs&... args) const;
@@ -81,13 +81,12 @@ private:
 	{
 	public:
 
-		void ProcessTransportExternal();
-		size_t ProcessTransport(std::vector<uint8_t>* result);
+		size_t TryProcessSingleCall(const std::shared_ptr<MAssIpcCallTransport>& transport, std::vector<uint8_t>* result);
 
 		MAssIpcCallInternal::ProcMap				m_proc_map;
 		MAssIpcCallInternal::MAssIpcCallPacket		m_packet_parser;
-		std::shared_ptr<MAssIpcCallTransport>		m_transport;
-		std::shared_ptr<MAssCallThreadTransport>	m_inter_thread_nullable;
+		std::weak_ptr<MAssIpcCallTransport>			m_transport;
+		std::weak_ptr<MAssCallThreadTransport>		m_inter_thread_nullable;
 		TErrorHandler								m_OnInvalidRemoteCall;
 
 	private:
@@ -102,7 +101,7 @@ private:
 			std::string message;
 		};
 
-		CreateCallJobRes CreateCallJob(std::unique_ptr<std::vector<uint8_t> > call_info_data) const;
+		CreateCallJobRes CreateCallJob(const std::shared_ptr<MAssIpcCallTransport>& transport, std::unique_ptr<std::vector<uint8_t> > call_info_data) const;
 
 	};
 
