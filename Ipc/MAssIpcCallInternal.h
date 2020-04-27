@@ -3,7 +3,6 @@
 #include <map>
 #include "MAssIpcCallDataStream.h"
 #include "MAssCallThreadTransport.h"
-#include <stdint.h>
 #include <functional>
 #include "MAssIpcCallPacket.h"
 #include "MAssIpcCallTransport.h"
