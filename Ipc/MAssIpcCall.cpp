@@ -69,7 +69,13 @@ void MAssIpcCall::Internals::InvokeLocal(std::unique_ptr<std::vector<uint8_t> > 
 	CreateCallJobRes call_job = CreateCallJob(transport, std::move(call_info_data));
 
 	if(call_job.obj)
-		call_job.obj->Invoke();
+	{
+		auto inter_thread_nullable = m_inter_thread_nullable.lock();
+		if( inter_thread_nullable )
+			inter_thread_nullable->CallFromThread(call_job.obj->m_call_info->m_thread_id, call_job.obj);
+		else
+			call_job.obj->Invoke();
+	}
 	else
 	{// fail to call
 		if( call_job.send_return )
