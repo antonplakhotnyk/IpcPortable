@@ -98,8 +98,8 @@ void MAssIpcCall::ProcessTransport()
 
 	while( true )
 	{
-		size_t return_processed_need_more_data_size = m_int->TryProcessSingleCall(transport, nullptr);
-		if( return_processed_need_more_data_size>0 )
+		size_t needed_data_size = m_int->TryProcessSingleCall(transport, nullptr);
+		if( needed_data_size>0 )
 			break;
 	}
 }
@@ -114,10 +114,10 @@ void MAssIpcCall::InvokeRemote(const std::vector<uint8_t>& call_info_data, std::
 	{
 		while( true )
 		{
-			size_t return_processed_need_more_data_size = m_int->TryProcessSingleCall(transport, result);
-			if( return_processed_need_more_data_size>0 )
+			size_t needed_data_size = m_int->TryProcessSingleCall(transport, result);
+			if( needed_data_size>0 )
 			{
-				if( !transport->WaitRespond(return_processed_need_more_data_size) )
+				if( !transport->WaitRespond(needed_data_size) )
 					break;
 			}
 			else
@@ -128,11 +128,11 @@ void MAssIpcCall::InvokeRemote(const std::vector<uint8_t>& call_info_data, std::
 
 size_t MAssIpcCall::Internals::TryProcessSingleCall(const std::shared_ptr<MAssIpcCallTransport>& transport, std::vector<uint8_t>* result)
 {
-	size_t return_processed_need_more_data_size = 0;
+	size_t needed_data_size = 0;
 
-	return_processed_need_more_data_size = m_packet_parser.IsNeedMoreDataSize(transport);
-	if( return_processed_need_more_data_size>0 )
-		return return_processed_need_more_data_size;
+	needed_data_size = m_packet_parser.ReadNeededDataSize(transport);
+	if( needed_data_size>0 )
+		return needed_data_size;
 
 	MAssIpcCallPacket::PacketType data_type = m_packet_parser.ReadType(transport);
 

@@ -24,7 +24,7 @@ public:
 	MAssIpcCallPacket();
 	~MAssIpcCallPacket();
 
-	size_t				IsNeedMoreDataSize(const std::shared_ptr<MAssIpcCallTransport>& in_data);
+	size_t				ReadNeededDataSize(const std::shared_ptr<MAssIpcCallTransport>& in_data);
 	PacketType			ReadType(const std::shared_ptr<MAssIpcCallTransport>& in_data);
 	void				ReadData(const std::shared_ptr<MAssIpcCallTransport>& in_data, std::vector<uint8_t>* data_replace, size_t data_size);
 	size_t				FinishReceivePacketSize();

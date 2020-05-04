@@ -15,7 +15,7 @@ MAssIpcCallPacket::~MAssIpcCallPacket()
 {
 }
 
-size_t MAssIpcCallPacket::IsNeedMoreDataSize(const std::shared_ptr<MAssIpcCallTransport>& in_data)
+size_t MAssIpcCallPacket::ReadNeededDataSize(const std::shared_ptr<MAssIpcCallTransport>& in_data)
 {
 	if( m_incoming_packet_data_size==c_invalid_packet_size )
 	{
@@ -34,7 +34,7 @@ size_t MAssIpcCallPacket::IsNeedMoreDataSize(const std::shared_ptr<MAssIpcCallTr
 		size_t available = in_data->ReadBytesAvailable();
 		size_t need_size = (m_incoming_packet_data_size+c_net_call_packet_type_size);
 		if( available < need_size )
-			return need_size-available;
+			return need_size;
 		return 0;
 	}
 
