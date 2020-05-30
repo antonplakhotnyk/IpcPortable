@@ -33,12 +33,12 @@ public:
 	void SetTransport(const std::weak_ptr<MAssIpcCallTransport>& transport);
 
 	template<class TRet, class... TArgs>
-	TRet WaitInvokeRet(const std::string& proc_name, TArgs&... args) const;
+	TRet WaitInvokeRet(const std::string& proc_name, const TArgs&... args) const;
 	template<class... TArgs>
-	void WaitInvoke(const std::string& proc_name, TArgs&... args) const;
+	void WaitInvoke(const std::string& proc_name, const TArgs&... args) const;
 
 	template<class... TArgs>
-	void AsyncInvoke(const std::string& proc_name, TArgs&... args) const;
+	void AsyncInvoke(const std::string& proc_name, const TArgs&... args) const;
 
 
 	template<class TDelegateW>
@@ -68,7 +68,7 @@ private:
 									   const std::string& params_type);
 
 	template<class TRet, class... TArgs>
-	void InvokeUnified(const std::string& proc_name, std::vector<uint8_t>* result_buf_wait_return, TArgs&... args) const;
+	void InvokeUnified(const std::string& proc_name, std::vector<uint8_t>* result_buf_wait_return, const TArgs&... args) const;
 	void InvokeRemote(const std::vector<uint8_t>& call_info_data, std::vector<uint8_t>* result) const;
 
 	void AddProcSignature(const std::string& proc_name, std::string& params_type, const std::shared_ptr<MAssIpcCallInternal::CallInfo>& call_info, const std::string& comment);
@@ -130,7 +130,7 @@ void MAssIpcCall::AddHandler(const std::string& proc_name, const TDelegateW& del
 }
 
 template<class TRet, class... TArgs>
-void MAssIpcCall::InvokeUnified(const std::string& proc_name, std::vector<uint8_t>* result_buf_wait_return, TArgs&... args) const
+void MAssIpcCall::InvokeUnified(const std::string& proc_name, std::vector<uint8_t>* result_buf_wait_return, const TArgs&... args) const
 {
 	typedef TRet(*TreatProc)(TArgs...);
 	std::string return_type;
@@ -155,7 +155,7 @@ void MAssIpcCall::InvokeUnified(const std::string& proc_name, std::vector<uint8_
 }
 
 template<class TRet, class... TArgs>
-TRet MAssIpcCall::WaitInvokeRet(const std::string& proc_name, TArgs&... args) const
+TRet MAssIpcCall::WaitInvokeRet(const std::string& proc_name, const TArgs&... args) const
 {
 	static_assert(!std::is_same<TRet,void>::value, "can not be implicit void use function call explicitely return void");
 
@@ -173,14 +173,14 @@ TRet MAssIpcCall::WaitInvokeRet(const std::string& proc_name, TArgs&... args) co
 }
 
 template<class... TArgs>
-void MAssIpcCall::WaitInvoke(const std::string& proc_name, TArgs&... args) const
+void MAssIpcCall::WaitInvoke(const std::string& proc_name, const TArgs&... args) const
 {
 	std::vector<uint8_t> result_buf;
 	InvokeUnified<void>(proc_name, &result_buf, args...);
 }
 
 template<class... TArgs>
-void MAssIpcCall::AsyncInvoke(const std::string& proc_name, TArgs&... args) const
+void MAssIpcCall::AsyncInvoke(const std::string& proc_name, const TArgs&... args) const
 {
 	InvokeUnified<void>(proc_name, nullptr, args...);
 }

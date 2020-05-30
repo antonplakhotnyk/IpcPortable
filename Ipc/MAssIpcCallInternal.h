@@ -164,7 +164,7 @@ static inline std::tuple<TArgs...> DeserializeArgs(MAssIpcCallDataStream* call_i
 
 
 template<class... TArgs>
-static inline void SerializeArgs(MAssIpcCallDataStream* call_info, TArgs&... args)
+static inline void SerializeArgs(MAssIpcCallDataStream* call_info, const TArgs&... args)
 {
 	int unpack[]{0,(((*call_info)<<args),0)...};
 	unpack;
