@@ -157,7 +157,7 @@ void MAssIpcCall::ProcessTransportResponse(const std::shared_ptr<MAssIpcCallTran
 			CallDataBuffer call_data_buffer;
 			bool transport_ok = false;
 
-			{// WaitBuffer
+			{// WaitBuffer only one thread at the time here
 				size_t needed_data_size = 0;
 				needed_data_size = m_int->m_packet_parser.ReadNeededDataSize(transport);
 				if( needed_data_size>0 )
@@ -307,22 +307,6 @@ MAssIpcCall_EnumerateData MAssIpcCall::EnumerateRemote() const
 MAssIpcCall_EnumerateData MAssIpcCall::EnumerateLocal() const
 {
 	return m_int->m_proc_map.EnumerateHandlers();
-}
-
-void MAssIpcCall::AddProcSignature(const std::string& proc_name, std::string& params_type,
-							   const std::shared_ptr<MAssIpcCallInternal::CallInfo>& new_call_info, const std::string& comment)
-{
-	std::shared_ptr<MAssIpcCallInternal::CallInfo> ownership_call_info(new_call_info);
-	auto it_name = m_int->m_proc_map.m_name_procs.find(proc_name);
-	if( it_name == m_int->m_proc_map.m_name_procs.end() )
-	{
-		m_int->m_proc_map.m_name_procs[proc_name] = MAssIpcCallInternal::ProcMap::NameProcs();
-		it_name = m_int->m_proc_map.m_name_procs.find(proc_name);
-	}
-
-	auto it_params = it_name->second.m_signature_call.find(params_type);
-	mass_return_if_equal((it_params!=it_name->second.m_signature_call.end()) && (it_params->second.call_info->IsCallable()), true );
-	it_name->second.m_signature_call[params_type] = {ownership_call_info,comment};
 }
 
 void MAssIpcCall::SerializeCallSignature(MAssIpcCallDataStream* call_info, const std::string& proc_name,

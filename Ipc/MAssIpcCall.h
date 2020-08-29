@@ -6,7 +6,6 @@
 #include "MAssIpcCallPacket.h"
 #include "MAssCallThreadTransport.h"
 #include "MAssIpcCallInternal.h"
-
 #include <mutex>
 #include <list>
 #include <map>
@@ -82,8 +81,6 @@ private:
 	void InvokeRemote(const std::vector<uint8_t>& call_info_data, std::vector<uint8_t>* result, 
 					  MAssIpcCallInternal::MAssIpcCallPacket::TCallId response_id,
 					  bool process_incoming_calls) const;
-
-	void AddProcSignature(const std::string& proc_name, std::string& params_type, const std::shared_ptr<MAssIpcCallInternal::CallInfo>& call_info, const std::string& comment);
 
 	static void DeserializeNameSignature(MAssIpcCallDataStream* call_info, std::string* proc_name, bool* send_return, std::string* return_type, std::string* params_type);
 
@@ -171,7 +168,7 @@ void MAssIpcCall::AddHandler(const std::string& proc_name, const TDelegateW& del
 	const std::shared_ptr<MAssIpcCallInternal::CallInfo> call_info(new typename MAssIpcCallInternal::Impl_Selector<TDelegateW>::Res(del, thread_id));
 	std::string params_type;
 	MAssIpcCallInternal::ProcSignature<typename MAssIpcCallInternal::Impl_Selector<TDelegateW>::TDelProcUnified>::GetParams(&params_type);
-	AddProcSignature(proc_name, params_type, call_info, comment);
+	m_int->m_proc_map.AddProcSignature(proc_name, params_type, call_info, comment);
 }
 
 template<class TRet, class... TArgs>

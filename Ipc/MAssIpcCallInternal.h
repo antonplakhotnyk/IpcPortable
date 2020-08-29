@@ -6,6 +6,7 @@
 #include <functional>
 #include "MAssIpcCallPacket.h"
 #include "MAssIpcCallTransport.h"
+#include <mutex>
 
 
 namespace MAssIpcCallInternal
@@ -77,6 +78,7 @@ public:
 
 	std::shared_ptr<const CallInfo> FindCallInfo(const std::string& name, std::string& signature) const;
 	MAssIpcCall_EnumerateData EnumerateHandlers() const;
+	void AddProcSignature(const std::string& proc_name, std::string& params_type, const std::shared_ptr<MAssIpcCallInternal::CallInfo>& call_info, const std::string& comment);
 
 public:
 
@@ -91,7 +93,11 @@ public:
 		std::map<std::string, CallData> m_signature_call;
 	};
 
-	std::map<std::string, NameProcs> m_name_procs;
+private:
+
+
+	mutable std::mutex					m_lock;
+	std::map<std::string, NameProcs>	m_name_procs;
 };
 
 template<class TDelProc>

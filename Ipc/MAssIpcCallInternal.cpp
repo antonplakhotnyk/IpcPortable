@@ -66,6 +66,8 @@ void CallJob::Invoke()
 
 std::shared_ptr<const CallInfo> ProcMap::FindCallInfo(const std::string& name, std::string& signature) const
 {
+	std::unique_lock<std::mutex> lock(m_lock);
+
 	auto it_procs = m_name_procs.find(name);
 	if( it_procs==m_name_procs.end() )
 		return {};
@@ -79,6 +81,8 @@ std::shared_ptr<const CallInfo> ProcMap::FindCallInfo(const std::string& name, s
 
 MAssIpcCall_EnumerateData ProcMap::EnumerateHandlers() const
 {
+	std::unique_lock<std::mutex> lock(m_lock);
+
 	MAssIpcCall_EnumerateData res;
 
 	for( auto it_np = m_name_procs.begin(); it_np!=m_name_procs.end(); it_np++ )
@@ -86,6 +90,24 @@ MAssIpcCall_EnumerateData ProcMap::EnumerateHandlers() const
 			res.push_back({it_np->first, it_sc->second.call_info->GetSignature_RetType(), it_sc->first, it_sc->second.comment});
 
 	return res;
+}
+
+void ProcMap::AddProcSignature(const std::string& proc_name, std::string& params_type,
+								   const std::shared_ptr<MAssIpcCallInternal::CallInfo>& new_call_info, const std::string& comment)
+{
+	std::unique_lock<std::mutex> lock(m_lock);
+
+	std::shared_ptr<MAssIpcCallInternal::CallInfo> ownership_call_info(new_call_info);
+	auto it_name = m_name_procs.find(proc_name);
+	if( it_name == m_name_procs.end() )
+	{
+		m_name_procs[proc_name] = MAssIpcCallInternal::ProcMap::NameProcs();
+		it_name = m_name_procs.find(proc_name);
+	}
+
+	auto it_params = it_name->second.m_signature_call.find(params_type);
+	mass_return_if_equal((it_params!=it_name->second.m_signature_call.end()) && (it_params->second.call_info->IsCallable()), true);
+	it_name->second.m_signature_call[params_type] = {ownership_call_info,comment};
 }
 
 
