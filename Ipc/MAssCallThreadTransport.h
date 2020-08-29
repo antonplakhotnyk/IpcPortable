@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Integration/MAssThread.h"
+#include "MAssThread.h"
 #include <memory>
 
 class MAssCallThreadTransport
@@ -14,6 +14,6 @@ public:
 	};
 
 	virtual void			CallFromThread(MAssThread::Id thread_id, const std::shared_ptr<Job>& job) = 0;
-	virtual MAssThread::Id	GetCurrentThreadId()=0;
+	virtual MAssThread::Id	GetResultSendThreadId()=0;
 };
 

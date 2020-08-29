@@ -1,6 +1,6 @@
 #include "MAssIpcCallDataStream.h"
 #include <cstring>
-#include "Integration/MAssMacros.h"
+#include "MAssMacros.h"
 
 
 MAssIpcCallDataStream::MAssIpcCallDataStream(const uint8_t* data_read_only, size_t data_size)
@@ -33,12 +33,7 @@ void MAssIpcCallDataStream::WriteBytes(T t)
 	mass_return_if_not_equal(Size(), pos+sizeof(t));
 
 	uint8_t* bytes = DataRW()+pos;
-
-	for( size_t i = 0; i<sizeof(T); i++ )
-	{
-		bytes[i] = (0xFF & t);
-		t >>= 8;
-	}
+	WriteUnsafe(bytes, t);
 }
 
 template<class T>

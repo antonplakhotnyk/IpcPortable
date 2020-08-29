@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cstdint>
+#include <stdint.h>
 
-#include "Ipc/Integration/MAssCompilerSpecific.h"
+#include "MAssCompilerSpecific.h"
 

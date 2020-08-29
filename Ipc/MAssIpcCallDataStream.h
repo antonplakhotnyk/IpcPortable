@@ -88,6 +88,17 @@ public:
 	void ResizeRW(size_t size);
 	const uint8_t* DataR() const;
 
+	template<class T>
+	static void WriteUnsafe(uint8_t* bytes, T t)
+	{
+		for( size_t i = 0; i<sizeof(T); i++ )
+		{
+			bytes[i] = (0xFF & t);
+			t >>= 8;
+		}
+	}
+
+
 private:
 
 	size_t	m_pos;

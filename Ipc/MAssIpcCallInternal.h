@@ -33,7 +33,7 @@ class ResultJob: public MAssCallThreadTransport::Job
 {
 public:
 
-	ResultJob(const std::weak_ptr<MAssIpcCallTransport>& transport);
+	ResultJob(const std::weak_ptr<MAssIpcCallTransport>& transport, MAssIpcCallPacket::TCallId id);
 
 	void Invoke() override;
 
@@ -50,11 +50,12 @@ class CallJob: public MAssCallThreadTransport::Job
 public:
 
 	CallJob(const std::weak_ptr<MAssIpcCallTransport>& transport, const std::weak_ptr<MAssCallThreadTransport>& inter_thread,
-			std::unique_ptr<std::vector<uint8_t> > call_info_data);
+			std::unique_ptr<std::vector<uint8_t> > call_info_data, MAssIpcCallPacket::TCallId id);
 	void Invoke() override;
 
 	MAssIpcCallDataStream			m_call_info_data_str;
 	std::shared_ptr<const CallInfo>	m_call_info;
+	MAssIpcCallPacket::TCallId		m_id;
 	bool							m_send_return=false;
 
 private:
@@ -75,7 +76,7 @@ class ProcMap
 public:
 
 	std::shared_ptr<const CallInfo> FindCallInfo(const std::string& name, std::string& signature) const;
-	MAssIpcCall_EnumerateData EnumerateHandlers();
+	MAssIpcCall_EnumerateData EnumerateHandlers() const;
 
 public:
 
