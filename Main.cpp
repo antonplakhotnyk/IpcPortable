@@ -6,6 +6,8 @@
 #include <functional>
 #include "Ipc/MAssMacros.h"
 #include <sstream>
+#include <mutex>
+#include <condition_variable>
 
 // struct TestStruct
 // {
@@ -134,7 +136,7 @@ private:
 
 	private:
 
-		size_t Size() const override
+		MAssIpcData::TPacketSize Size() const override
 		{
 			return m_data.size();
 		}
@@ -175,7 +177,7 @@ public:
 			m_read->cond.wait(lock);
 	}
 
-	std::unique_ptr<MAssIpcData> Create(size_t size) override
+	std::unique_ptr<MAssIpcData> Create(MAssIpcData::TPacketSize size) override
 	{
 		return std::unique_ptr<MAssIpcData>(new MemoryPacket(size));
 	}
