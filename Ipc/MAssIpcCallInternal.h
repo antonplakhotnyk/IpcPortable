@@ -6,14 +6,14 @@
 #include <functional>
 #include "MAssIpcPacketParser.h"
 #include "MAssIpcCallTransport.h"
-#include <mutex>
+#include "MAssIpcThreadSafe.h"
 
 
 namespace MAssIpcCallInternal
 {
 
 MAssIpcCallDataStream CreateDataStream(const std::weak_ptr<MAssIpcPacketTransport>& weak_transport,
-									   MAssIpcPacketParser::TPacketSize no_header_size,
+									   MAssIpcData::TPacketSize no_header_size,
 									   MAssIpcPacketParser::PacketType pt,
 									   MAssIpcPacketParser::TCallId respond_id);
 
@@ -102,7 +102,7 @@ public:
 private:
 
 
-	mutable std::mutex					m_lock;
+	mutable MAssIpcThreadSafe::mutex	m_lock;
 	std::map<std::string, NameProcs>	m_name_procs;
 };
 
@@ -374,7 +374,7 @@ public:
 	{
 	}
 
-	size_t Size() const override
+	MAssIpcData::TPacketSize Size() const override
 	{
 		return m_storage_size;
 	}
@@ -387,7 +387,7 @@ public:
 private:
 
 	std::unique_ptr<uint8_t[]> m_storage;
-	const size_t m_storage_size;
+	const MAssIpcData::TPacketSize m_storage_size;
 };
 
 

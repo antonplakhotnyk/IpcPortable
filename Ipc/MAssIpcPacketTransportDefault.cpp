@@ -10,7 +10,7 @@ MAssIpcPacketTransportDefault::MAssIpcPacketTransportDefault(const std::weak_ptr
 {
 }
 
-std::unique_ptr<MAssIpcData> MAssIpcPacketTransportDefault::Create(size_t size)
+std::unique_ptr<MAssIpcData> MAssIpcPacketTransportDefault::Create(MAssIpcData::TPacketSize size)
 {
 	return std::unique_ptr<MAssIpcData>(new MAssIpcData_Vector(size));
 }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "MAssAssert.h"
+#include "MAssIpcAssert.h"
 
 //-------------------------------------------------------
 

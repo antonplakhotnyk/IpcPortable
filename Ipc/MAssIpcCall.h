@@ -5,10 +5,9 @@
 #include <memory>
 #include "MAssCallThreadTransport.h"
 #include "MAssIpcCallInternal.h"
-#include <mutex>
+#include "MAssIpcThreadSafe.h"
 #include <list>
 #include <map>
-#include <condition_variable>
 
 class MAssIpcCall
 {
@@ -104,11 +103,11 @@ private:
 	struct PendingResponces
 	{
 		// all membersaccess only during unique_lock(m_lock)
-		std::mutex m_lock;
+		MAssIpcThreadSafe::mutex m_lock;
 
 		MAssIpcCallInternal::MAssIpcPacketParser::TCallId m_incremental_id = 0;
 		volatile bool m_another_thread_waiting_transport = false;
-		std::condition_variable m_write_cond;
+		MAssIpcThreadSafe::condition_variable m_write_cond;
 		std::map<MAssIpcCallInternal::MAssIpcPacketParser::TCallId, CallDataBuffer> m_id_data_return;
 		std::list<CallDataBuffer> m_data_incoming_call;
 	};

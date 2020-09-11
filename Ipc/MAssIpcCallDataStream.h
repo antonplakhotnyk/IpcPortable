@@ -69,19 +69,19 @@ public:
 	MAssIpcCallDataStream &operator<<(float f);
 	MAssIpcCallDataStream &operator<<(double f);
 
-	void ReadRawData(uint8_t* data, size_t len);
-	void ReadRawData(char* data, size_t len);
-	void WriteRawData(const uint8_t* data, size_t len);
-	void WriteRawData(const char* data, size_t len);
+	void ReadRawData(uint8_t* data, MAssIpcData::TPacketSize len);
+	void ReadRawData(char* data, MAssIpcData::TPacketSize len);
+	void WriteRawData(const uint8_t* data, MAssIpcData::TPacketSize len);
+	void WriteRawData(const char* data, MAssIpcData::TPacketSize len);
 
 	std::unique_ptr<MAssIpcData> DetachData();
 	MAssIpcData* GetData();
-	size_t GetWritePos();
+	MAssIpcData::TPacketSize GetWritePos();
 	bool IsDataBufferPresent();
 
 public:
 
-	bool IsReadAvailable(size_t size);
+	bool IsReadAvailable(MAssIpcData::TPacketSize size);
 
 	template<class T>
 	void WriteBytes(T t);
@@ -92,7 +92,7 @@ public:
 	template<class T>
 	static void WriteUnsafe(uint8_t* bytes, T t)
 	{
-		for( size_t i = 0; i<sizeof(T); i++ )
+		for( MAssIpcData::TPacketSize i = 0; i<sizeof(T); i++ )
 		{
 			bytes[i] = (0xFF & t);
 			t >>= 8;
@@ -103,7 +103,7 @@ public:
 	static T ReadUnsafe(const uint8_t* bytes)
 	{
 		T t = 0;
-		for( size_t i = 0; i<sizeof(T); i++ )
+		for( MAssIpcData::TPacketSize i = 0; i<sizeof(T); i++ )
 		{
 			t <<= 8;
 			t |= bytes[sizeof(T)-1-i];
@@ -116,8 +116,8 @@ private:
 
 	std::unique_ptr<MAssIpcData> m_read_write;
 
-	size_t	m_read_pos = 0;
-	size_t	m_write_pos = 0;
+	MAssIpcData::TPacketSize	m_read_pos = 0;
+	MAssIpcData::TPacketSize	m_write_pos = 0;
 };
 
 //-------------------------------------------------------

@@ -92,7 +92,7 @@
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
       <LanguageStandard>stdcpp14</LanguageStandard>
       <PreprocessorDefinitions>_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>./Ipc/Integration;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./Ipc/Integration;./Ipc/Integration/Multithread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -109,7 +109,7 @@
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
       <LanguageStandard>stdcpp14</LanguageStandard>
       <PreprocessorDefinitions>_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>./Ipc/Integration;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./Ipc/Integration;./Ipc/Integration/Multithread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -128,7 +128,7 @@
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
       <LanguageStandard>stdcpp14</LanguageStandard>
       <PreprocessorDefinitions>_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>./Ipc/Integration;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./Ipc/Integration;./Ipc/Integration/Multithread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -149,7 +149,7 @@
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
       <LanguageStandard>stdcpp14</LanguageStandard>
       <PreprocessorDefinitions>_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>./Ipc/Integration;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./Ipc/Integration;./Ipc/Integration/Multithread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -173,9 +173,11 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Ipc\Integration\MAssAssert.h" />
-    <ClInclude Include="Ipc\Integration\MAssCompilerSpecific.h" />
-    <ClInclude Include="Ipc\Integration\MAssThread.h" />
+    <ClInclude Include="Ipc\Integration\MAssIpcAssert.h" />
+    <ClInclude Include="Ipc\Integration\MAssIpcCompilerSpecific.h" />
+    <ClInclude Include="Ipc\Integration\MAssIpcThread.h" />
+    <ClInclude Include="Ipc\Integration\Multithread\MAssIpcThreadSafe.h" />
+    <ClInclude Include="Ipc\Integration\Singlethread\MAssIpcThreadSafe.h" />
     <ClInclude Include="Ipc\MAssIpcCall.h" />
     <ClInclude Include="Ipc\MAssIpcCallInternal.h" />
     <ClInclude Include="Ipc\MAssIpcCallDataStream.h" />

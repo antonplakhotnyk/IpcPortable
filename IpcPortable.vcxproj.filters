@@ -19,6 +19,12 @@
     <Filter Include="Ipc\Integration">
       <UniqueIdentifier>{55b634dc-c833-4323-8090-b3f83730cb81}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Ipc\Integration\Singlethread">
+      <UniqueIdentifier>{5dd8513c-a40a-4c63-8705-cf348177c9f0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Ipc\Integration\Multithread">
+      <UniqueIdentifier>{5cbc455e-ed37-4964-be7e-5a919cdf901b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -47,12 +53,6 @@
     <ClInclude Include="stdafx.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="Ipc\Integration\MAssThread.h">
-      <Filter>Ipc\Integration</Filter>
-    </ClInclude>
-    <ClInclude Include="Ipc\Integration\MAssCompilerSpecific.h">
-      <Filter>Ipc\Integration</Filter>
-    </ClInclude>
     <ClInclude Include="Ipc\MAssIpcCall.h">
       <Filter>Ipc</Filter>
     </ClInclude>
@@ -71,14 +71,26 @@
     <ClInclude Include="Ipc\MAssMacros.h">
       <Filter>Ipc</Filter>
     </ClInclude>
-    <ClInclude Include="Ipc\Integration\MAssAssert.h">
-      <Filter>Ipc\Integration</Filter>
-    </ClInclude>
     <ClInclude Include="Ipc\MAssIpcPacketParser.h">
       <Filter>Ipc</Filter>
     </ClInclude>
     <ClInclude Include="Ipc\MAssIpcPacketTransportDefault.h">
       <Filter>Ipc</Filter>
+    </ClInclude>
+    <ClInclude Include="Ipc\Integration\Multithread\MAssIpcThreadSafe.h">
+      <Filter>Ipc\Integration\Multithread</Filter>
+    </ClInclude>
+    <ClInclude Include="Ipc\Integration\Singlethread\MAssIpcThreadSafe.h">
+      <Filter>Ipc\Integration\Singlethread</Filter>
+    </ClInclude>
+    <ClInclude Include="Ipc\Integration\MAssIpcAssert.h">
+      <Filter>Ipc\Integration</Filter>
+    </ClInclude>
+    <ClInclude Include="Ipc\Integration\MAssIpcCompilerSpecific.h">
+      <Filter>Ipc\Integration</Filter>
+    </ClInclude>
+    <ClInclude Include="Ipc\Integration\MAssIpcThread.h">
+      <Filter>Ipc\Integration</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

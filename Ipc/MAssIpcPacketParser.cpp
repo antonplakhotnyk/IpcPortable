@@ -1,6 +1,7 @@
 #include "MAssIpcPacketParser.h"
 #include "MAssMacros.h"
 #include "MAssIpcCallInternal.h"
+#include <cstring>
 
 namespace MAssIpcCallInternal
 {
@@ -68,11 +69,11 @@ MAssIpcPacketParser::Header MAssIpcPacketParser::ReadHeader(MAssIpcCallDataStrea
 }
 
 void MAssIpcPacketParser::PacketHeaderWrite(MAssIpcCallDataStream& packet_data,
-											   MAssIpcPacketParser::TPacketSize no_header_size,
+											   MAssIpcData::TPacketSize no_header_size,
 											   MAssIpcPacketParser::PacketType pt,
 											   MAssIpcPacketParser::TCallId id)
 {
-	packet_data<<TPacketSize(no_header_size)<<std::underlying_type<PacketType>::type(pt)<<TCallId(id);
+	packet_data<<MAssIpcData::TPacketSize(no_header_size)<<std::underlying_type<PacketType>::type(pt)<<TCallId(id);
 }
 
 }

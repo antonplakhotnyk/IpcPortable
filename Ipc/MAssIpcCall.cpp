@@ -125,7 +125,7 @@ MAssIpcCallDataStream MAssIpcCall::ProcessTransportResponse(MAssIpcCallInternal:
 		MAssIpcCall::CallDataBuffer buffer;
 
 		{// ReadBuffer
-			std::unique_lock<std::mutex> lock(m_int->m_pending_responses.m_lock);
+			MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(m_int->m_pending_responses.m_lock);
 			while( true )
 			{
 				auto it = m_int->m_pending_responses.m_id_data_return.find(wait_response_id);
@@ -185,7 +185,7 @@ MAssIpcCallDataStream MAssIpcCall::ProcessTransportResponse(MAssIpcCallInternal:
 			bool new_return_buffer = false;
 
 			{// WriteBuffer
-				std::unique_lock<std::mutex> lock(m_int->m_pending_responses.m_lock);
+				MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(m_int->m_pending_responses.m_lock);
 				
 				m_int->m_pending_responses.m_another_thread_waiting_transport = false;
 
@@ -195,7 +195,7 @@ MAssIpcCallDataStream MAssIpcCall::ProcessTransportResponse(MAssIpcCallInternal:
 						m_int->m_pending_responses.m_data_incoming_call.push_back(std::move(call_data_buffer));
 					else
 					{
-						m_int->m_pending_responses.m_id_data_return.insert({call_data_buffer.header.id, std::move(call_data_buffer)});
+						m_int->m_pending_responses.m_id_data_return.insert(std::make_pair(call_data_buffer.header.id, std::move(call_data_buffer)) );
 						new_return_buffer = true;
 					}
 				}
@@ -327,7 +327,7 @@ void MAssIpcCall::SetErrorHandler(TErrorHandler OnInvalidRemoteCall)
 
 MAssIpcCallInternal::MAssIpcPacketParser::TCallId MAssIpcCall::NewCallId() const
 {
-	std::unique_lock<std::mutex> lock(m_int->m_pending_responses.m_lock);
+	MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(m_int->m_pending_responses.m_lock);
 	MAssIpcCallInternal::MAssIpcPacketParser::TCallId new_id;
 
 	{

@@ -13,7 +13,7 @@ static std::unique_ptr<MAssIpcData> CreateDataBuffer(const std::weak_ptr<MAssIpc
 }
 
 MAssIpcCallDataStream CreateDataStream(const std::weak_ptr<MAssIpcPacketTransport>& weak_transport, 
-														 MAssIpcPacketParser::TPacketSize no_header_size, 
+														 MAssIpcData::TPacketSize no_header_size, 
 														 MAssIpcPacketParser::PacketType pt, 
 														 MAssIpcPacketParser::TCallId respond_id)
 {
@@ -91,7 +91,7 @@ void CallJob::Invoke()
 
 std::shared_ptr<const CallInfo> ProcMap::FindCallInfo(const std::string& name, std::string& signature) const
 {
-	std::unique_lock<std::mutex> lock(m_lock);
+	MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(m_lock);
 
 	auto it_procs = m_name_procs.find(name);
 	if( it_procs==m_name_procs.end() )
@@ -106,7 +106,7 @@ std::shared_ptr<const CallInfo> ProcMap::FindCallInfo(const std::string& name, s
 
 MAssIpcCall_EnumerateData ProcMap::EnumerateHandlers() const
 {
-	std::unique_lock<std::mutex> lock(m_lock);
+	MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(m_lock);
 
 	MAssIpcCall_EnumerateData res;
 
@@ -120,7 +120,7 @@ MAssIpcCall_EnumerateData ProcMap::EnumerateHandlers() const
 void ProcMap::AddProcSignature(const std::string& proc_name, std::string& params_type,
 								   const std::shared_ptr<MAssIpcCallInternal::CallInfo>& new_call_info, const std::string& comment)
 {
-	std::unique_lock<std::mutex> lock(m_lock);
+	MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(m_lock);
 
 	std::shared_ptr<MAssIpcCallInternal::CallInfo> ownership_call_info(new_call_info);
 	auto it_name = m_name_procs.find(proc_name);

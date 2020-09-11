@@ -1,6 +1,6 @@
 #pragma once
 
-#include "MAssThread.h"
+#include "MAssIpcThread.h"
 #include <memory>
 
 class MAssCallThreadTransport
