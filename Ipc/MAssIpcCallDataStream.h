@@ -1,8 +1,9 @@
 #pragma once
 
 #include <stdint.h>
-#include <vector>
 #include <string>
+#include "MAssIpcCallTransport.h"
+#include <vector>
 
 template<class TType>
 struct MAssIpcType
@@ -17,7 +18,7 @@ struct MAssIpcType
 // name_value used for compile time checks						  	
 // NameValue used in runtime									  	
 // in c++17 name_value can be used in compile and runtime 		  	
-// as soon as all template statics ar inlined					  	
+// as soon as all template statics are inlined					  	
 // before c++17 name_value declaration necessary 				  	
 // in single cpp file for each specialization					  	
 #define MASS_IPC_TYPE_SIGNATURE(type)									\
@@ -37,8 +38,10 @@ class MAssIpcCallDataStream
 {
 public:
 
-	MAssIpcCallDataStream(const uint8_t* data_read_only, size_t data_size);
-	MAssIpcCallDataStream(std::vector<uint8_t>* data_read_write);
+	MAssIpcCallDataStream(MAssIpcCallDataStream&&) = default;
+	MAssIpcCallDataStream(std::unique_ptr<MAssIpcData> data_read_write);
+	MAssIpcCallDataStream() = default;
+	MAssIpcCallDataStream& operator= (MAssIpcCallDataStream&&) = default;
 	~MAssIpcCallDataStream();
 
 	MAssIpcCallDataStream &operator>>(int8_t &i);
@@ -71,7 +74,10 @@ public:
 	void WriteRawData(const uint8_t* data, size_t len);
 	void WriteRawData(const char* data, size_t len);
 
-	int SkipRawData(size_t len);
+	std::unique_ptr<MAssIpcData> DetachData();
+	MAssIpcData* GetData();
+	size_t GetWritePos();
+	bool IsDataBufferPresent();
 
 public:
 
@@ -83,11 +89,6 @@ public:
 	template<class T>
 	void ReadBytes(T* t);
 
-	uint8_t* DataRW();
-	size_t Size();
-	void ResizeRW(size_t size);
-	const uint8_t* DataR() const;
-
 	template<class T>
 	static void WriteUnsafe(uint8_t* bytes, T t)
 	{
@@ -98,15 +99,25 @@ public:
 		}
 	}
 
+	template<class T>
+	static T ReadUnsafe(const uint8_t* bytes)
+	{
+		T t = 0;
+		for( size_t i = 0; i<sizeof(T); i++ )
+		{
+			t <<= 8;
+			t |= bytes[sizeof(T)-1-i];
+		}
+		return t;
+	}
+
 
 private:
 
-	size_t	m_pos;
+	std::unique_ptr<MAssIpcData> m_read_write;
 
-	std::vector<uint8_t>* const m_data_read_write;
-
-	const uint8_t* const m_data_read_only;
-	const size_t m_data_read_only_size;
+	size_t	m_read_pos = 0;
+	size_t	m_write_pos = 0;
 };
 
 //-------------------------------------------------------

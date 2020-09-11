@@ -33,10 +33,13 @@
     <ClCompile Include="Ipc\MAssIpcCallDataStream.cpp">
       <Filter>Ipc</Filter>
     </ClCompile>
-    <ClCompile Include="Ipc\MAssIpcCallPacket.cpp">
+    <ClCompile Include="Ipc\MAssIpcCallInternal.cpp">
       <Filter>Ipc</Filter>
     </ClCompile>
-    <ClCompile Include="Ipc\MAssIpcCallInternal.cpp">
+    <ClCompile Include="Ipc\MAssIpcPacketParser.cpp">
+      <Filter>Ipc</Filter>
+    </ClCompile>
+    <ClCompile Include="Ipc\MAssIpcPacketTransportDefault.cpp">
       <Filter>Ipc</Filter>
     </ClCompile>
   </ItemGroup>
@@ -45,9 +48,6 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="Ipc\Integration\MAssThread.h">
-      <Filter>Ipc\Integration</Filter>
-    </ClInclude>
-    <ClInclude Include="Ipc\Integration\MAssMacros.h">
       <Filter>Ipc\Integration</Filter>
     </ClInclude>
     <ClInclude Include="Ipc\Integration\MAssCompilerSpecific.h">
@@ -62,16 +62,22 @@
     <ClInclude Include="Ipc\MAssIpcCallDataStream.h">
       <Filter>Ipc</Filter>
     </ClInclude>
-    <ClInclude Include="Ipc\MAssIpcCallPacket.h">
-      <Filter>Ipc</Filter>
-    </ClInclude>
     <ClInclude Include="Ipc\MAssIpcCallTransport.h">
       <Filter>Ipc</Filter>
     </ClInclude>
-    <ClInclude Include="Ipc\MAssIpcDataStreamSerializers.h">
+    <ClInclude Include="Ipc\MAssCallThreadTransport.h">
       <Filter>Ipc</Filter>
     </ClInclude>
-    <ClInclude Include="Ipc\MAssCallThreadTransport.h">
+    <ClInclude Include="Ipc\MAssMacros.h">
+      <Filter>Ipc</Filter>
+    </ClInclude>
+    <ClInclude Include="Ipc\Integration\MAssAssert.h">
+      <Filter>Ipc\Integration</Filter>
+    </ClInclude>
+    <ClInclude Include="Ipc\MAssIpcPacketParser.h">
+      <Filter>Ipc</Filter>
+    </ClInclude>
+    <ClInclude Include="Ipc\MAssIpcPacketTransportDefault.h">
       <Filter>Ipc</Filter>
     </ClInclude>
   </ItemGroup>

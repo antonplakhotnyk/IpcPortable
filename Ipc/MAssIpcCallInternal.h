@@ -4,7 +4,7 @@
 #include "MAssIpcCallDataStream.h"
 #include "MAssCallThreadTransport.h"
 #include <functional>
-#include "MAssIpcCallPacket.h"
+#include "MAssIpcPacketParser.h"
 #include "MAssIpcCallTransport.h"
 #include <mutex>
 
@@ -12,7 +12,13 @@
 namespace MAssIpcCallInternal
 {
 
+MAssIpcCallDataStream CreateDataStream(const std::weak_ptr<MAssIpcPacketTransport>& weak_transport,
+									   MAssIpcPacketParser::TPacketSize no_header_size,
+									   MAssIpcPacketParser::PacketType pt,
+									   MAssIpcPacketParser::TCallId respond_id);
+
 //-------------------------------------------------------
+
 
 class CallInfo
 {
@@ -20,7 +26,9 @@ public:
 
 	CallInfo(MAssThread::Id thread_id);
 
-	virtual void Invoke(MAssIpcCallDataStream* res, MAssIpcCallDataStream* params) const = 0;
+	virtual std::unique_ptr<MAssIpcData> Invoke(const std::weak_ptr<MAssIpcPacketTransport>& transport, 
+												MAssIpcPacketParser::TCallId respond_id,
+												MAssIpcCallDataStream& params) const = 0;
 	virtual bool IsCallable() const = 0;
 	virtual const char* GetSignature_RetType() const = 0;
 
@@ -34,15 +42,14 @@ class ResultJob: public MAssCallThreadTransport::Job
 {
 public:
 
-	ResultJob(const std::weak_ptr<MAssIpcCallTransport>& transport, MAssIpcCallPacket::TCallId id);
+	ResultJob(const std::weak_ptr<MAssIpcPacketTransport>& transport, std::unique_ptr<MAssIpcData>& result);
 
 	void Invoke() override;
 
-	std::vector<uint8_t> m_result;
-
 private:
 
-	std::weak_ptr<MAssIpcCallTransport> m_transport;
+	std::unique_ptr<MAssIpcData> m_result;
+	std::weak_ptr<MAssIpcPacketTransport> m_transport;
 };
 
 
@@ -50,13 +57,13 @@ class CallJob: public MAssCallThreadTransport::Job
 {
 public:
 
-	CallJob(const std::weak_ptr<MAssIpcCallTransport>& transport, const std::weak_ptr<MAssCallThreadTransport>& inter_thread,
-			std::unique_ptr<std::vector<uint8_t> > call_info_data, MAssIpcCallPacket::TCallId id);
+	CallJob(const std::weak_ptr<MAssIpcPacketTransport>& transport, const std::weak_ptr<MAssCallThreadTransport>& inter_thread,
+			MAssIpcCallDataStream& call_info_data, MAssIpcPacketParser::TCallId id);
 	void Invoke() override;
 
 	MAssIpcCallDataStream			m_call_info_data_str;
 	std::shared_ptr<const CallInfo>	m_call_info;
-	MAssIpcCallPacket::TCallId		m_id;
+	MAssIpcPacketParser::TCallId	m_id;
 	bool							m_send_return=false;
 
 private:
@@ -65,9 +72,8 @@ private:
 
 private:
 
-	std::unique_ptr<const std::vector<uint8_t> >		m_call_info_data;
 	MAssThread::Id			m_result_thread_id;
-	std::weak_ptr<MAssIpcCallTransport>					m_transport;
+	std::weak_ptr<MAssIpcPacketTransport>				m_transport;
 	std::weak_ptr<MAssCallThreadTransport>				m_inter_thread;
 };
 
@@ -161,19 +167,19 @@ Ret ExpandTupleCall(const std::function<Ret(Args...)>& pf, std::tuple<Args...>& 
 //-------------------------------------------------------
 
 template<class... TArgs, size_t... Indexes>
-static inline std::tuple<TArgs...> DeserializeArgs(MAssIpcCallDataStream* call_info, index_tuple< Indexes... >)
+static inline std::tuple<TArgs...> DeserializeArgs(MAssIpcCallDataStream& call_info, index_tuple< Indexes... >)
 {
 	std::tuple<TArgs...> tup;
-	int unpack[]{0,(((*call_info)>>std::get<Indexes>(tup)),0)...};
+	int unpack[]{0,((call_info>>std::get<Indexes>(tup)),0)...};
 	unpack;
 	return tup;
 }
 
 
 template<class... TArgs>
-static inline void SerializeArgs(MAssIpcCallDataStream* call_info, const TArgs&... args)
+static inline void SerializeArgs(MAssIpcCallDataStream& call_info, const TArgs&... args)
 {
-	int unpack[]{0,(((*call_info)<<args),0)...};
+	int unpack[]{0,((call_info<<args),0)...};
 	unpack;
 }
 
@@ -258,10 +264,16 @@ public:
 
 	private:
 
-		void Invoke(MAssIpcCallDataStream* res, MAssIpcCallDataStream* params) const override
+		std::unique_ptr<MAssIpcData> Invoke(const std::weak_ptr<MAssIpcPacketTransport>& transport, 
+											MAssIpcPacketParser::TCallId respond_id,
+											MAssIpcCallDataStream& params) const override
 		{
 			std::tuple<TArgs...> args = DeserializeArgs<TArgs...>(params, typename make_indexes<TArgs...>::type());
 			ExpandTupleCall(m_del, args);
+
+			MAssIpcCallDataStream data_stream(CreateDataStream(transport, 0, MAssIpcPacketParser::PacketType::pt_return, respond_id));
+			return data_stream.DetachData();
+			return {};
 		}
 
 		bool IsCallable() const override
@@ -298,12 +310,19 @@ public:
 
 	private:
 
-		void Invoke(MAssIpcCallDataStream* res, MAssIpcCallDataStream* params) const override
+		std::unique_ptr<MAssIpcData> Invoke(const std::weak_ptr<MAssIpcPacketTransport>& transport, 
+											MAssIpcPacketParser::TCallId respond_id,
+											MAssIpcCallDataStream& params) const override
 		{
 			std::tuple<TArgs...> args = DeserializeArgs<TArgs...>(params, typename make_indexes<TArgs...>::type());
 			TRet ret = ExpandTupleCall(m_del, args);
-			if( res )
-				(*res)<<ret;
+
+			MAssIpcCallDataStream measure_size;
+			measure_size<<ret;
+
+			MAssIpcCallDataStream result_str = CreateDataStream(transport, measure_size.GetWritePos(), MAssIpcPacketParser::PacketType::pt_return, respond_id);
+			result_str<<ret;
+			return result_str.DetachData();
 		}
 
 		bool IsCallable() const override
@@ -342,6 +361,34 @@ public:
 		::template Imp<TDelegate> Res;
 };
 
+//-------------------------------------------------------
+
+class MAssIpcData_Vector: public MAssIpcData
+{
+public:
+
+	MAssIpcData_Vector() = default;
+	MAssIpcData_Vector(size_t size)
+		: m_storage(new uint8_t[size])
+		, m_storage_size(size)
+	{
+	}
+
+	size_t Size() const override
+	{
+		return m_storage_size;
+	}
+
+	uint8_t* Data() override
+	{
+		return m_storage.get();
+	}
+
+private:
+
+	std::unique_ptr<uint8_t[]> m_storage;
+	const size_t m_storage_size;
+};
 
 
 }// namespace MAssIpcCallInternal;

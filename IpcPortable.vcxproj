@@ -162,7 +162,8 @@
     <ClCompile Include="Ipc\MAssIpcCall.cpp" />
     <ClCompile Include="Ipc\MAssIpcCallDataStream.cpp" />
     <ClCompile Include="Ipc\MAssIpcCallInternal.cpp" />
-    <ClCompile Include="Ipc\MAssIpcCallPacket.cpp" />
+    <ClCompile Include="Ipc\MAssIpcPacketParser.cpp" />
+    <ClCompile Include="Ipc\MAssIpcPacketTransportDefault.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -178,9 +179,10 @@
     <ClInclude Include="Ipc\MAssIpcCall.h" />
     <ClInclude Include="Ipc\MAssIpcCallInternal.h" />
     <ClInclude Include="Ipc\MAssIpcCallDataStream.h" />
-    <ClInclude Include="Ipc\MAssIpcCallPacket.h" />
     <ClInclude Include="Ipc\MAssIpcCallTransport.h" />
     <ClInclude Include="Ipc\MAssCallThreadTransport.h" />
+    <ClInclude Include="Ipc\MAssIpcPacketParser.h" />
+    <ClInclude Include="Ipc\MAssIpcPacketTransportDefault.h" />
     <ClInclude Include="Ipc\MAssMacros.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>

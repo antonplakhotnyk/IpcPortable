@@ -5,6 +5,32 @@
 namespace MAssIpcCallInternal
 {
 
+static std::unique_ptr<MAssIpcData> CreateDataBuffer(const std::weak_ptr<MAssIpcPacketTransport>& weak_transport, size_t packet_size)
+{
+	auto transport = weak_transport.lock();
+	mass_return_x_if_equal(bool(transport), false, {});
+	return transport->Create(packet_size);
+}
+
+MAssIpcCallDataStream CreateDataStream(const std::weak_ptr<MAssIpcPacketTransport>& weak_transport, 
+														 MAssIpcPacketParser::TPacketSize no_header_size, 
+														 MAssIpcPacketParser::PacketType pt, 
+														 MAssIpcPacketParser::TCallId respond_id)
+{
+	if( respond_id!=MAssIpcPacketParser::c_invalid_id )
+	{
+		auto data_buffer = CreateDataBuffer(weak_transport, MAssIpcPacketParser::c_net_call_packet_header_size+no_header_size);
+		if( data_buffer )
+		{
+			MAssIpcCallDataStream result(std::move(data_buffer));
+			MAssIpcPacketParser::PacketHeaderWrite(result, no_header_size, pt, respond_id);
+			return std::move(result);
+		}
+	}
+
+	return {};
+}
+
 //-------------------------------------------------------
 CallInfo::CallInfo(MAssThread::Id thread_id)
 	:m_thread_id(thread_id)
@@ -13,27 +39,25 @@ CallInfo::CallInfo(MAssThread::Id thread_id)
 
 //-------------------------------------------------------
 
-ResultJob::ResultJob(const std::weak_ptr<MAssIpcCallTransport>& transport, MAssIpcCallPacket::TCallId id)
+ResultJob::ResultJob(const std::weak_ptr<MAssIpcPacketTransport>& transport, std::unique_ptr<MAssIpcData>& result)
 	:m_transport(transport)
+	, m_result(std::move(result))
 {
-	MAssIpcCallPacket::PacketHeaderAllocate(&m_result, MAssIpcCallPacket::PacketType::pt_return, id);
 };
 
 void ResultJob::Invoke()
 {
-	mass_return_if_equal(m_result.size()>=MAssIpcCallPacket::c_net_call_packet_header_size, false);
+	mass_return_if_equal(m_result->Size()>=MAssIpcPacketParser::c_net_call_packet_header_size, false);
 	auto transport = m_transport.lock();
 	mass_return_if_equal(bool(transport), false);
-	MAssIpcCallPacket::PacketHeaderUpdateSize(&m_result);
-	transport->Write(m_result.data(), m_result.size());
+	transport->Write(std::move(m_result));
 }
 
 //-------------------------------------------------------
 
-CallJob::CallJob(const std::weak_ptr<MAssIpcCallTransport>& transport, const std::weak_ptr<MAssCallThreadTransport>& inter_thread,
-				 std::unique_ptr<std::vector<uint8_t> > call_info_data, MAssIpcCallPacket::TCallId id)
-	: m_call_info_data_str(call_info_data->data(), call_info_data->size())
-	, m_call_info_data(std::move(call_info_data))
+CallJob::CallJob(const std::weak_ptr<MAssIpcPacketTransport>& transport, const std::weak_ptr<MAssCallThreadTransport>& inter_thread,
+				 MAssIpcCallDataStream& call_info_data, MAssIpcPacketParser::TCallId id)
+	: m_call_info_data_str(std::move(call_info_data))
 	, m_result_thread_id(MakeResultThreadId(inter_thread))
 	, m_transport(transport)
 	, m_inter_thread(inter_thread)
@@ -49,11 +73,12 @@ MAssThread::Id CallJob::MakeResultThreadId(const std::weak_ptr<MAssCallThreadTra
 
 void CallJob::Invoke()
 {
-	std::shared_ptr<ResultJob> result_job(new ResultJob(m_transport,m_id));
-	MAssIpcCallDataStream result_str(&result_job->m_result);
-	m_call_info->Invoke(&result_str, &m_call_info_data_str);
+	auto respond_id = (m_send_return ? m_id : MAssIpcPacketParser::c_invalid_id);
+	auto result = m_call_info->Invoke(m_transport, respond_id, m_call_info_data_str);
 	if( m_send_return )
 	{
+		std::shared_ptr<ResultJob> result_job(new ResultJob(m_transport, result));
+
 		auto inter_thread = m_inter_thread.lock();
 		if( inter_thread )
 			inter_thread->CallFromThread(m_result_thread_id, result_job);

@@ -110,13 +110,125 @@ private:
 };
 
 //-------------------------------------------------------
+
+class IpcPackerTransportMemory: public MAssIpcPacketTransport
+{
+private:
+	struct SyncData
+	{
+		std::mutex	lock;
+		bool incoming_data = false;
+		bool cancel_wait_respond = false;
+		std::condition_variable cond;
+		std::list<std::unique_ptr<MAssIpcData> > data;
+	};
+
+	class MemoryPacket: public MAssIpcData
+	{
+	public:
+
+		MemoryPacket(size_t size)
+			:m_data(size)
+		{
+		}
+
+	private:
+
+		size_t Size() const override
+		{
+			return m_data.size();
+		}
+
+		uint8_t* Data() override
+		{
+			return m_data.data();
+		}
+
+	private:
+
+		std::vector<uint8_t>	m_data;
+	};
+
+	IpcPackerTransportMemory(std::shared_ptr<SyncData> read, std::shared_ptr<SyncData> write)
+		:m_read(read)
+		, m_write(write)
+	{
+	}
+
+public:
+
+	IpcPackerTransportMemory()
+		:m_read(new SyncData)
+		, m_write(new SyncData)
+	{
+	}
+
+	std::shared_ptr<IpcPackerTransportMemory> CreateComplementar()
+	{
+		return std::shared_ptr<IpcPackerTransportMemory>(new IpcPackerTransportMemory(m_write, m_read));
+	}
+
+	void WaitIncomingData()
+	{
+		std::unique_lock<std::mutex> lock(m_read->lock);
+		while( !m_read->incoming_data )
+			m_read->cond.wait(lock);
+	}
+
+	std::unique_ptr<MAssIpcData> Create(size_t size) override
+	{
+		return std::unique_ptr<MAssIpcData>(new MemoryPacket(size));
+	}
+
+	bool	Read(bool wait_incoming_packet, std::unique_ptr<MAssIpcData>* packet) override
+	{
+		std::unique_lock<std::mutex> lock(m_read->lock);
+		while( m_read->data.empty() && (!m_read->cancel_wait_respond) )
+		{
+			if( wait_incoming_packet )
+				m_read->cond.wait(lock);
+			else
+				return true;
+		}
+		if( m_read->cancel_wait_respond )
+			return false;
+
+		*packet = std::move(m_read->data.front());
+		m_read->data.pop_front();
+		return true;
+	}
+
+	void	Write(std::unique_ptr<MAssIpcData> packet) override
+	{
+		std::lock_guard<std::mutex> lock(m_write->lock);
+		SyncData& sync = *m_write;
+		sync.data.push_back(std::move(packet));
+		sync.incoming_data = true;
+		sync.cond.notify_all();
+	}
+
+	void CancelWaitRespond()
+	{
+		std::unique_lock<std::mutex> lock(m_read->lock);
+		SyncData& sync = *m_read;
+		sync.cancel_wait_respond = true;
+		sync.cond.notify_all();
+	}
+
+private:
+
+
+	std::shared_ptr<SyncData>	m_write;
+	std::shared_ptr<SyncData>	m_read;
+};
+
+//-------------------------------------------------------
 class MAssCallThreadTransport_Stub: public MAssCallThreadTransport
 {
 public:
 
 	void			CallFromThread(MAssThread::Id thread_id, const std::shared_ptr<Job>& job) override
 	{
-		volatile int a = 0;
 		job->Invoke();
 	}
 
@@ -128,97 +240,10 @@ public:
 
 //-------------------------------------------------------
 
-
-static std::string Ipc_Proc1(uint8_t a, std::string b, uint32_t c)
-{
-// 	if( a == 1 )
-// 	{
-// 		(*local_data->call)("ClientProc")(a, c);
-// 		return "callback";
-// 	}
-
-	return std::string("test result ")+std::to_string(a)+b+std::to_string(c);
-}
-
-static bool IsLinkUp()
-{
-	return false;
-}
-
-static void Ipc_Proc3(uint8_t a, std::string b, uint32_t c)
-{
-}
-
-static void Ipc_Proc4()
-{
-}
-
 static void OnInvalidRemoteCall(MAssIpcCall::ErrorType et, std::string message)
 {
 }
 
-static void ServerStop(bool* run)
-{
-	*run = false;
-}
-
-void Main_IpcService(std::shared_ptr<IpcTransportMemory> transport_buffer)
-{
-	std::shared_ptr<MAssCallThreadTransport_Stub> thread_transport(new MAssCallThreadTransport_Stub);
-	MAssIpcCall call(thread_transport);
-	bool run=true;
-
-	call.SetErrorHandler(MAssIpcCall::TErrorHandler(&OnInvalidRemoteCall));
-
-// 	call.AddHandler("Ipc_Proc1", DelegateW<std::string(uint8_t, std::string, uint32_t)>().BindS(&Ipc_Proc1));
- 	call.AddHandler("IsLinkUp_Sta", std::function<bool()>(&IsLinkUp), MAssThread::Id(3));
-	call.AddHandler("Ipc_Proc4", std::function<void()>(&Ipc_Proc4));
- 	call.AddHandler("Ipc_Proc1", std::function<std::string(uint8_t, std::string, uint32_t)>(&Ipc_Proc1));
-	call.AddHandler("Ipc_Proc3", std::function<void(uint8_t, std::string, uint32_t)>(&Ipc_Proc3));
-//	call.AddHandler("IsLinkUp_Sta", std::function<void(uint8_t, std::string, uint32_t)>(&Ipc_Proc3));
-
-	call.AddHandler("ServerStop", std::function<void()>(std::bind(&ServerStop, &run)));
-
-	call.SetTransport(transport_buffer);
-
-
-	while( true )
-	{
-		call.ProcessTransport();
-		if( !run )
-			break;
-		transport_buffer->WaitIncomingData();
-	}
-}
-
-//-------------------------------------------------------
-
-enum struct TestEnum1: uint8_t
-{
-	te1_a,
-	te1_b,
-};
-
-
-MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const TestEnum1& v)
-{
-	stream<<std::underlying_type<TestEnum1>::type(v);
-	return stream;
-}
-
-MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, TestEnum1& v)
-{
-	return stream >> reinterpret_cast<std::underlying_type<TestEnum1>::type&>(v);
-}
-
-MASS_IPC_TYPE_SIGNATURE(TestEnum1);
-
-
-void ClientProc(uint8_t a, uint32_t b)
-{
-	volatile int val = a+b;
-	val = val;
-}
 
 //-------------------------------------------------------
 
@@ -243,7 +268,7 @@ static std::string TestThreads_Proc3(uint8_t a, std::string b, uint32_t c)
 	return ss.str();
 }
 
-void TestThreads_Handler(std::shared_ptr<IpcTransportMemory> transport_buffer, MAssIpcCall call)
+void TestThreads_Handler(std::shared_ptr<IpcPackerTransportMemory> transport_buffer, MAssIpcCall call)
 {
 	while( true )
 	{
@@ -254,7 +279,7 @@ void TestThreads_Handler(std::shared_ptr<IpcTransportMemory> transport_buffer, M
 	}
 }
 
-void TestThreads_Sender(std::shared_ptr<IpcTransportMemory> transport_buffer, MAssIpcCall call)
+void TestThreads_Sender(std::shared_ptr<IpcPackerTransportMemory> transport_buffer, MAssIpcCall call)
 {
 	std::stringstream ss;
 	ss<<std::this_thread::get_id();
@@ -319,8 +344,8 @@ void TestThreads_Sender(std::shared_ptr<IpcTransportMemory> transport_buffer, MA
 
 void TestThreads_MainThread()
 {
-	std::shared_ptr<IpcTransportMemory> transport_buffer(new IpcTransportMemory);
-	std::shared_ptr<IpcTransportMemory> complementar_buffer = transport_buffer->CreateComplementar();
+	std::shared_ptr<IpcPackerTransportMemory> transport_buffer(new IpcPackerTransportMemory);
+	std::shared_ptr<IpcPackerTransportMemory> complementar_buffer = transport_buffer->CreateComplementar();
 	MAssIpcCall call_sender({});
 	MAssIpcCall call_handler({});
 
@@ -357,7 +382,152 @@ void TestThreads_MainThread()
 }
 
 //-------------------------------------------------------
+//-------------------------------------------------------
 
+
+static std::string Ipc_Proc1(uint8_t a, std::string b, uint32_t c)
+{
+	// 	if( a == 1 )
+	// 	{
+	// 		(*local_data->call)("ClientProc")(a, c);
+	// 		return "callback";
+	// 	}
+
+	return std::string("test result ")+std::to_string(a)+b+std::to_string(c);
+}
+
+static bool IsLinkUp()
+{
+	return false;
+}
+
+static void Ipc_Proc3(uint8_t a, std::string b, uint32_t c)
+{
+}
+
+static void Ipc_Proc4()
+{
+}
+
+static void ServerStop(bool* run)
+{
+	*run = false;
+}
+
+
+struct DataStruct1
+{
+	int a;
+	int b;
+	int c;
+};
+
+
+void Ipc_UniquePtr1(std::unique_ptr<DataStruct1> data)
+{
+}
+
+MASS_IPC_TYPE_SIGNATURE(std::unique_ptr<DataStruct1>)
+
+MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const std::unique_ptr<DataStruct1>& v)
+{
+	return stream<<v->a<<v->b<<v->c;
+}
+
+MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, std::unique_ptr<DataStruct1>& v)
+{
+	v.reset(new DataStruct1);
+	return stream>>v->a>>v->b>>v->c;
+}
+
+
+struct DataStruct2
+{
+	int a;
+	int b;
+	int c;
+};
+
+
+void Ipc_Ptr2(DataStruct2* data)
+{
+	delete data;
+}
+
+MASS_IPC_TYPE_SIGNATURE(DataStruct2*)
+
+MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const DataStruct2* v)
+{
+	return stream<<v->a<<v->b<<v->c;
+}
+
+MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, DataStruct2*& v)
+{
+	v = new DataStruct2;
+	return stream>>v->a>>v->b>>v->c;
+}
+
+void Main_IpcService(std::shared_ptr<IpcPackerTransportMemory> transport_buffer)
+{
+	std::shared_ptr<MAssCallThreadTransport_Stub> thread_transport(new MAssCallThreadTransport_Stub);
+	MAssIpcCall call(thread_transport);
+	bool run = true;
+
+	call.SetErrorHandler(MAssIpcCall::TErrorHandler(&OnInvalidRemoteCall));
+
+	// 	call.AddHandler("Ipc_Proc1", DelegateW<std::string(uint8_t, std::string, uint32_t)>().BindS(&Ipc_Proc1));
+	call.AddHandler("IsLinkUp_Sta", std::function<bool()>(&IsLinkUp), MAssThread::Id(3));
+	call.AddHandler("Ipc_Proc4", std::function<void()>(&Ipc_Proc4));
+	call.AddHandler("Ipc_Proc1", std::function<std::string(uint8_t, std::string, uint32_t)>(&Ipc_Proc1));
+	call.AddHandler("Ipc_Proc3", std::function<void(uint8_t, std::string, uint32_t)>(&Ipc_Proc3));
+	call.AddHandler("Ipc_UniquePtr1", std::function<void(std::unique_ptr<DataStruct1>)>(&Ipc_UniquePtr1));
+	call.AddHandler("Ipc_UniquePtr2", std::function<void(DataStruct2*)>(&Ipc_Ptr2));
+	//	call.AddHandler("IsLinkUp_Sta", std::function<void(uint8_t, std::string, uint32_t)>(&Ipc_Proc3));
+
+	call.AddHandler("ServerStop", std::function<void()>(std::bind(&ServerStop, &run)));
+
+	call.SetTransport(transport_buffer);
+
+
+	while( true )
+	{
+		call.ProcessTransport();
+		if( !run )
+			break;
+		transport_buffer->WaitIncomingData();
+	}
+}
+
+//-------------------------------------------------------
+
+enum struct TestEnum1: uint8_t
+{
+	te1_a,
+	te1_b,
+};
+
+
+MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const TestEnum1& v)
+{
+	stream<<std::underlying_type<TestEnum1>::type(v);
+	return stream;
+}
+
+MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, TestEnum1& v)
+{
+	return stream >> reinterpret_cast<std::underlying_type<TestEnum1>::type&>(v);
+}
+
+MASS_IPC_TYPE_SIGNATURE(TestEnum1);
+
+
+void ClientProc(uint8_t a, uint32_t b)
+{
+	volatile int val = a+b;
+	val = val;
+}
+
+//-------------------------------------------------------
 
 void Main_IpcClient()
 {
@@ -367,9 +537,9 @@ void Main_IpcClient()
 
 	call.SetErrorHandler(MAssIpcCall::TErrorHandler(&OnInvalidRemoteCall));
 
-	std::shared_ptr<IpcTransportMemory> transport_buffer(new IpcTransportMemory);
+	std::shared_ptr<IpcPackerTransportMemory> transport_buffer(new IpcPackerTransportMemory);
 
-	std::shared_ptr<IpcTransportMemory> complementar_buffer = transport_buffer->CreateComplementar();
+	std::shared_ptr<IpcPackerTransportMemory> complementar_buffer = transport_buffer->CreateComplementar();
 	std::thread serv_thread(&Main_IpcService, complementar_buffer);
 
 	call.SetTransport(transport_buffer);
@@ -394,6 +564,12 @@ void Main_IpcClient()
 	std::string res = call.WaitInvokeRet<std::string>("Ipc_Proc1",a, b, c);
 	call.WaitInvoke("Ipc_Proc4");
 
+	std::unique_ptr<DataStruct1> ds1(new DataStruct1({1,2,3}));
+	DataStruct2* ds2 = new DataStruct2({4,5,6});
+	call.WaitInvoke("Ipc_UniquePtr1", ds1);
+	call.WaitInvoke("Ipc_UniquePtr2", ds2);
+
+
 	call.WaitInvoke("ServerStop");
 
 // 	TestThreads_MainThread();
@@ -407,10 +583,19 @@ void Main_IpcClient()
 }
 
 
+//-------------------------------------------------------
+// template<const char* str>
+// struct  string
+// {
+// };
+// 
+// constexpr const char str[] = "str";
+// string<str> test;
+//-------------------------------------------------------
+
 int main()
 {
-
-	Main_IpcClient();
+ 	Main_IpcClient();
 	TestThreads_MainThread();
 	return 0;
 }

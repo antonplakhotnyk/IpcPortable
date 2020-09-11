@@ -3,19 +3,16 @@
 #include "MAssMacros.h"
 
 
-MAssIpcCallDataStream::MAssIpcCallDataStream(const uint8_t* data_read_only, size_t data_size)
-	:m_pos(0)
-	, m_data_read_write(NULL)
-	, m_data_read_only(data_read_only)
-	, m_data_read_only_size(data_size)
+static size_t MakeSkip(size_t data_read_only_size, size_t skip)
 {
+	if( skip > data_read_only_size )
+		skip = data_read_only_size;
+
+	return skip;
 }
 
-MAssIpcCallDataStream::MAssIpcCallDataStream(std::vector<uint8_t>* data_read_write)
-	: m_pos(0)
-	, m_data_read_write(data_read_write)
-	, m_data_read_only(NULL)
-	, m_data_read_only_size(0)
+MAssIpcCallDataStream::MAssIpcCallDataStream(std::unique_ptr<MAssIpcData> data_read_write)
+	:m_read_write(std::move(data_read_write))
 {
 }
 
@@ -23,86 +20,83 @@ MAssIpcCallDataStream::~MAssIpcCallDataStream()
 {
 }
 
+bool MAssIpcCallDataStream::IsDataBufferPresent()
+{
+	return bool(m_read_write);
+}
+
+std::unique_ptr<MAssIpcData> MAssIpcCallDataStream::DetachData()
+{
+	return std::move(m_read_write);
+}
+
+MAssIpcData* MAssIpcCallDataStream::GetData()
+{
+	return m_read_write.get();
+}
+
 template<class T>
 void MAssIpcCallDataStream::WriteBytes(T t)
 {
-	mass_return_if_equal(m_data_read_write,NULL);
+	if( m_read_write )
+	{
+		size_t size = m_read_write->Size();
+		mass_return_if_equal(size < m_write_pos+sizeof(t), true);
 
-	size_t pos = Size();
-	ResizeRW(pos+sizeof(T));
-	mass_return_if_not_equal(Size(), pos+sizeof(t));
+		uint8_t* bytes = m_read_write->Data()+m_write_pos;
+		WriteUnsafe(bytes, t);
+	}
 
-	uint8_t* bytes = DataRW()+pos;
-	WriteUnsafe(bytes, t);
+	m_write_pos += sizeof(t);
 }
 
 template<class T>
 void MAssIpcCallDataStream::ReadBytes(T* t)
 {
 	mass_return_if_equal(IsReadAvailable(sizeof(*t)), false);
-	const uint8_t* bytes = DataR()+m_pos;
+	const uint8_t* bytes = m_read_write->Data()+m_read_pos;
 
-	*t = 0;
-	for( size_t i = 0; i<sizeof(T); i++ )
-	{
-		*t <<= 8;
-		*t |= bytes[sizeof(T)-1-i];
-	}
-
-	m_pos += sizeof(T);
+	*t = ReadUnsafe<T>(bytes);
+	m_read_pos += sizeof(T);
 }
 
 
 void MAssIpcCallDataStream::ReadRawData(uint8_t* data, size_t len)
 {
 	mass_return_if_equal(IsReadAvailable(len), false);
-	const uint8_t* pos = DataR()+m_pos;
+	const uint8_t* pos = m_read_write->Data()+m_read_pos;
 	memcpy(data, pos, len);
-	m_pos += len;
+	m_read_pos += len;
 }
 
 void MAssIpcCallDataStream::WriteRawData(const uint8_t* data, size_t len)
 {
-	mass_return_if_equal(m_data_read_write, NULL);
+	if( m_read_write )
+	{
+		size_t size = m_read_write->Size();
+		mass_return_if_equal(size < m_write_pos+len, true);
 
-	size_t pos = Size();
-	ResizeRW(pos+len);
-	mass_return_if_not_equal(Size(), pos+len);
+		uint8_t* bytes = m_read_write->Data()+m_write_pos;
+		memcpy(bytes, data, len);
+	}
 
-	uint8_t* bytes = DataRW()+pos;
-	memcpy(bytes, data, len);
+	m_write_pos += len;
 }
 
 bool MAssIpcCallDataStream::IsReadAvailable(size_t size)
 {
-	bool res = Size()-m_pos >= size;
-	return res;
+	if( m_read_write )
+	{
+		bool res = m_read_write->Size()-m_read_pos >= size;
+		return res;
+	}
+
+	return false;
 }
 
-//-------------------------------------------------------
-
-uint8_t* MAssIpcCallDataStream::DataRW()
+size_t MAssIpcCallDataStream::GetWritePos()
 {
-	return &(*m_data_read_write)[0];
-}
-
-size_t MAssIpcCallDataStream::Size()
-{
-	if( m_data_read_write )
-		return m_data_read_write->size();
-	return m_data_read_only_size;
-}
-
-void MAssIpcCallDataStream::ResizeRW(size_t size)
-{
-	m_data_read_write->resize(size);
-}
-
-const uint8_t* MAssIpcCallDataStream::DataR() const
-{
-	if( m_data_read_write )
-		return &(*m_data_read_write)[0];
-	return m_data_read_only;
+	return m_write_pos;
 }
 
 //-------------------------------------------------------

@@ -3,7 +3,6 @@
 #include "MAssIpcCallDataStream.h"
 #include <functional>
 #include <memory>
-#include "MAssIpcCallPacket.h"
 #include "MAssCallThreadTransport.h"
 #include "MAssIpcCallInternal.h"
 #include <mutex>
@@ -34,6 +33,7 @@ public:
 	MAssIpcCall(const std::weak_ptr<MAssCallThreadTransport>& inter_thread_nullable);
 
 	void SetTransport(const std::weak_ptr<MAssIpcCallTransport>& transport);
+	void SetTransport(const std::weak_ptr<MAssIpcPacketTransport>& transport);
 
 	template<class TRet, class... TArgs>
 	TRet WaitInvokeRet(const std::string& proc_name, const TArgs&... args) const;
@@ -68,38 +68,35 @@ public:
 
 private:
 
-	static void SerializeCallSignature(MAssIpcCallDataStream* call_info, const std::string& proc_name,
+	static void SerializeCallSignature(MAssIpcCallDataStream& call_info, const std::string& proc_name,
 									   bool send_return, const std::string& return_type,
 									   const std::string& params_type);
 
 	template<class TRet, class... TArgs>
 	TRet WaitInvokeRetUnified(const std::string& proc_name, bool process_incoming_calls, const TArgs&... args) const;
 	template<class TRet, class... TArgs>
-	void InvokeUnified(const std::string& proc_name, std::vector<uint8_t>* result_buf_wait_return, 
+	void InvokeUnified(const std::string& proc_name, MAssIpcCallDataStream* result_buf_wait_return,
 					   bool process_incoming_calls,
 					   const TArgs&... args) const;
-	void InvokeRemote(const std::vector<uint8_t>& call_info_data, std::vector<uint8_t>* result, 
-					  MAssIpcCallInternal::MAssIpcCallPacket::TCallId response_id,
+	void InvokeRemote(MAssIpcCallDataStream& call_info_data, MAssIpcCallDataStream* result_buf_wait_return,
+					  MAssIpcCallInternal::MAssIpcPacketParser::TCallId wait_response_id,
 					  bool process_incoming_calls) const;
 
-	static void DeserializeNameSignature(MAssIpcCallDataStream* call_info, std::string* proc_name, bool* send_return, std::string* return_type, std::string* params_type);
+	static void DeserializeNameSignature(MAssIpcCallDataStream& call_info, std::string* proc_name, bool* send_return, std::string* return_type, std::string* params_type);
 
-	MAssIpcCallInternal::MAssIpcCallPacket::TCallId NewCallId() const;
+	MAssIpcCallInternal::MAssIpcPacketParser::TCallId NewCallId() const;
 	
-	void ProcessTransportResponse(const std::shared_ptr<MAssIpcCallTransport>& transport,
-								  std::vector<uint8_t>* result, 
-								  MAssIpcCallInternal::MAssIpcCallPacket::TCallId response_id,
-								  bool process_incoming_calls,
-								  bool wait_incoming_data) const;
+	MAssIpcCallDataStream ProcessTransportResponse(MAssIpcCallInternal::MAssIpcPacketParser::TCallId wait_response_id,
+												   bool process_incoming_calls) const;
 
 
 	struct CallDataBuffer
 	{
-		MAssIpcCallInternal::MAssIpcCallPacket::Header header;
-		std::unique_ptr<std::vector<uint8_t> > data;
+		MAssIpcCallDataStream data;
+		MAssIpcCallInternal::MAssIpcPacketParser::Header header;
 	};
 
-	CallDataBuffer ReceiveCallDataBuffer(const std::shared_ptr<MAssIpcCallTransport>& transport) const;
+	CallDataBuffer ReceiveCallDataBuffer(std::unique_ptr<MAssIpcData>& packet) const;
 
 private:
 
@@ -109,10 +106,10 @@ private:
 		// all membersaccess only during unique_lock(m_lock)
 		std::mutex m_lock;
 
-		MAssIpcCallInternal::MAssIpcCallPacket::TCallId m_incremental_id = 0;
+		MAssIpcCallInternal::MAssIpcPacketParser::TCallId m_incremental_id = 0;
 		volatile bool m_another_thread_waiting_transport = false;
 		std::condition_variable m_write_cond;
-		std::map<MAssIpcCallInternal::MAssIpcCallPacket::TCallId, CallDataBuffer> m_id_data_return;
+		std::map<MAssIpcCallInternal::MAssIpcPacketParser::TCallId, CallDataBuffer> m_id_data_return;
 		std::list<CallDataBuffer> m_data_incoming_call;
 	};
 
@@ -121,19 +118,19 @@ private:
 	{
 	public:
 
-		void ProcessBuffer(CallDataBuffer buffer, std::vector<uint8_t>* result, const std::shared_ptr<MAssIpcCallTransport>& transport) const;
+		MAssIpcCallDataStream ProcessBuffer(CallDataBuffer buffer) const;
 
-		MAssIpcCallInternal::ProcMap				m_proc_map;
-		MAssIpcCallInternal::MAssIpcCallPacket		m_packet_parser;
-		std::weak_ptr<MAssIpcCallTransport>			m_transport;
-		std::weak_ptr<MAssCallThreadTransport>		m_inter_thread_nullable;
-		TErrorHandler								m_OnInvalidRemoteCall;
+		MAssIpcCallInternal::ProcMap			m_proc_map;
+		std::shared_ptr<MAssIpcPacketTransport>	m_transport_default;
+		std::weak_ptr<MAssIpcPacketTransport>	m_transport;
+		std::weak_ptr<MAssCallThreadTransport>	m_inter_thread_nullable;
+		TErrorHandler							m_OnInvalidRemoteCall;
 		
-		PendingResponces							m_pending_responses;
+		PendingResponces						m_pending_responses;
 
 	private:
 
-		void InvokeLocal(std::unique_ptr<std::vector<uint8_t> > call_info_data, MAssIpcCallInternal::MAssIpcCallPacket::TCallId id) const;
+		void InvokeLocal(MAssIpcCallDataStream& call_info_data, MAssIpcCallInternal::MAssIpcPacketParser::TCallId id) const;
 
 		struct CreateCallJobRes
 		{
@@ -143,7 +140,11 @@ private:
 			std::string message;
 		};
 
-		CreateCallJobRes CreateCallJob(const std::shared_ptr<MAssIpcCallTransport>& transport, std::unique_ptr<std::vector<uint8_t> > call_info_data, MAssIpcCallInternal::MAssIpcCallPacket::TCallId id) const;
+		CreateCallJobRes CreateCallJob(const std::shared_ptr<MAssIpcPacketTransport>& transport, 
+									   MAssIpcCallDataStream& call_info_data, 
+									   MAssIpcCallInternal::MAssIpcPacketParser::TCallId id) const;
+		static void StoreReturnFailCall(MAssIpcCallDataStream* result_str, const CreateCallJobRes& call_job, 
+										MAssIpcCallInternal::MAssIpcPacketParser::TCallId id);
 
 	};
 
@@ -172,7 +173,7 @@ void MAssIpcCall::AddHandler(const std::string& proc_name, const TDelegateW& del
 }
 
 template<class TRet, class... TArgs>
-void MAssIpcCall::InvokeUnified(const std::string& proc_name, std::vector<uint8_t>* result_buf_wait_return, 
+void MAssIpcCall::InvokeUnified(const std::string& proc_name, MAssIpcCallDataStream* result_buf_wait_return,
 								bool process_incoming_calls,
 								const TArgs&... args) const
 {
@@ -182,16 +183,16 @@ void MAssIpcCall::InvokeUnified(const std::string& proc_name, std::vector<uint8_
 	return_type = MAssIpcType<TRet>::NameValue();
 	MAssIpcCallInternal::ProcSignature<TreatProc>::GetParams(&params_type);
 
-	std::vector<uint8_t> call_info_data_buf;
-	MAssIpcCallDataStream call_info(&call_info_data_buf);
+	MAssIpcCallDataStream measure_size;
+	MAssIpcCall::SerializeCallSignature(measure_size, proc_name, (result_buf_wait_return!=nullptr), return_type, params_type);
+	MAssIpcCallInternal::SerializeArgs(measure_size, args...);
 
 	auto new_id = NewCallId();
-	MAssIpcCallInternal::MAssIpcCallPacket::PacketHeaderAllocate(&call_info_data_buf, MAssIpcCallInternal::MAssIpcCallPacket::PacketType::pt_call, new_id);
-	MAssIpcCall::SerializeCallSignature(&call_info, proc_name, (result_buf_wait_return!=nullptr), return_type, params_type);
-	MAssIpcCallInternal::SerializeArgs(&call_info, args...);
-	MAssIpcCallInternal::MAssIpcCallPacket::PacketHeaderUpdateSize(&call_info_data_buf);
+	MAssIpcCallDataStream call_info(CreateDataStream(m_int->m_transport, measure_size.GetWritePos(), MAssIpcCallInternal::MAssIpcPacketParser::PacketType::pt_call, new_id));
+	MAssIpcCall::SerializeCallSignature(call_info, proc_name, (result_buf_wait_return!=nullptr), return_type, params_type);
+	MAssIpcCallInternal::SerializeArgs(call_info, args...);
 
-	InvokeRemote(call_info_data_buf, result_buf_wait_return, new_id, process_incoming_calls);
+	InvokeRemote(call_info, result_buf_wait_return, new_id, process_incoming_calls);
 }
 
 template<class TRet, class... TArgs>
@@ -199,15 +200,12 @@ TRet MAssIpcCall::WaitInvokeRetUnified(const std::string& proc_name, bool proces
 {
 	static_assert(!std::is_same<TRet,void>::value, "can not be implicit void use function call explicitely return void");
 
-	std::vector<uint8_t> result_buf;
-	InvokeUnified<TRet>(proc_name, &result_buf, process_incoming_calls, args...);
+	MAssIpcCallDataStream result;
+	InvokeUnified<TRet>(proc_name, &result, process_incoming_calls, args...);
 	{
 		TRet res = {};
-		if( !result_buf.empty() )
-		{
-			MAssIpcCallDataStream result(&result_buf[0], result_buf.size());
+		if( result.IsDataBufferPresent() )
 			result>>res;
-		}
 		return res;
 	}
 }
@@ -221,7 +219,7 @@ TRet MAssIpcCall::WaitInvokeRet(const std::string& proc_name, const TArgs&... ar
 template<class... TArgs>
 void MAssIpcCall::WaitInvoke(const std::string& proc_name, const TArgs&... args) const
 {
-	std::vector<uint8_t> result_buf;
+	MAssIpcCallDataStream result_buf;
 	InvokeUnified<void>(proc_name, &result_buf, false, args...);
 }
 
@@ -234,7 +232,7 @@ void MAssIpcCall::AsyncInvoke(const std::string& proc_name, const TArgs&... args
 template<class... TArgs>
 void MAssIpcCall::WaitInvokeAlertable(const std::string& proc_name, const TArgs&... args) const
 {
-	std::vector<uint8_t> result_buf;
+	MAssIpcCallDataStream result_buf;
 	InvokeUnified<void>(proc_name, &result_buf, true, args...);
 }
 
