@@ -17,6 +17,11 @@ MAssIpcCallDataStream CreateDataStream(const std::weak_ptr<MAssIpcPacketTranspor
 									   MAssIpcPacketParser::PacketType pt,
 									   MAssIpcPacketParser::TCallId respond_id);
 
+MAssIpcCallDataStream CreateDataStreamInplace(std::unique_ptr<MAssIpcData>& inplace_send_buffer,
+											  MAssIpcData::TPacketSize no_header_size,
+											  MAssIpcPacketParser::PacketType pt,
+											  MAssIpcPacketParser::TCallId respond_id);
+
 //-------------------------------------------------------
 
 
@@ -152,16 +157,16 @@ struct make_indexes: make_indexes_impl<0, index_tuple<>, Types...>
 };
 
 
-template<class Ret, class... Args, size_t... Indexes >
-Ret ExpandHelper(const std::function<Ret(Args...)>& pf, index_tuple< Indexes... >, std::tuple<Args...>& tup)
+template<class TFunc, class Ret, class... Args, size_t... Indexes >
+Ret ExpandHelper(const TFunc& pf, index_tuple< Indexes... >, std::tuple<Args...>& tup)
 {
 	return pf(std::forward<Args>(std::get<Indexes>(tup))...);
 }
 
-template<class Ret, class ... Args>
-Ret ExpandTupleCall(const std::function<Ret(Args...)>& pf, std::tuple<Args...>& tup)
+template<class TFunc, class Ret, class ... Args>
+Ret ExpandTupleCall(const TFunc& pf, std::tuple<Args...>& tup)
 {
-	return ExpandHelper(pf, typename make_indexes<Args...>::type(), tup);
+	return ExpandHelper<TFunc, Ret>(pf, typename make_indexes<Args...>::type(), tup);
 }
 
 //-------------------------------------------------------
@@ -269,7 +274,7 @@ public:
 											MAssIpcCallDataStream& params) const override
 		{
 			std::tuple<TArgs...> args = DeserializeArgs<TArgs...>(params, typename make_indexes<TArgs...>::type());
-			ExpandTupleCall(m_del, args);
+			ExpandTupleCall<TDelegate, void>(m_del, args);
 
 			MAssIpcCallDataStream data_stream(CreateDataStream(transport, 0, MAssIpcPacketParser::PacketType::pt_return, respond_id));
 			return data_stream.DetachData();
@@ -315,7 +320,7 @@ public:
 											MAssIpcCallDataStream& params) const override
 		{
 			std::tuple<TArgs...> args = DeserializeArgs<TArgs...>(params, typename make_indexes<TArgs...>::type());
-			TRet ret = ExpandTupleCall(m_del, args);
+			TRet ret = ExpandTupleCall<TDelegate, TRet>(m_del, args);
 
 			MAssIpcCallDataStream measure_size;
 			measure_size<<ret;

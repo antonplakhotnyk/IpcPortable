@@ -31,6 +31,19 @@ MAssIpcCallDataStream CreateDataStream(const std::weak_ptr<MAssIpcPacketTranspor
 	return {};
 }
 
+
+MAssIpcCallDataStream CreateDataStreamInplace(std::unique_ptr<MAssIpcData>& inplace_send_buffer,
+											  MAssIpcData::TPacketSize no_header_size,
+											  MAssIpcPacketParser::PacketType pt,
+											  MAssIpcPacketParser::TCallId respond_id)
+{
+	MAssIpcData::TPacketSize packet_size = no_header_size+MAssIpcPacketParser::c_net_call_packet_header_size;
+	mass_return_x_if_equal(inplace_send_buffer->Size() < packet_size, true, {});
+	MAssIpcCallDataStream result(std::move(inplace_send_buffer));
+	MAssIpcCallInternal::MAssIpcPacketParser::PacketHeaderWrite(result, no_header_size, MAssIpcCallInternal::MAssIpcPacketParser::PacketType::pt_call, respond_id);
+	return std::move(result);
+}
+
 //-------------------------------------------------------
 CallInfo::CallInfo(MAssThread::Id thread_id)
 	:m_thread_id(thread_id)

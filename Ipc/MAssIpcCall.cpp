@@ -147,6 +147,7 @@ MAssIpcCallDataStream MAssIpcCall::ProcessTransportResponse(MAssIpcCallInternal:
 				else
 				{
 					buffer = std::move(it->second);
+					m_int->m_pending_responses.m_id_data_return.erase(it);
 					break;
 				}
 

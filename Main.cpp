@@ -9,6 +9,8 @@
 #include <mutex>
 #include <condition_variable>
 
+
+
 // struct TestStruct
 // {
 // };
@@ -558,6 +560,12 @@ void Main_IpcClient()
 	call.WaitInvoke("Ipc_Proc3", a1, b, c);
 	call.AsyncInvoke("Ipc_Proc3", a, b, c);
 	call.WaitInvoke("Ipc_Proc3", TestEnum1::te1_a);
+
+	auto packet_size = MAssIpcCall::CalcCallSize<std::string>(true, "Ipc_Proc1", a, b, c);
+	std::unique_ptr<MAssIpcData> inplace_send_buffer(new MAssIpcCallInternal::MAssIpcData_Vector(packet_size));
+	std::string res4 = call.WaitInvokeRet<std::string>(std::move(inplace_send_buffer), "Ipc_Proc1", a, b, c);
+	mass_return_if_not_equal(res2, res4);
+
 // 	TestStruct tstr;
 // 	call.AsyncInvoke("TestProc", tstr);
 	MAssIpcCall_EnumerateData enum_data = call.EnumerateRemote();
@@ -594,6 +602,8 @@ void Main_IpcClient()
 // constexpr const char str[] = "str";
 // string<str> test;
 //-------------------------------------------------------
+
+
 
 int main()
 {
