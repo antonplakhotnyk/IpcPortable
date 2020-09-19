@@ -53,17 +53,27 @@ void MAssIpcCallDataStream::WriteBytes(T t)
 
 void MAssIpcCallDataStream::WriteRawData(const uint8_t* data, MAssIpcData::TPacketSize len)
 {
+	uint8_t* bytes = WriteRawData(len);
+	if( bytes )
+		memcpy(bytes, data, len);
+}
+
+uint8_t* MAssIpcCallDataStream::WriteRawData(MAssIpcData::TPacketSize len)
+{
+	uint8_t* bytes = nullptr;
 	if( m_read_write )
 	{
 		MAssIpcData::TPacketSize size = m_read_write->Size();
-		mass_return_if_equal((m_write_pos<(std::numeric_limits<MAssIpcData::TPacketSize>::max()-len))&&(size < m_write_pos+len), true);
+		mass_return_x_if_equal((m_write_pos<(std::numeric_limits<MAssIpcData::TPacketSize>::max()-len))&&(size < m_write_pos+len), true, nullptr);
 
-		uint8_t* bytes = m_read_write->Data()+m_write_pos;
-		memcpy(bytes, data, len);
+		bytes = m_read_write->Data()+m_write_pos;
 	}
 
-	m_write_pos += len;
+	m_write_pos += len;// calc necessary size even without storage
+
+	return bytes;
 }
+
 
 template<class T>
 void MAssIpcCallDataStream::ReadBytes(T* t)
@@ -75,13 +85,21 @@ void MAssIpcCallDataStream::ReadBytes(T* t)
 	m_read_pos += sizeof(T);
 }
 
+const uint8_t* MAssIpcCallDataStream::ReadRawData(MAssIpcData::TPacketSize len)
+{
+	mass_return_x_if_equal(IsReadAvailable(len), false, nullptr);
+	const uint8_t* pos = m_read_write->Data()+m_read_pos;
+	m_read_pos += len;
+	return pos;
+}
 
 void MAssIpcCallDataStream::ReadRawData(uint8_t* data, MAssIpcData::TPacketSize len)
 {
-	mass_return_if_equal(IsReadAvailable(len), false);
-	const uint8_t* pos = m_read_write->Data()+m_read_pos;
-	memcpy(data, pos, len);
-	m_read_pos += len;
+	const uint8_t* pos = ReadRawData(len);
+	if( pos )
+		memcpy(data, pos, len);
+	else
+		memset(data, 0, len);
 }
 
 bool MAssIpcCallDataStream::IsReadAvailable(MAssIpcData::TPacketSize size)

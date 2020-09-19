@@ -92,5 +92,8 @@
     <ClInclude Include="Ipc\Integration\MAssIpcThread.h">
       <Filter>Ipc\Integration</Filter>
     </ClInclude>
+    <ClInclude Include="Ipc\Integration\MAssIpcData.h">
+      <Filter>Ipc\Integration</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

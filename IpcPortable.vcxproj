@@ -175,6 +175,7 @@
   <ItemGroup>
     <ClInclude Include="Ipc\Integration\MAssIpcAssert.h" />
     <ClInclude Include="Ipc\Integration\MAssIpcCompilerSpecific.h" />
+    <ClInclude Include="Ipc\Integration\MAssIpcData.h" />
     <ClInclude Include="Ipc\Integration\MAssIpcThread.h" />
     <ClInclude Include="Ipc\Integration\Multithread\MAssIpcThreadSafe.h" />
     <ClInclude Include="Ipc\Integration\Singlethread\MAssIpcThreadSafe.h" />

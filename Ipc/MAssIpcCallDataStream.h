@@ -69,10 +69,14 @@ public:
 	MAssIpcCallDataStream &operator<<(float f);
 	MAssIpcCallDataStream &operator<<(double f);
 
+ 	MAssIpcCallDataStream& operator<<(void* p)=delete;// protect for implicit conversion of pointer to bool
+
 	void ReadRawData(uint8_t* data, MAssIpcData::TPacketSize len);
 	void ReadRawData(char* data, MAssIpcData::TPacketSize len);
+	const uint8_t* ReadRawData(MAssIpcData::TPacketSize len);
 	void WriteRawData(const uint8_t* data, MAssIpcData::TPacketSize len);
 	void WriteRawData(const char* data, MAssIpcData::TPacketSize len);
+	uint8_t* WriteRawData(MAssIpcData::TPacketSize len);
 
 	std::unique_ptr<MAssIpcData> DetachData();
 	MAssIpcData* GetData();
