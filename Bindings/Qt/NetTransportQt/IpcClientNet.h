@@ -1,39 +1,35 @@
 #pragma once
 
-#include "IpcCall.h"
-#include "EventgateW.h"
+#include "MAssIpcCall.h"
 #include "IpcClientTcpTransport.h"
-#include "AVLogSimple.h"
 
 #include "PostInterThread.h"
-#include "SynchroLock.h"
 
-class IpcClientNet: private AVLogSimple, private PostInterThread
+class IpcClientNet: public QObject, private PostInterThread
 {
 public:
 
-	struct Handlers
-	{
-		EventgateW<void()> OnDisconnected;
-		EventgateW<void()> OnConnected;
-	};
+	Q_OBJECT;
 
 	IpcClientNet(void);
 	~IpcClientNet(void);
 
-	IpcCall& Call();
+	MAssIpcCall& Call();
 
 	void Init(const Handlers& handlers, const char* ip_address, uint16_t target_port);
 
 	void WaitConnection();
 
 	static bool IsExist();
-	static IpcCall& Get();
+	static MAssIpcCall& Get();
 
 	void SendLog(const char* msg, int msg_char_count) override;
 
 	void OnPostInterThread() override;
 
+signals:
+	void OnDisconnected();
+	void OnConnected();
 
 private:
 
@@ -41,8 +37,8 @@ private:
 	SynchroLock	m_thread_messages_lock;
 	size_t m_constructor_thread_id;
 
-	OPtr<SO<IpcCall> > m_ipc_call;
-	OPtr<IpcClientTcpTransport> m_transport;
+	std::shared_ptr<MAssIpcCall> m_ipc_call;
+	std::unique_ptr<IpcClientTcpTransport> m_transport;
 
 	static IpcClientNet* s_instance;
 };

@@ -1,10 +1,9 @@
 #pragma once
 
 #include <QtCore/QPointer>
+#include "MAssMacros.h"
 
-// Нужен чтобы контролировать RefCounter-ом время жизни QObject-а у которого есть parent
-//
-// typedef SO<ScopedPtrQtSafe<QObject>> RCObject;
+// Used for controling scope-deleted QObject with parent
 template<class TVal>
 class ScopedPtrQtSafe
 {
@@ -39,7 +38,7 @@ public:
 
 	TVal* operator ->() const
 	{
-		return_x_if_equal(m_val,NULL,NULL);
+		mass_return_x_if_equal(m_val,NULL,NULL);
 		return m_val;
 	}
 

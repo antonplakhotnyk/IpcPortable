@@ -1,29 +1,27 @@
 #pragma once
 
-#include "IpcCall.h"
-#include "EventgateW.h"
+#include "MAssIpcCall.h"
 #include "IpcServerTcpTransport.h"
 
 
-class IpcServerNet
+class IpcServerNet: public QObject
 {
+	Q_OBJECT
 public:
-
-	struct Handlers
-	{
-		EventgateW<void()> OnDisconnected;
-		EventgateW<void()> OnConnected;
-	};
 
 	IpcServerNet(void);
 
-	void Init(const Handlers& handlers, uint16_t listen_port);
+	void Init(uint16_t listen_port);
 
-	IpcCall& Call();
+	MAssIpcCall& Call();
+
+signals:
+	void OnDisconnected();
+	void OnConnected();
 
 private:
 
-	OPtr<IpcServerTcpTransport> m_transport;
-	OPtr<SO<IpcCall> > m_ipc_call;
+	std::unique_ptr<IpcServerTcpTransport> m_transport;
+	std::shared_ptr<MAssIpcCall> m_ipc_call;
 };
 

@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "IpcTcpTransportQt.h"
-#include "LockInt.h"
-
+#include "MAssMacros.h"
 
 IpcTcpTransportQt::IpcTcpTransportQt()
 	:m_disconnect_called(false)
@@ -11,11 +10,6 @@ IpcTcpTransportQt::IpcTcpTransportQt()
 
 IpcTcpTransportQt::~IpcTcpTransportQt()
 {
-}
-
-void IpcTcpTransportQt::Init(const Handlers& handlers)
-{
-	m_handlers=handlers;
 }
 
 void IpcTcpTransportQt::AssignConnection(QTcpSocket* connection)
@@ -38,7 +32,7 @@ QTcpSocket* IpcTcpTransportQt::Connection()
 	return m_connection.GetP();
 }
 
-void IpcTcpTransportQt::WaitRespound()
+bool IpcTcpTransportQt::WaitRespond(size_t expected_size)
 {
 	m_connection->waitForReadyRead();
 
@@ -56,19 +50,19 @@ size_t	IpcTcpTransportQt::ReadBytesAvailable()
 
 void	IpcTcpTransportQt::Read(uint8_t* data, size_t size)
 {
-	return_if_equal(m_connection.GetP(), NULL);
+	mass_return_if_equal(m_connection.GetP(), NULL);
 	m_connection->read(reinterpret_cast<char*>(data), size);
 }
 
 void	IpcTcpTransportQt::Write(const uint8_t* data, size_t size)
 {
-	return_if_equal(m_connection.GetP(), NULL);
+	mass_return_if_equal(m_connection.GetP(), NULL);
 	m_connection->write(reinterpret_cast<const char*>(data), size);
 }
 
 void IpcTcpTransportQt::OnConnected()
 {
-	m_handlers.OnConnected();
+	HandlerOnConnected();
 }
 
 void IpcTcpTransportQt::OnDisconnected()
@@ -76,13 +70,13 @@ void IpcTcpTransportQt::OnDisconnected()
 	if( !m_disconnect_called )
 	{
 		m_disconnect_called = true;
-		m_handlers.OnDisconnected();
+		HandlerOnDisconnected();
 	}
 }
 
 void IpcTcpTransportQt::OnReadyRead()
 {
-	m_handlers.ProcessTransport();
+	HandlerProcessTransport();
 }
 
 void IpcTcpTransportQt::OnError(QAbstractSocket::SocketError er)
@@ -90,7 +84,7 @@ void IpcTcpTransportQt::OnError(QAbstractSocket::SocketError er)
 	if( !m_disconnect_called )
 	{
 		m_disconnect_called = true;
-		m_handlers.OnDisconnected();
+		HandlerOnDisconnected();
 	}
 }
 

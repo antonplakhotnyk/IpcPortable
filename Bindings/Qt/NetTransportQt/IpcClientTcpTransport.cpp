@@ -9,10 +9,8 @@ IpcClientTcpTransport::~IpcClientTcpTransport()
 {
 }
 
-void IpcClientTcpTransport::Init(const Handlers& handlers, QHostAddress address, uint16_t target_port)
+void IpcClientTcpTransport::Init(QHostAddress address, uint16_t target_port)
 {
-	IpcTcpTransportQt::Init(handlers);
-
 	QTcpSocket* connection = new QTcpSocket();
 	AssignConnection(connection);
 
@@ -22,6 +20,6 @@ void IpcClientTcpTransport::Init(const Handlers& handlers, QHostAddress address,
 void IpcClientTcpTransport::WaitConnection()
 {
 	bool br = Connection()->waitForConnected();
-	return_if_equal(br, false);
+	mass_return_if_equal(br, false);
 }
 

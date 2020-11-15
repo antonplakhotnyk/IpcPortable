@@ -37,7 +37,7 @@ void IpcClientNet::WaitConnection()
 	m_transport->WaitConnection();
 }
 
-IpcCall& IpcClientNet::Call()
+MAssIpcCall& IpcClientNet::Call()
 {
 	return *m_ipc_call;
 }
@@ -47,9 +47,9 @@ bool IpcClientNet::IsExist()
 	return s_instance;
 }
 
-IpcCall& IpcClientNet::Get()
+MAssIpcCall& IpcClientNet::Get()
 {
-	return_x_if_equal(s_instance, NULL, *(reinterpret_cast<IpcCall*>(NULL)));
+	mass_return_x_if_equal(s_instance, NULL, *(reinterpret_cast<IpcCall*>(NULL)));
 	return s_instance->Call();
 }
 

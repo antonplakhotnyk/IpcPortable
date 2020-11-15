@@ -11,7 +11,7 @@ IpcServerTcpTransport::~IpcServerTcpTransport()
 {
 }
 
-void IpcServerTcpTransport::Init(const Handlers& handlers, uint16_t listen_port)
+void IpcServerTcpTransport::Init(uint16_t listen_port)
 {
 	IpcTcpTransportQt::Init(handlers);
 	m_server.listen(QHostAddress::Any, listen_port);
