@@ -42,7 +42,7 @@ class CallInfo
 {
 public:
 
-	CallInfo(MAssIpcThread::Id thread_id);
+	CallInfo(MAssIpcThreadTransportTarget::Id thread_id);
 
 	virtual std::unique_ptr<MAssIpcData> Invoke(const std::weak_ptr<MAssIpcPacketTransport>& transport, 
 												MAssIpcPacketParser::TCallId respond_id,
@@ -52,7 +52,7 @@ public:
 
 public:
 
-	const MAssIpcThread::Id m_thread_id;
+	const MAssIpcThreadTransportTarget::Id m_thread_id;
 };
 
 
@@ -86,11 +86,11 @@ public:
 
 private:
 
-	static MAssIpcThread::Id MakeResultThreadId(const std::weak_ptr<MAssCallThreadTransport>& inter_thread);
+	static MAssIpcThreadTransportTarget::Id MakeResultThreadId(const std::weak_ptr<MAssCallThreadTransport>& inter_thread);
 
 private:
 
-	MAssIpcThread::Id			m_result_thread_id;
+	MAssIpcThreadTransportTarget::Id			m_result_thread_id;
 	std::weak_ptr<MAssIpcPacketTransport>				m_transport;
 	std::weak_ptr<MAssCallThreadTransport>				m_inter_thread;
 };
@@ -326,7 +326,7 @@ public:
 
 	public:
 
-		Imp(const TDelegate& del, MAssIpcThread::Id thread_id): CallInfo(thread_id), m_del(del)
+		Imp(const TDelegate& del, MAssIpcThreadTransportTarget::Id thread_id): CallInfo(thread_id), m_del(del)
 		{
 		};
 	};
@@ -375,7 +375,7 @@ public:
 
 	public:
 
-		Imp(const TDelegate& del, MAssIpcThread::Id thread_id):CallInfo(thread_id), m_del(del)
+		Imp(const TDelegate& del, MAssIpcThreadTransportTarget::Id thread_id):CallInfo(thread_id), m_del(del)
 		{
 		};
 	};

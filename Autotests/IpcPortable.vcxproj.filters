@@ -80,9 +80,6 @@
     <ClInclude Include="..\Ipc\Integration\MAssIpcAssert.h">
       <Filter>Ipc\Integration</Filter>
     </ClInclude>
-    <ClInclude Include="..\Ipc\Integration\MAssIpcThread.h">
-      <Filter>Ipc\Integration</Filter>
-    </ClInclude>
     <ClInclude Include="..\Ipc\Integration\Multithread\MAssIpcThreadSafe.h">
       <Filter>Ipc\Integration\Multithread</Filter>
     </ClInclude>
@@ -94,6 +91,9 @@
     </ClInclude>
     <ClInclude Include="CompilerSpecific.h">
       <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Ipc\Integration\MAssIpcThreadTransportTarget.h">
+      <Filter>Ipc\Integration</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

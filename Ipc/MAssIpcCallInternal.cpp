@@ -45,7 +45,7 @@ MAssIpcCallDataStream CreateDataStreamInplace(std::unique_ptr<MAssIpcData>& inpl
 }
 
 //-------------------------------------------------------
-CallInfo::CallInfo(MAssIpcThread::Id thread_id)
+CallInfo::CallInfo(MAssIpcThreadTransportTarget::Id thread_id)
 	:m_thread_id(thread_id)
 {
 };
@@ -78,10 +78,10 @@ CallJob::CallJob(const std::weak_ptr<MAssIpcPacketTransport>& transport, const s
 {
 }
 
-MAssIpcThread::Id CallJob::MakeResultThreadId(const std::weak_ptr<MAssCallThreadTransport>& inter_thread)
+MAssIpcThreadTransportTarget::Id CallJob::MakeResultThreadId(const std::weak_ptr<MAssCallThreadTransport>& inter_thread)
 {
 	auto inter_thread_strong = inter_thread.lock();
-	return inter_thread_strong ? inter_thread_strong->GetResultSendThreadId() : MAssIpcThread::c_no_thread;
+	return inter_thread_strong ? inter_thread_strong->GetResultSendThreadId() : MAssCallThreadTransport::NoThread();
 }
 
 void CallJob::Invoke()

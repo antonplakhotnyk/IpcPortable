@@ -256,14 +256,14 @@ class MAssCallThreadTransport_Stub: public MAssCallThreadTransport
 {
 public:
 
-	void			CallFromThread(MAssIpcThread::Id thread_id, std::unique_ptr<Job> job) override
+	void			CallFromThread(MAssIpcThreadTransportTarget::Id thread_id, std::unique_ptr<Job> job) override
 	{
 		job->Invoke();
 	}
 
-	MAssIpcThread::Id	GetResultSendThreadId() override
+	MAssIpcThreadTransportTarget::Id	GetResultSendThreadId() override
 	{
-		return MAssIpcThread::Id(2);
+		return MAssIpcThreadTransportTarget::Id(2);
 	}
 };
 
@@ -311,7 +311,7 @@ void TestThreads_Handler(std::shared_ptr<IpcPackerTransportMemory> transport_buf
 void TestThreads_Sender(std::shared_ptr<IpcPackerTransportMemory> transport_buffer, MAssIpcCall call)
 {
 	std::stringstream ss;
-	ss<<std::this_thread::get_id();
+	ss<<MAssIpcThreadSafe::get_id();
 
 	uint8_t a = 1;
 	std::string b = ss.str();
@@ -508,7 +508,7 @@ void Main_IpcService(std::shared_ptr<IpcPackerTransportMemory> transport_buffer)
 	call.SetErrorHandler(MAssIpcCall::TErrorHandler(&OnInvalidRemoteCall));
 
 	// 	call.AddHandler("Ipc_Proc1", DelegateW<std::string(uint8_t, std::string, uint32_t)>().BindS(&Ipc_Proc1));
-	call.AddHandler("IsLinkUp_Sta", std::function<bool()>(&IsLinkUp), MAssIpcThread::Id(3));
+	call.AddHandler("IsLinkUp_Sta", std::function<bool()>(&IsLinkUp), MAssIpcThreadTransportTarget::Id(3));
 	call.AddHandler("Ipc_Proc4", std::function<void()>(&Ipc_Proc4));
 	call.AddHandler("Ipc_Proc1", std::function<std::string(uint8_t, std::string, uint32_t)>(&Ipc_Proc1));
 	call.AddHandler("Ipc_Proc3", std::function<void(uint8_t, std::string, uint32_t)>(&Ipc_Proc3));

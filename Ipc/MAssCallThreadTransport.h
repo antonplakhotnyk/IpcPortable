@@ -1,6 +1,6 @@
 #pragma once
 
-#include "MAssIpcThread.h"
+#include "MAssIpcThreadTransportTarget.h"
 #include <memory>
 
 class MAssCallThreadTransport
@@ -14,7 +14,12 @@ public:
 		virtual void Invoke() = 0;
 	};
 
-	virtual void			CallFromThread(MAssIpcThread::Id thread_id, std::unique_ptr<Job> job) = 0;
-	virtual MAssIpcThread::Id	GetResultSendThreadId()=0;
+	static inline MAssIpcThreadTransportTarget::Id NoThread()
+	{
+		return MAssIpcThreadTransportTarget::Id();
+	}
+
+	virtual void			CallFromThread(MAssIpcThreadTransportTarget::Id thread_id, std::unique_ptr<Job> job) = 0;
+	virtual MAssIpcThreadTransportTarget::Id	GetResultSendThreadId()=0;
 };
 

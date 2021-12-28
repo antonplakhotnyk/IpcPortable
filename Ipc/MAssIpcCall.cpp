@@ -143,7 +143,7 @@ MAssIpcCall::CallDataBuffer MAssIpcCall::ReceiveCallDataBuffer(std::unique_ptr<M
 MAssIpcCallDataStream MAssIpcCall::ProcessTransportResponse(MAssIpcCallInternal::MAssIpcPacketParser::TCallId wait_response_id,
 										   bool process_incoming_calls) const
 {
-	std::unique_lock<LockCurrentThreadId> lock_thread_waiting_transport(m_int->m_pending_responses.m_thread_waiting_transport, std::defer_lock_t());
+	MAssIpcThreadSafe::unique_lock<LockCurrentThreadId> lock_thread_waiting_transport(m_int->m_pending_responses.m_thread_waiting_transport, MAssIpcThreadSafe::defer_lock_t());
 
 	const bool wait_incoming_packet = (wait_response_id!=MAssIpcPacketParser::c_invalid_id);
 
@@ -249,23 +249,23 @@ MAssIpcCallDataStream MAssIpcCall::ProcessTransportResponse(MAssIpcCallInternal:
 
 void MAssIpcCall::LockCurrentThreadId::lock()
 {
-	mass_assert_if_not_equal(m_locked_id, std::thread::id::id());
-	m_locked_id = std::this_thread::get_id();
+	mass_assert_if_not_equal(m_locked_id, MAssIpcThreadSafe::id());
+	m_locked_id = MAssIpcThreadSafe::get_id();
 	}
 
 void MAssIpcCall::LockCurrentThreadId::unlock()
 {
-	m_locked_id = std::thread::id::id();
+	m_locked_id = MAssIpcThreadSafe::id();
 }
 
 bool MAssIpcCall::LockCurrentThreadId::IsLocked() const
 {
-	return (m_locked_id != std::thread::id::id());
+	return (m_locked_id != MAssIpcThreadSafe::id());
 }
 
 bool MAssIpcCall::LockCurrentThreadId::IsCurrent() const
 {
-	return (m_locked_id == std::this_thread::get_id());
+	return (m_locked_id == MAssIpcThreadSafe::get_id());
 }
 
 void MAssIpcCall::ProcessTransport()

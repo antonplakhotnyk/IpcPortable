@@ -69,10 +69,10 @@ public:
 
 	template<class TDelegateW>
 	void AddHandler(const std::string& proc_name, const TDelegateW& del,
-					MAssIpcThread::Id thread_id = MAssIpcThread::c_no_thread);
+					MAssIpcThreadTransportTarget::Id thread_id = MAssCallThreadTransport::NoThread());
 	template<class TDelegateW>
 	void AddHandler(const std::string& proc_name, const TDelegateW& del, const std::string& comment,
-					MAssIpcThread::Id thread_id = MAssIpcThread::c_no_thread);
+					MAssIpcThreadTransportTarget::Id thread_id = MAssCallThreadTransport::NoThread());
 
 	void SetErrorHandler(TErrorHandler OnInvalidRemoteCall);
 
@@ -129,7 +129,7 @@ private:
 		bool IsLocked() const;
 
 	private:
-		std::thread::id m_locked_id = std::thread::id::id();
+		MAssIpcThreadSafe::id m_locked_id = MAssIpcThreadSafe::id();
 	};
 
 	struct PendingResponces
@@ -188,14 +188,14 @@ private:
 //-------------------------------------------------------
 
 template<class TDelegateW>
-void MAssIpcCall::AddHandler(const std::string& proc_name, const TDelegateW& del, MAssIpcThread::Id thread_id)
+void MAssIpcCall::AddHandler(const std::string& proc_name, const TDelegateW& del, MAssIpcThreadTransportTarget::Id thread_id)
 {
 	AddHandler(proc_name, del, std::string(), thread_id);
 }
 
 template<class TDelegateW>
 void MAssIpcCall::AddHandler(const std::string& proc_name, const TDelegateW& del, const std::string& comment,
-						 MAssIpcThread::Id thread_id)
+						 MAssIpcThreadTransportTarget::Id thread_id)
 {
 	static_assert(!std::is_bind_expression<TDelegateW>::value, "can not deduce signature from bind_expression, use std::function<>(std::bind())");
 	const std::shared_ptr<MAssIpcCallInternal::CallInfo> call_info(std::make_shared<typename MAssIpcCallInternal::Impl_Selector<TDelegateW>::Res>(del, thread_id));
