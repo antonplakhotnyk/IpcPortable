@@ -2,14 +2,12 @@
 #include <thread>
 #include <condition_variable>
 #include <mutex>
-#include "Ipc/MAssIpcCall.h"
+#include "../Ipc/MAssIpcCall.h"
 #include <functional>
-#include "Ipc/MAssMacros.h"
+#include "../Ipc/MAssMacros.h"
 #include <sstream>
 #include <mutex>
 #include <condition_variable>
-
-
 
 // struct TestStruct
 // {
@@ -25,12 +23,22 @@
 // }																
 // };
 
+// void* operator new(std::size_t n) throw(std::bad_alloc)
+// {
+// 	return malloc();
+// }
+// void operator delete(void* p) throw()
+// {
+// 	//...
+// }
+
 
 class IpcTransportMemory: public MAssIpcCallTransport
 {
 private:
 	struct SyncData
 	{
+		std::function<void()> on_read;
 		std::mutex	lock;
 		bool incoming_data = false;
 		bool cancel_wait_respond = false;
@@ -50,6 +58,12 @@ public:
 		:m_read(new SyncData)
 		, m_write(new SyncData)
 	{
+	}
+
+	void SetHnadler_OnRead(std::function<void()> on_read, bool sync_data_read)
+	{
+		std::shared_ptr<SyncData>& sync_data = sync_data_read ? m_read : m_write;
+		sync_data->on_read = on_read;
 	}
 
 	std::shared_ptr<IpcTransportMemory> CreateComplementar()
@@ -82,6 +96,8 @@ public:
 	{
 		std::lock_guard<std::mutex> lock(m_read->lock);
 		SyncData& sync = *m_read;
+		if( sync.on_read )
+			sync.on_read();// it not necessary but ipc must survive this
 		if( sync.data.size()<size )
 			return;// unexpected
 		std::copy(sync.data.begin(), sync.data.begin()+size, data);
@@ -120,6 +136,7 @@ class IpcPackerTransportMemory: public MAssIpcPacketTransport
 private:
 	struct SyncData
 	{
+		std::function<void()> on_read;
 		std::mutex	lock;
 		bool incoming_data = false;
 		bool cancel_wait_respond = false;
@@ -167,6 +184,12 @@ public:
 	{
 	}
 
+	void SetHnadler_OnRead(std::function<void()> on_read, bool sync_data_read)
+	{
+		std::shared_ptr<SyncData>& sync_data = sync_data_read ? m_read : m_write;
+		sync_data->on_read = on_read;
+	}
+
 	std::shared_ptr<IpcPackerTransportMemory> CreateComplementar()
 	{
 		return std::shared_ptr<IpcPackerTransportMemory>(new IpcPackerTransportMemory(m_write, m_read));
@@ -187,6 +210,8 @@ public:
 	bool	Read(bool wait_incoming_packet, std::unique_ptr<MAssIpcData>* packet) override
 	{
 		std::unique_lock<std::mutex> lock(m_read->lock);
+		if( m_read->on_read )
+			m_read->on_read();// it not necessary but ipc must survive this
 		while( m_read->data.empty() && (!m_read->cancel_wait_respond) )
 		{
 			if( wait_incoming_packet )
@@ -231,14 +256,14 @@ class MAssCallThreadTransport_Stub: public MAssCallThreadTransport
 {
 public:
 
-	void			CallFromThread(MAssThread::Id thread_id, const std::shared_ptr<Job>& job) override
+	void			CallFromThread(MAssIpcThread::Id thread_id, std::unique_ptr<Job> job) override
 	{
 		job->Invoke();
 	}
 
-	MAssThread::Id	GetResultSendThreadId() override
+	MAssIpcThread::Id	GetResultSendThreadId() override
 	{
-		return MAssThread::Id(2);
+		return MAssIpcThread::Id(2);
 	}
 };
 
@@ -363,6 +388,9 @@ void TestThreads_MainThread()
 	call_handler.SetErrorHandler(MAssIpcCall::TErrorHandler(&OnInvalidRemoteCall));
 	call_handler.SetTransport(complementar_buffer);
 
+	transport_buffer->SetHnadler_OnRead([&](){call_sender.ProcessTransport();}, true);
+	transport_buffer->SetHnadler_OnRead([&](){call_handler.ProcessTransport();}, false);
+
 	call_handler.AddHandler("TestThreads_Proc3", std::function<std::string(uint8_t, std::string, uint32_t)>(&TestThreads_Proc3));
 	call_handler.AddHandler("TestThreads_HandlerWithCallBack", std::function<std::string()>(std::bind(&TestThreads_HandlerWithCallBack, call_handler)));
 
@@ -480,7 +508,7 @@ void Main_IpcService(std::shared_ptr<IpcPackerTransportMemory> transport_buffer)
 	call.SetErrorHandler(MAssIpcCall::TErrorHandler(&OnInvalidRemoteCall));
 
 	// 	call.AddHandler("Ipc_Proc1", DelegateW<std::string(uint8_t, std::string, uint32_t)>().BindS(&Ipc_Proc1));
-	call.AddHandler("IsLinkUp_Sta", std::function<bool()>(&IsLinkUp), MAssThread::Id(3));
+	call.AddHandler("IsLinkUp_Sta", std::function<bool()>(&IsLinkUp), MAssIpcThread::Id(3));
 	call.AddHandler("Ipc_Proc4", std::function<void()>(&Ipc_Proc4));
 	call.AddHandler("Ipc_Proc1", std::function<std::string(uint8_t, std::string, uint32_t)>(&Ipc_Proc1));
 	call.AddHandler("Ipc_Proc3", std::function<void(uint8_t, std::string, uint32_t)>(&Ipc_Proc3));
@@ -560,12 +588,6 @@ void Main_IpcClient()
 	call.WaitInvoke("Ipc_Proc3", a1, b, c);
 	call.AsyncInvoke("Ipc_Proc3", a, b, c);
 	call.WaitInvoke("Ipc_Proc3", TestEnum1::te1_a);
-
-	auto packet_size = MAssIpcCall::CalcCallSize<std::string>(true, "Ipc_Proc1", a, b, c);
-	std::unique_ptr<MAssIpcData> inplace_send_buffer(new MAssIpcCallInternal::MAssIpcData_Vector(packet_size));
-	std::string res4 = call.WaitInvokeRet<std::string>(std::move(inplace_send_buffer), "Ipc_Proc1", a, b, c);
-	mass_return_if_not_equal(res2, res4);
-
 // 	TestStruct tstr;
 // 	call.AsyncInvoke("TestProc", tstr);
 	MAssIpcCall_EnumerateData enum_data = call.EnumerateRemote();

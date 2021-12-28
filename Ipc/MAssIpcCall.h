@@ -30,9 +30,13 @@ public:
 	MAssIpcCall(const MAssIpcCall&)=default;
 	MAssIpcCall& operator=(const MAssIpcCall&) = default;
 	MAssIpcCall(const std::weak_ptr<MAssCallThreadTransport>& inter_thread_nullable);
+	MAssIpcCall(const std::weak_ptr<MAssIpcCallTransport>& transport, const std::weak_ptr<MAssCallThreadTransport>& inter_thread_nullable);
+	MAssIpcCall(const std::weak_ptr<MAssIpcPacketTransport>& transport, const std::weak_ptr<MAssCallThreadTransport>& inter_thread_nullable);
 
 	void SetTransport(const std::weak_ptr<MAssIpcCallTransport>& transport);
 	void SetTransport(const std::weak_ptr<MAssIpcPacketTransport>& transport);
+	void AddAllHandlers(const MAssIpcCall& other);
+	void ClearAllHandlers();
 
 	template<class TRet, class... TArgs>
 	TRet WaitInvokeRet(const std::string& proc_name, const TArgs&... args) const;
@@ -65,10 +69,10 @@ public:
 
 	template<class TDelegateW>
 	void AddHandler(const std::string& proc_name, const TDelegateW& del,
-					MAssThread::Id thread_id = MAssThread::c_no_thread);
+					MAssIpcThread::Id thread_id = MAssIpcThread::c_no_thread);
 	template<class TDelegateW>
 	void AddHandler(const std::string& proc_name, const TDelegateW& del, const std::string& comment,
-					MAssThread::Id thread_id = MAssThread::c_no_thread);
+					MAssIpcThread::Id thread_id = MAssIpcThread::c_no_thread);
 
 	void SetErrorHandler(TErrorHandler OnInvalidRemoteCall);
 
@@ -81,9 +85,8 @@ public:
 
 private:
 
-	static void SerializeCallSignature(MAssIpcCallDataStream& call_info, const std::string& proc_name,
-									   bool send_return, const std::string& return_type,
-									   const std::string& params_type);
+	template<class TRet, class... TArgs>
+	static void SerializeCallSignature(MAssIpcCallDataStream& call_info, const std::string& proc_name, bool send_return);
 
 	template<class TRet, class... TArgs>
 	static void SerializeCall(MAssIpcCallDataStream& call_info, const std::string& proc_name, bool send_return, const TArgs&... args);
@@ -117,14 +120,25 @@ private:
 
 private:
 
+	struct LockCurrentThreadId
+	{
+		void lock();
+		void unlock();
+
+		bool IsCurrent() const;
+		bool IsLocked() const;
+
+	private:
+		std::thread::id m_locked_id = std::thread::id::id();
+	};
 
 	struct PendingResponces
 	{
 		// all membersaccess only during unique_lock(m_lock)
 		MAssIpcThreadSafe::mutex m_lock;
 
+		LockCurrentThreadId m_thread_waiting_transport;
 		MAssIpcCallInternal::MAssIpcPacketParser::TCallId m_incremental_id = 0;
-		volatile bool m_another_thread_waiting_transport = false;
 		MAssIpcThreadSafe::condition_variable m_write_cond;
 		std::map<MAssIpcCallInternal::MAssIpcPacketParser::TCallId, CallDataBuffer> m_id_data_return;
 		std::list<CallDataBuffer> m_data_incoming_call;
@@ -151,7 +165,7 @@ private:
 
 		struct CreateCallJobRes
 		{
-			std::shared_ptr<MAssIpcCallInternal::CallJob> obj;
+			std::unique_ptr<MAssIpcCallInternal::CallJob> obj;
 			bool send_return = false;
 			ErrorType error = ErrorType::unknown_error;
 			std::string message;
@@ -174,16 +188,17 @@ private:
 //-------------------------------------------------------
 
 template<class TDelegateW>
-void MAssIpcCall::AddHandler(const std::string& proc_name, const TDelegateW& del, MAssThread::Id thread_id)
+void MAssIpcCall::AddHandler(const std::string& proc_name, const TDelegateW& del, MAssIpcThread::Id thread_id)
 {
 	AddHandler(proc_name, del, std::string(), thread_id);
 }
 
 template<class TDelegateW>
 void MAssIpcCall::AddHandler(const std::string& proc_name, const TDelegateW& del, const std::string& comment,
-						 MAssThread::Id thread_id)
+						 MAssIpcThread::Id thread_id)
 {
-	const std::shared_ptr<MAssIpcCallInternal::CallInfo> call_info(new typename MAssIpcCallInternal::Impl_Selector<TDelegateW>::Res(del, thread_id));
+	static_assert(!std::is_bind_expression<TDelegateW>::value, "can not deduce signature from bind_expression, use std::function<>(std::bind())");
+	const std::shared_ptr<MAssIpcCallInternal::CallInfo> call_info(std::make_shared<typename MAssIpcCallInternal::Impl_Selector<TDelegateW>::Res>(del, thread_id));
 	std::string params_type;
 	MAssIpcCallInternal::ProcSignature<typename MAssIpcCallInternal::Impl_Selector<TDelegateW>::TDelProcUnified>::GetParams(&params_type);
 	m_int->m_proc_map.AddProcSignature(proc_name, params_type, call_info, comment);
@@ -198,7 +213,7 @@ MAssIpcData::TPacketSize MAssIpcCall::CalcCallSize(bool send_return, const std::
 }
 
 template<class TRet, class... TArgs>
-void MAssIpcCall::SerializeCall(MAssIpcCallDataStream& call_info, const std::string& proc_name, bool send_return, const TArgs&... args)
+void MAssIpcCall::SerializeCallSignature(MAssIpcCallDataStream& call_info, const std::string& proc_name, bool send_return)
 {
 	typedef TRet(*TreatProc)(TArgs...);
 	std::string return_type;
@@ -206,7 +221,13 @@ void MAssIpcCall::SerializeCall(MAssIpcCallDataStream& call_info, const std::str
 	return_type = MAssIpcType<TRet>::NameValue();
 	MAssIpcCallInternal::ProcSignature<TreatProc>::GetParams(&params_type);
 
-	MAssIpcCall::SerializeCallSignature(call_info, proc_name, send_return, return_type, params_type);
+	call_info<<proc_name<<send_return<<return_type<<params_type;
+}
+
+template<class TRet, class... TArgs>
+void MAssIpcCall::SerializeCall(MAssIpcCallDataStream& call_info, const std::string& proc_name, bool send_return, const TArgs&... args)
+{
+	MAssIpcCall::SerializeCallSignature<TRet, TArgs...>(call_info, proc_name, send_return);
 	MAssIpcCallInternal::SerializeArgs(call_info, args...);
 }
 

@@ -49,7 +49,7 @@ void MAssIpcPacketParser::ReceiveReadHeader(const std::shared_ptr<MAssIpcCallTra
 	m_incoming_packet_size = MAssIpcCallDataStream::ReadUnsafe<decltype(m_incoming_packet_size)>(data_raw);
 
 	// sanity check? type? size? crc?
-	m_incoming_packet_header_data.reset(new MAssIpcData_Vector(c_net_call_packet_header_size+m_incoming_packet_size));
+	m_incoming_packet_header_data = std::make_unique<MAssIpcData_Vector>(c_net_call_packet_header_size+m_incoming_packet_size);
 	memcpy(m_incoming_packet_header_data->Data(), data_raw, sizeof(data_raw));
 }
 

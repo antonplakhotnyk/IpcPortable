@@ -1,10 +1,10 @@
 #pragma once
 
 
-class MAssThread
+class MAssIpcThread
 {
 public:
 
 	typedef size_t Id;
-	static const Id c_no_thread = MAssThread::Id(-1);
+	static const Id c_no_thread = MAssIpcThread::Id(-1);
 };

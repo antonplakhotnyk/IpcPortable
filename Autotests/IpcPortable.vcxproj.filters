@@ -17,13 +17,13 @@
       <UniqueIdentifier>{4ebc2275-3364-4e2a-bd62-72772bf4038b}</UniqueIdentifier>
     </Filter>
     <Filter Include="Ipc\Integration">
-      <UniqueIdentifier>{55b634dc-c833-4323-8090-b3f83730cb81}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Ipc\Integration\Singlethread">
-      <UniqueIdentifier>{5dd8513c-a40a-4c63-8705-cf348177c9f0}</UniqueIdentifier>
+      <UniqueIdentifier>{ca54401e-aed9-4512-8276-bef30416af8a}</UniqueIdentifier>
     </Filter>
     <Filter Include="Ipc\Integration\Multithread">
-      <UniqueIdentifier>{5cbc455e-ed37-4964-be7e-5a919cdf901b}</UniqueIdentifier>
+      <UniqueIdentifier>{f989c639-7ef8-49e2-bdc3-400e8185f2b5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Ipc\Integration\Singlethread">
+      <UniqueIdentifier>{9e7462b1-f370-4c0d-8735-567d723a7d33}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -33,19 +33,19 @@
     <ClCompile Include="stdafx.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Ipc\MAssIpcCall.cpp">
+    <ClCompile Include="..\Ipc\MAssIpcCall.cpp">
       <Filter>Ipc</Filter>
     </ClCompile>
-    <ClCompile Include="Ipc\MAssIpcCallDataStream.cpp">
+    <ClCompile Include="..\Ipc\MAssIpcCallDataStream.cpp">
       <Filter>Ipc</Filter>
     </ClCompile>
-    <ClCompile Include="Ipc\MAssIpcCallInternal.cpp">
+    <ClCompile Include="..\Ipc\MAssIpcCallInternal.cpp">
       <Filter>Ipc</Filter>
     </ClCompile>
-    <ClCompile Include="Ipc\MAssIpcPacketParser.cpp">
+    <ClCompile Include="..\Ipc\MAssIpcPacketParser.cpp">
       <Filter>Ipc</Filter>
     </ClCompile>
-    <ClCompile Include="Ipc\MAssIpcPacketTransportDefault.cpp">
+    <ClCompile Include="..\Ipc\MAssIpcPacketTransportDefault.cpp">
       <Filter>Ipc</Filter>
     </ClCompile>
   </ItemGroup>
@@ -53,47 +53,47 @@
     <ClInclude Include="stdafx.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="Ipc\MAssIpcCall.h">
+    <ClInclude Include="..\Ipc\MAssIpcCall.h">
       <Filter>Ipc</Filter>
     </ClInclude>
-    <ClInclude Include="Ipc\MAssIpcCallInternal.h">
+    <ClInclude Include="..\Ipc\MAssIpcCallInternal.h">
       <Filter>Ipc</Filter>
     </ClInclude>
-    <ClInclude Include="Ipc\MAssIpcCallDataStream.h">
+    <ClInclude Include="..\Ipc\MAssIpcCallDataStream.h">
       <Filter>Ipc</Filter>
     </ClInclude>
-    <ClInclude Include="Ipc\MAssIpcCallTransport.h">
+    <ClInclude Include="..\Ipc\MAssIpcCallTransport.h">
       <Filter>Ipc</Filter>
     </ClInclude>
-    <ClInclude Include="Ipc\MAssCallThreadTransport.h">
+    <ClInclude Include="..\Ipc\MAssCallThreadTransport.h">
       <Filter>Ipc</Filter>
     </ClInclude>
-    <ClInclude Include="Ipc\MAssMacros.h">
+    <ClInclude Include="..\Ipc\MAssMacros.h">
       <Filter>Ipc</Filter>
     </ClInclude>
-    <ClInclude Include="Ipc\MAssIpcPacketParser.h">
+    <ClInclude Include="..\Ipc\MAssIpcPacketParser.h">
       <Filter>Ipc</Filter>
     </ClInclude>
-    <ClInclude Include="Ipc\MAssIpcPacketTransportDefault.h">
+    <ClInclude Include="..\Ipc\MAssIpcPacketTransportDefault.h">
       <Filter>Ipc</Filter>
     </ClInclude>
-    <ClInclude Include="Ipc\Integration\Multithread\MAssIpcThreadSafe.h">
+    <ClInclude Include="..\Ipc\Integration\MAssIpcAssert.h">
+      <Filter>Ipc\Integration</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Ipc\Integration\MAssIpcThread.h">
+      <Filter>Ipc\Integration</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Ipc\Integration\Multithread\MAssIpcThreadSafe.h">
       <Filter>Ipc\Integration\Multithread</Filter>
     </ClInclude>
-    <ClInclude Include="Ipc\Integration\Singlethread\MAssIpcThreadSafe.h">
+    <ClInclude Include="..\Ipc\Integration\Singlethread\MAssIpcThreadSafe.h">
       <Filter>Ipc\Integration\Singlethread</Filter>
     </ClInclude>
-    <ClInclude Include="Ipc\Integration\MAssIpcAssert.h">
-      <Filter>Ipc\Integration</Filter>
+    <ClInclude Include="..\Ipc\MAssIpcData.h">
+      <Filter>Ipc</Filter>
     </ClInclude>
-    <ClInclude Include="Ipc\Integration\MAssIpcCompilerSpecific.h">
-      <Filter>Ipc\Integration</Filter>
-    </ClInclude>
-    <ClInclude Include="Ipc\Integration\MAssIpcThread.h">
-      <Filter>Ipc\Integration</Filter>
-    </ClInclude>
-    <ClInclude Include="Ipc\Integration\MAssIpcData.h">
-      <Filter>Ipc\Integration</Filter>
+    <ClInclude Include="CompilerSpecific.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

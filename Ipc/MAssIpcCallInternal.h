@@ -24,12 +24,25 @@ MAssIpcCallDataStream CreateDataStreamInplace(std::unique_ptr<MAssIpcData>& inpl
 
 //-------------------------------------------------------
 
+template<class TFrom, class TTo>
+auto DeduceAvailable(int) -> decltype(TTo(std::declval<TFrom>()), std::true_type{});
+
+template<class, class>
+auto DeduceAvailable(...)->std::false_type;
+
+template<class TFrom, class TTo>
+class IsConvertible: public decltype(DeduceAvailable<TFrom, TTo>(0))
+{
+};
+
+//-------------------------------------------------------
+
 
 class CallInfo
 {
 public:
 
-	CallInfo(MAssThread::Id thread_id);
+	CallInfo(MAssIpcThread::Id thread_id);
 
 	virtual std::unique_ptr<MAssIpcData> Invoke(const std::weak_ptr<MAssIpcPacketTransport>& transport, 
 												MAssIpcPacketParser::TCallId respond_id,
@@ -39,7 +52,7 @@ public:
 
 public:
 
-	const MAssThread::Id m_thread_id;
+	const MAssIpcThread::Id m_thread_id;
 };
 
 
@@ -73,11 +86,11 @@ public:
 
 private:
 
-	static MAssThread::Id MakeResultThreadId(const std::weak_ptr<MAssCallThreadTransport>& inter_thread);
+	static MAssIpcThread::Id MakeResultThreadId(const std::weak_ptr<MAssCallThreadTransport>& inter_thread);
 
 private:
 
-	MAssThread::Id			m_result_thread_id;
+	MAssIpcThread::Id			m_result_thread_id;
 	std::weak_ptr<MAssIpcPacketTransport>				m_transport;
 	std::weak_ptr<MAssCallThreadTransport>				m_inter_thread;
 };
@@ -90,6 +103,8 @@ public:
 	std::shared_ptr<const CallInfo> FindCallInfo(const std::string& name, std::string& signature) const;
 	MAssIpcCall_EnumerateData EnumerateHandlers() const;
 	void AddProcSignature(const std::string& proc_name, std::string& params_type, const std::shared_ptr<MAssIpcCallInternal::CallInfo>& call_info, const std::string& comment);
+	void AddAllProcs(const ProcMap& other);
+	void ClearAllProcs();
 
 public:
 
@@ -228,9 +243,10 @@ static constexpr bool IsSeparatorInName(size_t i)
 }
 
 template<const char t_name[]>
-static constexpr void CheckSeparatorInName()
+static constexpr bool CheckSeparatorInName()
 {
 	static_assert(IsSeparatorInName<t_name>(0), "invalid type name contains separator");
+	return true;
 }
 
 
@@ -252,6 +268,24 @@ struct ProcSignature<TRet(*)(TArgs... args)>
 	};
 
 };
+
+struct IsCallable_Check
+{
+	template<class TDelegate>
+	static inline bool ToBool(const TDelegate& del){return bool(del);}
+};
+
+struct IsCallable_True
+{
+	template<class TDelegate>
+	static constexpr bool ToBool(const TDelegate& del){return true;}
+};
+
+template<class TDelegate>
+static inline bool IsBoolConvertible(const TDelegate& del)
+{
+	return std::conditional<IsConvertible<TDelegate, bool>::value, IsCallable_Check, IsCallable_True>::type::ToBool(del);
+}
 
 //-------------------------------------------------------
 
@@ -278,12 +312,11 @@ public:
 
 			MAssIpcCallDataStream data_stream(CreateDataStream(transport, 0, MAssIpcPacketParser::PacketType::pt_return, respond_id));
 			return data_stream.DetachData();
-			return {};
 		}
 
 		bool IsCallable() const override
 		{
-			return bool(m_del);
+			return IsBoolConvertible(m_del);
 		}
 
 		const char* GetSignature_RetType() const override
@@ -293,7 +326,7 @@ public:
 
 	public:
 
-		Imp(const TDelegate& del, MAssThread::Id thread_id): CallInfo(thread_id), m_del(del)
+		Imp(const TDelegate& del, MAssIpcThread::Id thread_id): CallInfo(thread_id), m_del(del)
 		{
 		};
 	};
@@ -332,7 +365,7 @@ public:
 
 		bool IsCallable() const override
 		{
-			return bool(m_del);
+			return IsBoolConvertible(m_del);
 		}
 
 		const char* GetSignature_RetType() const override
@@ -342,7 +375,7 @@ public:
 
 	public:
 
-		Imp(const TDelegate& del, MAssThread::Id thread_id):CallInfo(thread_id), m_del(del)
+		Imp(const TDelegate& del, MAssIpcThread::Id thread_id):CallInfo(thread_id), m_del(del)
 		{
 		};
 	};
@@ -373,8 +406,8 @@ class MAssIpcData_Vector: public MAssIpcData
 public:
 
 	MAssIpcData_Vector() = default;
-	MAssIpcData_Vector(size_t size)
-		: m_storage(new uint8_t[size])
+	MAssIpcData_Vector(MAssIpcData::TPacketSize size)
+		: m_storage(std::make_unique<uint8_t[]>(size))
 		, m_storage_size(size)
 	{
 	}

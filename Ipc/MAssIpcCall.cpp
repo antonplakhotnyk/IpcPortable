@@ -5,14 +5,26 @@
 using namespace MAssIpcCallInternal;
 
 MAssIpcCall::MAssIpcCall(const std::weak_ptr<MAssCallThreadTransport>& inter_thread_nullable)
-	:m_int(new Internals)
+	:m_int(std::make_shared<Internals>())
 {
 	m_int->m_inter_thread_nullable = inter_thread_nullable;
 }
 
+MAssIpcCall::MAssIpcCall(const std::weak_ptr<MAssIpcCallTransport>& transport, const std::weak_ptr<MAssCallThreadTransport>& inter_thread_nullable)
+	: MAssIpcCall(inter_thread_nullable)
+{
+	SetTransport(transport);
+}
+
+MAssIpcCall::MAssIpcCall(const std::weak_ptr<MAssIpcPacketTransport>& transport, const std::weak_ptr<MAssCallThreadTransport>& inter_thread_nullable)
+	: MAssIpcCall(inter_thread_nullable)
+{
+	SetTransport(transport);
+}
+
 void MAssIpcCall::SetTransport(const std::weak_ptr<MAssIpcCallTransport>& transport)
 {
-	m_int->m_transport_default.reset(new MAssIpcPacketTransportDefault(transport));
+	m_int->m_transport_default = std::make_shared<MAssIpcPacketTransportDefault>(transport);
 	m_int->m_transport = m_int->m_transport_default;
 }
 
@@ -20,6 +32,16 @@ void MAssIpcCall::SetTransport(const std::weak_ptr<MAssIpcPacketTransport>& tran
 {
 	m_int->m_transport_default.reset();
 	m_int->m_transport = transport;
+}
+
+void MAssIpcCall::AddAllHandlers(const MAssIpcCall& other)
+{
+	m_int->m_proc_map.AddAllProcs(other.m_int->m_proc_map);
+}
+
+void MAssIpcCall::ClearAllHandlers()
+{
+	m_int->m_proc_map.ClearAllProcs();
 }
 
 void MAssIpcCall::DeserializeNameSignature(MAssIpcCallDataStream& call_info, std::string* proc_name, bool* send_return, std::string* return_type, std::string* params_type)
@@ -32,7 +54,7 @@ MAssIpcCall::Internals::CreateCallJobRes MAssIpcCall::Internals::CreateCallJob(c
 																			   MAssIpcCallInternal::MAssIpcPacketParser::TCallId id) const
 {
 	CreateCallJobRes res = {};
-	std::shared_ptr<MAssIpcCallInternal::CallJob> call_job(new MAssIpcCallInternal::CallJob(transport, m_inter_thread_nullable, call_info_data, id));
+	std::unique_ptr<MAssIpcCallInternal::CallJob> call_job(std::make_unique<MAssIpcCallInternal::CallJob>(transport, m_inter_thread_nullable, call_info_data, id));
 
 	{
 		std::string return_type;
@@ -66,7 +88,7 @@ MAssIpcCall::Internals::CreateCallJobRes MAssIpcCall::Internals::CreateCallJob(c
 		}
 	}
 
-	res.obj = call_job;
+	res.obj = std::move(call_job);
 	return res;
 }
 
@@ -88,7 +110,10 @@ void MAssIpcCall::Internals::InvokeLocal(MAssIpcCallDataStream& call_info_data, 
 	{
 		auto inter_thread_nullable = m_inter_thread_nullable.lock();
 		if( inter_thread_nullable )
-			inter_thread_nullable->CallFromThread(call_job.obj->m_call_info->m_thread_id, call_job.obj);
+		{
+			auto thread_id = call_job.obj->m_call_info->m_thread_id;
+			inter_thread_nullable->CallFromThread(thread_id, std::move(call_job.obj));
+		}
 		else
 			call_job.obj->Invoke();
 	}
@@ -118,6 +143,8 @@ MAssIpcCall::CallDataBuffer MAssIpcCall::ReceiveCallDataBuffer(std::unique_ptr<M
 MAssIpcCallDataStream MAssIpcCall::ProcessTransportResponse(MAssIpcCallInternal::MAssIpcPacketParser::TCallId wait_response_id,
 										   bool process_incoming_calls) const
 {
+	std::unique_lock<LockCurrentThreadId> lock_thread_waiting_transport(m_int->m_pending_responses.m_thread_waiting_transport, std::defer_lock_t());
+
 	const bool wait_incoming_packet = (wait_response_id!=MAssIpcPacketParser::c_invalid_id);
 
 	while( true )
@@ -126,6 +153,10 @@ MAssIpcCallDataStream MAssIpcCall::ProcessTransportResponse(MAssIpcCallInternal:
 
 		{// ReadBuffer
 			MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(m_int->m_pending_responses.m_lock);
+
+			if( m_int->m_pending_responses.m_thread_waiting_transport.IsCurrent() )
+				return {};// transport read introduce reentrance (from same thread)
+
 			while( true )
 			{
 				auto it = m_int->m_pending_responses.m_id_data_return.find(wait_response_id);
@@ -138,9 +169,9 @@ MAssIpcCallDataStream MAssIpcCall::ProcessTransportResponse(MAssIpcCallInternal:
 						break;
 					}
 
-					if( !m_int->m_pending_responses.m_another_thread_waiting_transport )
+					if( !m_int->m_pending_responses.m_thread_waiting_transport.IsLocked() )
 					{
-						m_int->m_pending_responses.m_another_thread_waiting_transport = true;
+						lock_thread_waiting_transport.lock();
 						break;
 					}
 				}
@@ -188,7 +219,7 @@ MAssIpcCallDataStream MAssIpcCall::ProcessTransportResponse(MAssIpcCallInternal:
 			{// WriteBuffer
 				MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(m_int->m_pending_responses.m_lock);
 				
-				m_int->m_pending_responses.m_another_thread_waiting_transport = false;
+				lock_thread_waiting_transport.unlock();
 
 				if( call_data_buffer.header.type!=MAssIpcPacketParser::PacketType::pt_undefined )
 				{
@@ -213,8 +244,28 @@ MAssIpcCallDataStream MAssIpcCall::ProcessTransportResponse(MAssIpcCallInternal:
 				if( (!process_more_incoming_calls) && (!new_return_buffer) )
 					return {};
 		}
-
 	}
+}
+
+void MAssIpcCall::LockCurrentThreadId::lock()
+{
+	mass_assert_if_not_equal(m_locked_id, std::thread::id::id());
+	m_locked_id = std::this_thread::get_id();
+	}
+
+void MAssIpcCall::LockCurrentThreadId::unlock()
+{
+	m_locked_id = std::thread::id::id();
+}
+
+bool MAssIpcCall::LockCurrentThreadId::IsLocked() const
+{
+	return (m_locked_id != std::thread::id::id());
+}
+
+bool MAssIpcCall::LockCurrentThreadId::IsCurrent() const
+{
+	return (m_locked_id == std::this_thread::get_id());
 }
 
 void MAssIpcCall::ProcessTransport()
@@ -312,13 +363,6 @@ MAssIpcCall_EnumerateData MAssIpcCall::EnumerateRemote() const
 MAssIpcCall_EnumerateData MAssIpcCall::EnumerateLocal() const
 {
 	return m_int->m_proc_map.EnumerateHandlers();
-}
-
-void MAssIpcCall::SerializeCallSignature(MAssIpcCallDataStream& call_info, const std::string& proc_name,
-									 bool send_return, const std::string& return_type,
-									 const std::string& params_type)
-{
-	call_info<<proc_name<<send_return<<return_type<<params_type;
 }
 
 void MAssIpcCall::SetErrorHandler(TErrorHandler OnInvalidRemoteCall)

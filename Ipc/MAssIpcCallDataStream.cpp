@@ -4,14 +4,6 @@
 #include <limits>
 
 
-static MAssIpcData::TPacketSize MakeSkip(MAssIpcData::TPacketSize data_read_only_size, MAssIpcData::TPacketSize skip)
-{
-	if( skip > data_read_only_size )
-		skip = data_read_only_size;
-
-	return skip;
-}
-
 MAssIpcCallDataStream::MAssIpcCallDataStream(std::unique_ptr<MAssIpcData> data_read_write)
 	:m_read_write(std::move(data_read_write))
 {
