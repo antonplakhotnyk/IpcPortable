@@ -2,24 +2,26 @@
 
 #include <QtNetwork/QTcpSocket>
 #include <QtCore/QPointer>
-#include "MAssIpcCall.h"
+#include "IpcCall.h"
+#include "EventgateW.h"
 #include "ScopedPtrQtSafe.h"
 
-class IpcTcpTransportQt: public QObject, public MAssIpcCallTransport
+class IpcTcpTransportQt: public QObject, public IpcCallTransport
 {
-	Q_OBJECT;
 public:
+
+	struct Handlers
+	{
+		EventgateW<void()> OnDisconnected;
+		EventgateW<void()> OnConnected;
+		EventgateW<void()> ProcessTransport;
+	};
 
 	IpcTcpTransportQt();
 	~IpcTcpTransportQt();
 
+	void Init(const Handlers& handlers);
 	QTcpSocket* Connection();
-
-signals:
-
-	void HandlerOnDisconnected();
-	void HandlerOnConnected();
-	void HandlerProcessTransport();
 
 protected:
 
@@ -30,7 +32,7 @@ protected:
 
 private:
 
-	bool	WaitRespond(size_t expected_size) override;
+	void	WaitRespond() override;
 
 	size_t	ReadBytesAvailable() override;
 	void	Read(uint8_t* data, size_t size) override;
@@ -51,5 +53,6 @@ private:
 // 	int						m_wait_respound;
 
 	bool m_disconnect_called;
+	Handlers m_handlers;
 };
 

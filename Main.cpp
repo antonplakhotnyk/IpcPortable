@@ -603,8 +603,6 @@ void Main_IpcClient()
 // string<str> test;
 //-------------------------------------------------------
 
-
-
 int main()
 {
  	Main_IpcClient();
