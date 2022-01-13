@@ -32,6 +32,15 @@
 // 	//...
 // }
 
+static MAssIpcThreadTransportTarget::Id CreateCustomId(size_t value)
+{
+	MAssIpcThreadTransportTarget::Id id;
+	static_assert(sizeof(id)==sizeof(value), "unexpected size");
+	size_t* id_value = reinterpret_cast<size_t*>(&id);
+	*id_value = value;
+	return id;
+}
+
 
 class IpcTransportMemory: public MAssIpcCallTransport
 {
@@ -263,7 +272,7 @@ public:
 
 	MAssIpcThreadTransportTarget::Id	GetResultSendThreadId() override
 	{
-		return MAssIpcThreadTransportTarget::Id(2);
+		return CreateCustomId(2);
 	}
 };
 
@@ -508,7 +517,7 @@ void Main_IpcService(std::shared_ptr<IpcPackerTransportMemory> transport_buffer)
 	call.SetErrorHandler(MAssIpcCall::TErrorHandler(&OnInvalidRemoteCall));
 
 	// 	call.AddHandler("Ipc_Proc1", DelegateW<std::string(uint8_t, std::string, uint32_t)>().BindS(&Ipc_Proc1));
-	call.AddHandler("IsLinkUp_Sta", std::function<bool()>(&IsLinkUp), MAssIpcThreadTransportTarget::Id(3));
+	call.AddHandler("IsLinkUp_Sta", std::function<bool()>(&IsLinkUp), CreateCustomId(3));
 	call.AddHandler("Ipc_Proc4", std::function<void()>(&Ipc_Proc4));
 	call.AddHandler("Ipc_Proc1", std::function<std::string(uint8_t, std::string, uint32_t)>(&Ipc_Proc1));
 	call.AddHandler("Ipc_Proc3", std::function<void(uint8_t, std::string, uint32_t)>(&Ipc_Proc3));

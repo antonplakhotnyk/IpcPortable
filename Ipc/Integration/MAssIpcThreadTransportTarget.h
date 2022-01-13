@@ -3,12 +3,13 @@
 #include "MAssIpcThreadSafe.h"
 
 
+// This class only shows interface required by library.
+// you responsible for implementing this interface according to your needs.
+//
+// Thread transport id may be implemented not same as std::threads::id and may be not same as MAssIpcThreadSafe::Id
 class MAssIpcThreadTransportTarget
 {
 public:
-
-	// Thread transport may be implemented not based on std::threads used thread-id type which differ from MAssIpcThreadTransportTarget::Id
-	//using Id = MAssIpcThreadSafe::Id;
 
 	class Id
 	{
@@ -16,14 +17,12 @@ public:
 
 		constexpr Id() = default;
 
-		// used only for tests
-		constexpr Id(size_t id)
-			:m_id(id)
-		{
-		}
-
 	private:
 
 		size_t m_id = -1;
 	};
+
+	// possible implementations:
+	//using Id = MAssIpcThreadSafe::Id;
+	//using Id = std::thread::id
 };

@@ -7,6 +7,13 @@ public:
 	class mutex
 	{
 	public:
+		constexpr void lock()
+		{
+		}
+
+		constexpr void unlock()
+		{
+		}
 	};
 
 	struct defer_lock_t
@@ -20,21 +27,39 @@ public:
 	{
 	public:
 
-		unique_lock(TMutex& mtx)
+		constexpr unique_lock(TMutex& mtx)
+			: m_mtx(mtx)
+		{
+			lock();
+		}
+
+		constexpr unique_lock(TMutex& mtx, defer_lock_t)
+			: m_mtx(mtx)
 		{
 		}
 
-		unique_lock(TMutex& _Mtx, defer_lock_t)
+		~unique_lock()
 		{
+			if( m_locked )
+				m_mtx.unlock();
 		}
 
-		void lock()
+		constexpr void lock()
 		{
+			m_mtx.lock();
+			m_locked = true;
 		}
 
-		void unlock()
+		constexpr void unlock()
 		{
+			m_mtx.unlock();
+			m_locked = false;
 		}
+
+	private:
+
+		TMutex& m_mtx;
+		bool m_locked = false;
 	};
 
 
@@ -54,7 +79,7 @@ public:
 
 	using id = size_t;
 
-	static id get_id()
+	static constexpr id get_id()
 	{
 		return 1;
 	}

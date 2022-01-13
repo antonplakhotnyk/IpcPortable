@@ -7,7 +7,7 @@
 #include "MAssIpcPacketParser.h"
 #include "MAssIpcCallTransport.h"
 #include "MAssIpcThreadSafe.h"
-
+#include "MAssIpcRawString.h"
 
 namespace MAssIpcCallInternal
 {
@@ -90,9 +90,9 @@ private:
 
 private:
 
-	MAssIpcThreadTransportTarget::Id			m_result_thread_id;
-	std::weak_ptr<MAssIpcPacketTransport>				m_transport;
-	std::weak_ptr<MAssCallThreadTransport>				m_inter_thread;
+	MAssIpcThreadTransportTarget::Id		m_result_thread_id;
+	std::weak_ptr<MAssIpcPacketTransport>	m_transport;
+	std::weak_ptr<MAssCallThreadTransport>	m_inter_thread;
 };
 
 
@@ -253,20 +253,59 @@ static constexpr bool CheckSeparatorInName()
 template<class TUnifiedFunction>
 struct ProcSignature;
 
+struct ParamsTypeHolder_string
+{
+	ParamsTypeHolder_string(size_t reserve_size)
+	{
+		m_value.reserve(reserve_size);
+	}
+
+	void AddType(const MAssIpcRawString& string)
+	{
+		m_value.append(string.String(), string.Length());
+		m_value.append(&separator, sizeof(separator));
+	}
+
+	std::string m_value;
+};
+
+
+struct ParamsTypeHolder_MAssIpcCallDataStream
+{
+	void AddType(const MAssIpcRawString& string)
+	{
+		m_value.WriteRawData(string.String(), string.Length());
+		m_value.WriteRawData(&separator, sizeof(separator));
+	}
+
+	MAssIpcCallDataStream& m_value;
+};
+
+struct ParamsTypeHolder_TPacketSize
+{
+	void AddType(const MAssIpcRawString& string)
+	{
+		m_size += string.Length();
+		m_size += sizeof(separator);
+	}
+
+	MAssIpcData::TPacketSize m_size = 0;
+};
+
+
 template<class TRet, class... TArgs>
 struct ProcSignature<TRet(*)(TArgs... args)>
 {
-	static inline void GetParams(std::string* params_type)
+	template<class ParamsTypeHolder_T>
+	static inline void GetParams(ParamsTypeHolder_T* params_type)
 	{
-		int unpack[]{0,((*params_type += MAssIpcType<TArgs>::NameValue(), *params_type += separator
+		int unpack[]{0,((params_type->AddType(MAssIpcRawString(MAssIpcType<TArgs>::NameValue(), MAssIpcType<TArgs>::NameLength()))
 #if !(_MSC_VER==1916)// Visual Studio 2017 compiler crashes trying compile this
-						 , CheckSeparatorInName<MAssIpcType<TArgs>::name_value>() 
+						 , CheckSeparatorInName<MAssIpcType<TArgs>::name_value>()
 #endif
-
 						 ),0)...};
 		unpack;
 	};
-
 };
 
 struct IsCallable_Check
@@ -282,7 +321,7 @@ struct IsCallable_True
 };
 
 template<class TDelegate>
-static inline bool IsBoolConvertible(const TDelegate& del)
+static inline bool IsBoolConvertible_Callable(const TDelegate& del)
 {
 	return std::conditional<IsConvertible<TDelegate, bool>::value, IsCallable_Check, IsCallable_True>::type::ToBool(del);
 }
@@ -316,7 +355,7 @@ public:
 
 		bool IsCallable() const override
 		{
-			return IsBoolConvertible(m_del);
+			return IsBoolConvertible_Callable(m_del);
 		}
 
 		const char* GetSignature_RetType() const override
@@ -365,7 +404,7 @@ public:
 
 		bool IsCallable() const override
 		{
-			return IsBoolConvertible(m_del);
+			return IsBoolConvertible_Callable(m_del);
 		}
 
 		const char* GetSignature_RetType() const override

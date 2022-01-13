@@ -6,6 +6,7 @@
 #include "MAssCallThreadTransport.h"
 #include "MAssIpcCallInternal.h"
 #include "MAssIpcThreadSafe.h"
+#include "MAssIpcRawString.h"
 #include <list>
 #include <map>
 
@@ -81,12 +82,12 @@ public:
 	MAssIpcCall_EnumerateData EnumerateRemote() const;
 	MAssIpcCall_EnumerateData EnumerateLocal() const;
 
-	static constexpr char separator = MAssIpcCallInternal::separator;
+	static constexpr decltype(MAssIpcCallInternal::separator) separator = MAssIpcCallInternal::separator;
 
 private:
 
 	template<class TRet, class... TArgs>
-	static void SerializeCallSignature(MAssIpcCallDataStream& call_info, const std::string& proc_name, bool send_return);
+	static void SerializeCallSignature(MAssIpcCallDataStream& call_info, const MAssIpcRawString& proc_name, bool send_return);
 
 	template<class TRet, class... TArgs>
 	static void SerializeCall(MAssIpcCallDataStream& call_info, const std::string& proc_name, bool send_return, const TArgs&... args);
@@ -199,9 +200,14 @@ void MAssIpcCall::AddHandler(const std::string& proc_name, const TDelegateW& del
 {
 	static_assert(!std::is_bind_expression<TDelegateW>::value, "can not deduce signature from bind_expression, use std::function<>(std::bind())");
 	const std::shared_ptr<MAssIpcCallInternal::CallInfo> call_info(std::make_shared<typename MAssIpcCallInternal::Impl_Selector<TDelegateW>::Res>(del, thread_id));
-	std::string params_type;
-	MAssIpcCallInternal::ProcSignature<typename MAssIpcCallInternal::Impl_Selector<TDelegateW>::TDelProcUnified>::GetParams(&params_type);
-	m_int->m_proc_map.AddProcSignature(proc_name, params_type, call_info, comment);
+
+	MAssIpcCallInternal::ParamsTypeHolder_TPacketSize params_type_calc;
+	using TreatProc = typename MAssIpcCallInternal::Impl_Selector<TDelegateW>::TDelProcUnified;
+	MAssIpcCallInternal::ProcSignature<TreatProc>::GetParams(&params_type_calc);
+	MAssIpcCallInternal::ParamsTypeHolder_string params_type_string(params_type_calc.m_size);
+	MAssIpcCallInternal::ProcSignature<TreatProc>::GetParams(&params_type_string);
+
+	m_int->m_proc_map.AddProcSignature(proc_name, params_type_string.m_value, call_info, comment);
 }
 
 template<class TRet, class... TArgs>
@@ -213,15 +219,25 @@ MAssIpcData::TPacketSize MAssIpcCall::CalcCallSize(bool send_return, const std::
 }
 
 template<class TRet, class... TArgs>
-void MAssIpcCall::SerializeCallSignature(MAssIpcCallDataStream& call_info, const std::string& proc_name, bool send_return)
+void MAssIpcCall::SerializeCallSignature(MAssIpcCallDataStream& call_info, const MAssIpcRawString& proc_name, bool send_return)
 {
-	typedef TRet(*TreatProc)(TArgs...);
-	std::string return_type;
-	std::string params_type;
-	return_type = MAssIpcType<TRet>::NameValue();
-	MAssIpcCallInternal::ProcSignature<TreatProc>::GetParams(&params_type);
+	// call_info<<proc_name<<send_return<<return_type<<params_type;
 
-	call_info<<proc_name<<send_return<<return_type<<params_type;
+	typedef TRet(*TreatProc)(TArgs...);
+	constexpr MAssIpcRawString return_type(MAssIpcType<TRet>::NameValue(), MAssIpcType<TRet>::NameLength());
+
+	proc_name.Write(call_info);
+	call_info<<send_return;
+	return_type.Write(call_info);
+
+	{
+		MAssIpcCallInternal::ParamsTypeHolder_TPacketSize params_type_calc;
+		MAssIpcCallInternal::ProcSignature<TreatProc>::GetParams(&params_type_calc);
+
+		call_info<<params_type_calc.m_size;
+		MAssIpcCallInternal::ParamsTypeHolder_MAssIpcCallDataStream params_type_stream_write = {call_info};
+		MAssIpcCallInternal::ProcSignature<TreatProc>::GetParams(&params_type_stream_write);
+	}
 }
 
 template<class TRet, class... TArgs>

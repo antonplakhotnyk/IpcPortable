@@ -48,6 +48,9 @@
     <ClCompile Include="..\Ipc\MAssIpcPacketTransportDefault.cpp">
       <Filter>Ipc</Filter>
     </ClCompile>
+    <ClCompile Include="..\Ipc\MAssIpcRawString.cpp">
+      <Filter>Ipc</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h">
@@ -94,6 +97,9 @@
     </ClInclude>
     <ClInclude Include="..\Ipc\Integration\MAssIpcThreadTransportTarget.h">
       <Filter>Ipc\Integration</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Ipc\MAssIpcRawString.h">
+      <Filter>Ipc</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

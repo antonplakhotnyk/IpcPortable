@@ -16,7 +16,7 @@ public:
 
 	using id = std::thread::id;
 
-	static id get_id()
+	static inline id get_id()
 	{
 		return std::this_thread::get_id();
 	}
