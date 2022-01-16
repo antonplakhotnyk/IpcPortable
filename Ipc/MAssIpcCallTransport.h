@@ -13,9 +13,9 @@ class MAssIpcPacketTransport
 public:
 
 	virtual std::unique_ptr<MAssIpcData> Create(MAssIpcData::TPacketSize size) = 0;
-	virtual void Write(std::unique_ptr<MAssIpcData> packet) = 0;
+	virtual void Write(std::unique_ptr<const MAssIpcData> packet) = 0;
 	// return meaning same as MAssIpcCallTransport::WaitRespond
-	virtual bool Read(bool wait_incoming_packet, std::unique_ptr<MAssIpcData>* packet) = 0;
+	virtual bool Read(bool wait_incoming_packet, std::unique_ptr<const MAssIpcData>* packet) = 0;
 };
 
 //-------------------------------------------------------

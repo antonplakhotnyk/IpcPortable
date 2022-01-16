@@ -45,14 +45,15 @@ MAssIpcCallDataStream CreateDataStreamInplace(std::unique_ptr<MAssIpcData>& inpl
 }
 
 //-------------------------------------------------------
-CallInfo::CallInfo(MAssIpcThreadTransportTarget::Id thread_id)
+CallInfo::CallInfo(MAssIpcThreadTransportTarget::Id thread_id, const MAssIpcRawString& proc_name, std::string params_type)
 	:m_thread_id(thread_id)
+	, m_name(proc_name.Std_String())
+	, m_params_type(std::move(params_type))
 {
 };
-
 //-------------------------------------------------------
 
-ResultJob::ResultJob(const std::weak_ptr<MAssIpcPacketTransport>& transport, std::unique_ptr<MAssIpcData>& result)
+ResultJob::ResultJob(const std::weak_ptr<MAssIpcPacketTransport>& transport, std::unique_ptr<const MAssIpcData>& result)
 	:m_transport(transport)
 	, m_result(std::move(result))
 {
@@ -60,61 +61,71 @@ ResultJob::ResultJob(const std::weak_ptr<MAssIpcPacketTransport>& transport, std
 
 void ResultJob::Invoke()
 {
-	mass_return_if_equal(m_result->Size()>=MAssIpcPacketParser::c_net_call_packet_header_size, false);
-	auto transport = m_transport.lock();
-	mass_return_if_equal(bool(transport), false);
-	transport->Write(std::move(m_result));
+	Invoke(m_transport, m_result);
+}
+
+void ResultJob::Invoke(const std::weak_ptr<MAssIpcPacketTransport>& transport, std::unique_ptr<const MAssIpcData>& result)
+{
+	mass_return_if_equal(result->Size()>=MAssIpcPacketParser::c_net_call_packet_header_size, false);
+	auto transport_strong = transport.lock();
+	mass_return_if_equal(bool(transport_strong), false);
+	transport_strong->Write(std::move(result));
 }
 
 //-------------------------------------------------------
 
-CallJob::CallJob(const std::weak_ptr<MAssIpcPacketTransport>& transport, const std::weak_ptr<MAssCallThreadTransport>& inter_thread,
-				 MAssIpcCallDataStream& call_info_data, MAssIpcPacketParser::TCallId id)
-	: m_call_info_data_str(std::move(call_info_data))
-	, m_result_thread_id(MakeResultThreadId(inter_thread))
+CallJob::CallJob(const std::weak_ptr<MAssIpcPacketTransport>& transport, 
+				 const std::weak_ptr<MAssCallThreadTransport>& inter_thread,
+				 MAssIpcCallDataStream& call_info_data, MAssIpcPacketParser::TCallId respond_id,
+				 std::shared_ptr<const CallInfo> call_info)
+	: m_call_info_data(std::move(call_info_data))
 	, m_transport(transport)
 	, m_inter_thread(inter_thread)
-	, m_id(id)
+	, m_respond_id(respond_id)
+	, m_call_info(call_info)
 {
 }
 
-MAssIpcThreadTransportTarget::Id CallJob::MakeResultThreadId(const std::weak_ptr<MAssCallThreadTransport>& inter_thread)
+MAssIpcPacketParser::TCallId CallJob::CalcRespondId(bool send_return, MAssIpcPacketParser::TCallId id)
 {
-	auto inter_thread_strong = inter_thread.lock();
-	return inter_thread_strong ? inter_thread_strong->GetResultSendThreadId() : MAssCallThreadTransport::NoThread();
+	return (send_return ? id : MAssIpcPacketParser::c_invalid_id);
 }
 
 void CallJob::Invoke()
 {
-	auto respond_id = (m_send_return ? m_id : MAssIpcPacketParser::c_invalid_id);
-	auto result = m_call_info->Invoke(m_transport, respond_id, m_call_info_data_str);
-	if( m_send_return )
-	{
-		std::unique_ptr<ResultJob> result_job(std::make_unique<ResultJob>(m_transport, result));
+	Invoke(m_transport, m_inter_thread, m_call_info_data, m_call_info, m_respond_id);
+}
 
-		auto inter_thread = m_inter_thread.lock();
-		if( inter_thread )
-			inter_thread->CallFromThread(m_result_thread_id, std::move(result_job));
+void CallJob::Invoke(const std::weak_ptr<MAssIpcPacketTransport>& transport, const std::weak_ptr<MAssCallThreadTransport>& inter_thread,
+					 MAssIpcCallDataStream& call_info_data, std::shared_ptr<const CallInfo> call_info, 
+					 MAssIpcPacketParser::TCallId respond_id)
+{
+	auto result = call_info->Invoke(transport, respond_id, call_info_data);
+	if( respond_id!=MAssIpcPacketParser::c_invalid_id )
+	{
+		if( auto inter_thread_strong = inter_thread.lock() )
+		{
+			auto result_thread_id = inter_thread_strong->GetResultSendThreadId();
+			std::unique_ptr<ResultJob> result_job(std::make_unique<ResultJob>(transport, result));
+			inter_thread_strong->CallFromThread(result_thread_id, std::move(result_job));
+		}
 		else
-			result_job->Invoke();
+			ResultJob::Invoke(transport, result);
 	}
 }
 
 //-------------------------------------------------------
 
-std::shared_ptr<const CallInfo> ProcMap::FindCallInfo(const std::string& name, std::string& signature) const
+std::shared_ptr<const CallInfo> ProcMap::FindCallInfo(const MAssIpcRawString& name, const MAssIpcRawString& params_type) const
 {
 	MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(m_lock);
 
-	auto it_procs = m_name_procs.find(name);
-	if( it_procs==m_name_procs.end() )
+	const CallInfo::SignatureKey key{name,params_type};
+	auto it_procs_signature = m_name_procs.find(key);
+	if( it_procs_signature==m_name_procs.end() )
 		return {};
 
-	auto it_signature = it_procs->second.m_signature_call.find(signature);
-	if( it_signature==it_procs->second.m_signature_call.end() )
-		return {};
-
-	return it_signature->second.call_info;
+	return it_procs_signature->second.call_info;
 }
 
 MAssIpcCall_EnumerateData ProcMap::EnumerateHandlers() const
@@ -123,29 +134,22 @@ MAssIpcCall_EnumerateData ProcMap::EnumerateHandlers() const
 
 	MAssIpcCall_EnumerateData res;
 
-	for( auto it_np = m_name_procs.begin(); it_np!=m_name_procs.end(); it_np++ )
-		for( auto it_sc = it_np->second.m_signature_call.begin(); it_sc!=it_np->second.m_signature_call.end(); it_sc++ )
-			res.push_back({it_np->first, it_sc->second.call_info->GetSignature_RetType(), it_sc->first, it_sc->second.comment});
+	for( const auto& it : m_name_procs)
+		res.push_back({it.first.name.Std_String(), it.second.call_info->GetSignature_RetType().Std_String(), it.first.params_type.Std_String(), it.second.comment});
 
 	return res;
 }
 
-void ProcMap::AddProcSignature(const std::string& proc_name, std::string& params_type,
-								   const std::shared_ptr<MAssIpcCallInternal::CallInfo>& new_call_info, const std::string& comment)
+void ProcMap::AddProcSignature(const std::shared_ptr<MAssIpcCallInternal::CallInfo>& new_call_info, const std::string& comment)
 {
 	MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(m_lock);
 
 	std::shared_ptr<MAssIpcCallInternal::CallInfo> ownership_call_info(new_call_info);
-	auto it_name = m_name_procs.find(proc_name);
-	if( it_name == m_name_procs.end() )
-	{
-		m_name_procs[proc_name] = MAssIpcCallInternal::ProcMap::NameProcs();
-		it_name = m_name_procs.find(proc_name);
-	}
 
-	auto it_params = it_name->second.m_signature_call.find(params_type);
-	mass_return_if_equal((it_params!=it_name->second.m_signature_call.end()) && (it_params->second.call_info->IsCallable()), true);
-	it_name->second.m_signature_call[params_type] = {ownership_call_info,comment};
+	auto key{new_call_info->GetSignatureKey()};
+	auto it_name_params = m_name_procs.find(key);
+	mass_return_if_equal((it_name_params!=m_name_procs.end()) && (it_name_params->second.call_info->IsCallable()), true);
+	m_name_procs[key] = {ownership_call_info, comment};
 }
 
 void ProcMap::AddAllProcs(const ProcMap& other)

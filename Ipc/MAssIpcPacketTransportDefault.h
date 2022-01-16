@@ -14,8 +14,8 @@ public:
 	MAssIpcPacketTransportDefault(const std::weak_ptr<MAssIpcCallTransport>& transport);
 
 	std::unique_ptr<MAssIpcData> Create(MAssIpcData::TPacketSize size) override;
-	void Write(std::unique_ptr<MAssIpcData> packet) override;
-	bool Read(bool wait_incoming_packet, std::unique_ptr<MAssIpcData>* packet) override;
+	void Write(std::unique_ptr<const MAssIpcData> packet) override;
+	bool Read(bool wait_incoming_packet, std::unique_ptr<const MAssIpcData>* packet) override;
 
 private:
 

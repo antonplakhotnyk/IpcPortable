@@ -43,7 +43,8 @@ class MAssIpcCallDataStream
 public:
 
 	MAssIpcCallDataStream(MAssIpcCallDataStream&&) = default;
-	MAssIpcCallDataStream(std::unique_ptr<MAssIpcData> data_read_write);
+	MAssIpcCallDataStream(std::unique_ptr<const MAssIpcData> data_read);
+	MAssIpcCallDataStream(std::unique_ptr<MAssIpcData> data_write);
 	MAssIpcCallDataStream() = default;
 	MAssIpcCallDataStream& operator= (MAssIpcCallDataStream&&) = default;
 	~MAssIpcCallDataStream();
@@ -78,14 +79,17 @@ public:
 	void ReadRawData(uint8_t* data, MAssIpcData::TPacketSize len);
 	void ReadRawData(char* data, MAssIpcData::TPacketSize len);
 	const uint8_t* ReadRawData(MAssIpcData::TPacketSize len);
+	const char* ReadRawDataChar(MAssIpcData::TPacketSize len);
 	void WriteRawData(const uint8_t* data, MAssIpcData::TPacketSize len);
 	void WriteRawData(const char* data, MAssIpcData::TPacketSize len);
 	uint8_t* WriteRawData(MAssIpcData::TPacketSize len);
 
-	std::unique_ptr<MAssIpcData> DetachData();
-	MAssIpcData* GetData();
+	std::unique_ptr<const MAssIpcData> DetachRead();
+	std::unique_ptr<MAssIpcData> DetachWrite();
+	const MAssIpcData* GetDataRead() const;
+	MAssIpcData* GetDataWrite() const;
 	MAssIpcData::TPacketSize GetWritePos();
-	bool IsDataBufferPresent();
+	bool IsReadBufferPresent();
 
 public:
 
@@ -122,7 +126,8 @@ public:
 
 private:
 
-	std::unique_ptr<MAssIpcData> m_read_write;
+	std::unique_ptr<const MAssIpcData> m_read;
+	std::unique_ptr<MAssIpcData> m_write;
 
 	MAssIpcData::TPacketSize	m_read_pos = 0;
 	MAssIpcData::TPacketSize	m_write_pos = 0;

@@ -16,7 +16,7 @@ MAssIpcPacketParser::~MAssIpcPacketParser()
 {
 }
 
-size_t MAssIpcPacketParser::ReadNeededDataSize(const std::shared_ptr<MAssIpcCallTransport>& in_data, std::unique_ptr<MAssIpcData>* packet_data)
+size_t MAssIpcPacketParser::ReadNeededDataSize(const std::shared_ptr<MAssIpcCallTransport>& in_data, std::unique_ptr<const MAssIpcData>* packet_data)
 {
 	if( m_incoming_packet_size == c_invalid_packet_size )
 		if( in_data->ReadBytesAvailable()>=c_net_call_packet_header_size )

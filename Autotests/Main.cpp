@@ -150,8 +150,10 @@ private:
 		bool incoming_data = false;
 		bool cancel_wait_respond = false;
 		std::condition_variable cond;
-		std::list<std::unique_ptr<MAssIpcData> > data;
+		std::list<std::unique_ptr<const MAssIpcData> > data;
 	};
+
+public:
 
 	class MemoryPacket: public MAssIpcData
 	{
@@ -170,6 +172,11 @@ private:
 		}
 
 		uint8_t* Data() override
+		{
+			return m_data.data();
+		}
+
+		const uint8_t* Data() const override
 		{
 			return m_data.data();
 		}
@@ -216,7 +223,7 @@ public:
 		return std::unique_ptr<MAssIpcData>(new MemoryPacket(size));
 	}
 
-	bool	Read(bool wait_incoming_packet, std::unique_ptr<MAssIpcData>* packet) override
+	bool	Read(bool wait_incoming_packet, std::unique_ptr<const MAssIpcData>* packet) override
 	{
 		std::unique_lock<std::mutex> lock(m_read->lock);
 		if( m_read->on_read )
@@ -236,7 +243,7 @@ public:
 		return true;
 	}
 
-	void	Write(std::unique_ptr<MAssIpcData> packet) override
+	void	Write(std::unique_ptr<const MAssIpcData> packet) override
 	{
 		std::lock_guard<std::mutex> lock(m_write->lock);
 		SyncData& sync = *m_write;
@@ -278,10 +285,14 @@ public:
 
 //-------------------------------------------------------
 
+static MAssIpcCall::ErrorType s_state_error_et;
+static std::string s_state_error_message;
+
 static void OnInvalidRemoteCall(MAssIpcCall::ErrorType et, std::string message)
 {
+	s_state_error_et = et;
+	s_state_error_message = message;
 }
-
 
 //-------------------------------------------------------
 
@@ -434,7 +445,7 @@ static std::string Ipc_Proc1(uint8_t a, std::string b, uint32_t c)
 	// 		return "callback";
 	// 	}
 
-	return std::string("test result ")+std::to_string(a)+b+std::to_string(c);
+	return std::string("Ipc_Proc1 result ")+std::to_string(a)+b+std::to_string(c);
 }
 
 static bool IsLinkUp()
@@ -570,9 +581,19 @@ void ClientProc(uint8_t a, uint32_t b)
 
 //-------------------------------------------------------
 
+void StrProc(const MAssIpcCallInternal::MAssIpcRawString& str)
+{
+}
+
 void Main_IpcClient()
 {
 	MAssIpcCall call({});
+
+	const char str1[] = {"asdf"};
+	const char* str2 = {"asdf"};
+
+	StrProc(str1);
+  	StrProc(str2);
 
 // 	call.AddHandler("ClientProc", DelegateW<void(uint8_t, uint32_t)>().BindS(&ClientProc));
 
@@ -585,13 +606,38 @@ void Main_IpcClient()
 
 	call.SetTransport(transport_buffer);
 
+	{
+		auto packet_size = MAssIpcCall::CalcCallSize<void>(true, "NotExistProc", 0);
+		std::unique_ptr<MAssIpcData> ipc_buffer(new IpcPackerTransportMemory::MemoryPacket(packet_size));
+ 		call.AsyncInvoke(std::move(ipc_buffer),{"NotExistProc"}, 0);
+// 		call.InvokeWait("NotExistProc", std::move(ipc_buffer)).RetArgs<int>();
+//  	call[{std::move(ipc_buffer), "NotExistProc"}];
+	}
+
 
 	uint8_t a = 123;
 	std::string b = "4567";
 	uint32_t c = 89012345;
 	bool br2 = call.WaitInvokeRet<bool>("IsLinkUp_Sta");
+	br2 = br2;
+	s_state_error_et = MAssIpcCall::ErrorType::unknown_error;
 	std::string res2 = call.WaitInvokeRet<std::string>("Ipc_Proc1",a, b, c);
+	mass_return_if_not_equal(res2, "Ipc_Proc1 result 123456789012345");
+	mass_return_if_not_equal(s_state_error_et, MAssIpcCall::ErrorType::unknown_error);
+
+	c = 654321;
+	const char* string_pointer_Ipc_Proc1 = "Ipc_Proc1";
+	res2 = call.WaitInvokeRet<std::string>(string_pointer_Ipc_Proc1, a, b, c);
+	mass_return_if_not_equal(res2, "Ipc_Proc1 result 1234567654321");
+	mass_return_if_not_equal(s_state_error_et, MAssIpcCall::ErrorType::unknown_error);
+
+	s_state_error_et = MAssIpcCall::ErrorType::unknown_error;
 	std::string res3 = call.WaitInvokeRet<std::string>("NotExistProc", a, b, c);
+	mass_return_if_not_equal(s_state_error_et, MAssIpcCall::ErrorType::respond_no_matching_call_name_parameters);
+	s_state_error_et = MAssIpcCall::ErrorType::unknown_error;
+	int res4 = call.WaitInvokeRet<int>("Ipc_Proc1", a, b, c);
+	mass_return_if_not_equal(s_state_error_et, MAssIpcCall::ErrorType::respond_no_matching_call_return_type);
+	res4 = res4;
 	call.AsyncInvoke("NotExistProc", a, b, c);
 	uint8_t& a1 = a;
 	call.WaitInvoke("Ipc_Proc3", a1, b, c);
@@ -602,6 +648,7 @@ void Main_IpcClient()
 	MAssIpcCall_EnumerateData enum_data = call.EnumerateRemote();
 	MAssIpcCall_EnumerateData enum_data2 = call.EnumerateRemote();
 	bool br = call.WaitInvokeRet<bool>("IsLinkUp_Sta");
+	br = br;
 	std::string res = call.WaitInvokeRet<std::string>("Ipc_Proc1",a, b, c);
 	call.WaitInvoke("Ipc_Proc4");
 

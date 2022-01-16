@@ -15,14 +15,14 @@ std::unique_ptr<MAssIpcData> MAssIpcPacketTransportDefault::Create(MAssIpcData::
 	return std::unique_ptr<MAssIpcData>(std::make_unique<MAssIpcData_Vector>(size));
 }
 
-void MAssIpcPacketTransportDefault::Write(std::unique_ptr<MAssIpcData> packet)
+void MAssIpcPacketTransportDefault::Write(std::unique_ptr<const MAssIpcData> packet)
 {
 	std::shared_ptr<MAssIpcCallTransport> transport = m_transport.lock();
 	mass_return_if_equal(bool(transport), false);
 	transport->Write(packet->Data(), packet->Size());
 }
 
-bool MAssIpcPacketTransportDefault::Read(bool wait_incoming_packet, std::unique_ptr<MAssIpcData>* packet)
+bool MAssIpcPacketTransportDefault::Read(bool wait_incoming_packet, std::unique_ptr<const MAssIpcData>* packet)
 {
 	std::shared_ptr<MAssIpcCallTransport> transport = m_transport.lock();
 	mass_return_x_if_equal(bool(transport), false, {});

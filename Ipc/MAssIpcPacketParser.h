@@ -33,7 +33,7 @@ public:
 	MAssIpcPacketParser();
 	~MAssIpcPacketParser();
 
-	size_t				ReadNeededDataSize(const std::shared_ptr<MAssIpcCallTransport>& in_data, std::unique_ptr<MAssIpcData>* packet_data);
+	size_t				ReadNeededDataSize(const std::shared_ptr<MAssIpcCallTransport>& in_data, std::unique_ptr<const MAssIpcData>* packet_data);
 
 	struct Header
 	{
