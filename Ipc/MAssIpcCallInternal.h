@@ -17,7 +17,7 @@ MAssIpcCallDataStream CreateDataStream(const std::weak_ptr<MAssIpcPacketTranspor
 									   MAssIpcPacketParser::PacketType pt,
 									   MAssIpcPacketParser::TCallId respond_id);
 
-MAssIpcCallDataStream CreateDataStreamInplace(std::unique_ptr<MAssIpcData>& inplace_send_buffer,
+MAssIpcCallDataStream CreateDataStreamInplace(std::unique_ptr<MAssIpcData> inplace_send_buffer,
 											  MAssIpcData::TPacketSize no_header_size,
 											  MAssIpcPacketParser::PacketType pt,
 											  MAssIpcPacketParser::TCallId respond_id);
@@ -128,44 +128,6 @@ class ProcMap
 {
 public:
 
-//	struct CallKey_Add;
-
-// 	struct CallKey_Find
-// 	{
-// 		std::string name;
-// 		std::string params_type;
-// 
-// // 		bool operator<(const CallKey_Add& fk) const
-// // 		{
-// // 			return true;
-// // 		}
-// 	};
-
-// 	struct CallKey_Add
-// 	{
-// 		std::string name;
-// 		std::string params_type;
-// 
-// 		bool operator<(const CallKey_Add& other) const
-// 		{
-// 			if( name == other.name )
-// 				return (params_type<other.params_type);
-// 			else
-// 				return name<other.name;
-// 		}
-
-// 		bool operator<(const CallKey_Find& fk) const
-// 		{
-// 			return true;
-// 		}
-// 
-// 		bool operator<(const CallData& fk) const
-// 		{
-// 			return true;
-// 		}
-
-// 	};
-
 	std::shared_ptr<const CallInfo> FindCallInfo(const MAssIpcRawString& name, const MAssIpcRawString& params_type) const;
 	MAssIpcCall_EnumerateData EnumerateHandlers() const;
 	void AddProcSignature(const std::shared_ptr<MAssIpcCallInternal::CallInfo>& call_info, const std::string& comment);
@@ -178,16 +140,6 @@ public:
 	{
 		std::shared_ptr<CallInfo> call_info;
 		std::string comment;
-
-// 		bool operator<(const FindCallKey& lk) const
-// 		{
-// 			return true;
-// 		}
-// 
-// 		bool operator<(const CallData& fk2) const
-// 		{
-// 			return true;
-// 		}
 	};
 
 private:
@@ -400,6 +352,22 @@ static inline bool IsBoolConvertible_Callable(const TDelegate& del)
 
 //-------------------------------------------------------
 
+std::unique_ptr<const MAssIpcData> SerializeReturn(const std::weak_ptr<MAssIpcPacketTransport>& transport,
+														  MAssIpcPacketParser::TCallId respond_id);
+
+template<class TRet>
+std::unique_ptr<const MAssIpcData> SerializeReturn(const TRet& ret, const std::weak_ptr<MAssIpcPacketTransport>& transport,
+												   MAssIpcPacketParser::TCallId respond_id)
+{
+	if( respond_id == MAssIpcPacketParser::c_invalid_id )
+		return {};
+	MAssIpcCallDataStream measure_size;
+	measure_size<<ret;
+	MAssIpcCallDataStream result_stream(CreateDataStream(transport, measure_size.GetWritePos(), MAssIpcPacketParser::PacketType::pt_return, respond_id));
+	result_stream<<ret;
+	return result_stream.DetachWrite();
+}
+
 template<class... TArgs>
 class Sig_RetVoid<void(*)(TArgs...)>
 {
@@ -421,10 +389,7 @@ public:
 			std::tuple<TArgs...> args = DeserializeArgs<TArgs...>(params, typename make_indexes<TArgs...>::type());
 			ExpandTupleCall<TDelegate, void>(m_del, args);
 
-			if( respond_id == MAssIpcPacketParser::c_invalid_id )
-				return {};
-			MAssIpcCallDataStream result_stream(CreateDataStream(transport, 0, MAssIpcPacketParser::PacketType::pt_return, respond_id));
-			return result_stream.DetachWrite();
+			return SerializeReturn(transport, respond_id);
 		}
 
 		bool IsCallable() const override
@@ -445,8 +410,6 @@ public:
 		};
 	};
 };
-
-
 
 template<class TRet, class... TArgs>
 class Sig_RetVoidNo<TRet(*)(TArgs...)>
@@ -469,13 +432,7 @@ public:
 			std::tuple<TArgs...> args = DeserializeArgs<TArgs...>(params, typename make_indexes<TArgs...>::type());
 			TRet ret = ExpandTupleCall<TDelegate, TRet>(m_del, args);
 
-			if( respond_id == MAssIpcPacketParser::c_invalid_id )
-				return {};
-			MAssIpcCallDataStream measure_size;
-			measure_size<<ret;
-			MAssIpcCallDataStream result_stream(CreateDataStream(transport, measure_size.GetWritePos(), MAssIpcPacketParser::PacketType::pt_return, respond_id));
-			result_stream<<ret;
-			return result_stream.DetachWrite();
+			return SerializeReturn(ret, transport, respond_id);
 		}
 
 		bool IsCallable() const override

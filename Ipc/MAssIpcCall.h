@@ -14,17 +14,35 @@ class MAssIpcCall
 {
 private:
 
-// 	struct InvokeSetting
-// 	{
-// 		InvokeSetting(const MAssIpcCallInternal::MAssIpcRawString& proc_name, std::unique_ptr<MAssIpcData> inplace_send_buffer)
-// 			:proc_name(proc_name)
-// 			, inplace_send_buffer(inplace_send_buffer)
-// 		{
-// 		}
-// 
-// 		const MAssIpcCallInternal::MAssIpcRawString& proc_name;
-// 		std::unique_ptr<MAssIpcData> inplace_send_buffer;
-// 	};
+	struct InvokeSetting
+	{
+		template<size_t N>
+		constexpr InvokeSetting(const char(&str)[N])
+			:proc_name{str,(N-1)}
+		{
+			static_assert(N>=1, "unexpected string size");
+		}
+
+		template<class T, typename = typename std::enable_if<!std::is_array<T>::value>::type>
+		InvokeSetting(const T str)
+			: proc_name{str,strlen(str)}
+		{
+		}
+
+		InvokeSetting(const std::string& str)
+			: proc_name{str.data(),str.length()}
+		{
+		}
+
+		InvokeSetting(const MAssIpcCallInternal::MAssIpcRawString& proc_name, std::unique_ptr<MAssIpcData> inplace_send_buffer)
+			:proc_name(proc_name)
+			, inplace_send_buffer(std::move(inplace_send_buffer))
+		{
+		}
+
+		MAssIpcCallInternal::MAssIpcRawString proc_name;
+		std::unique_ptr<MAssIpcData> inplace_send_buffer;
+	};
 
 
 public:
@@ -55,29 +73,16 @@ public:
 	void ClearAllHandlers();
 
 	template<class TRet, class... TArgs>
-	TRet WaitInvokeRet(const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TArgs&... args) const;
+	TRet WaitInvokeRet(InvokeSetting settings, const TArgs&... args) const;
 	template<class... TArgs>
-	void WaitInvoke(const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TArgs&... args) const;
+	void WaitInvoke(InvokeSetting settings, const TArgs&... args) const;
 	template<class TRet, class... TArgs>
-	TRet WaitInvokeRetAlertable(const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TArgs&... args) const;
+	TRet WaitInvokeRetAlertable(InvokeSetting settings, const TArgs&... args) const;
 	template<class... TArgs>
-	void WaitInvokeAlertable(const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TArgs&... args) const;
-
-	template<class TRet, class... TArgs>
-	TRet WaitInvokeRet(std::unique_ptr<MAssIpcData> inplace_send_buffer, const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TArgs&... args) const;
-	template<class... TArgs>
-	void WaitInvoke(std::unique_ptr<MAssIpcData> inplace_send_buffer, const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TArgs&... args) const;
-	template<class TRet, class... TArgs>
-	TRet WaitInvokeRetAlertable(std::unique_ptr<MAssIpcData> inplace_send_buffer, const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TArgs&... args) const;
-	template<class... TArgs>
-	void WaitInvokeAlertable(std::unique_ptr<MAssIpcData> inplace_send_buffer, const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TArgs&... args) const;
-
+	void WaitInvokeAlertable(InvokeSetting settings, const TArgs&... args) const;
 
 	template<class... TArgs>
-	void AsyncInvoke(const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TArgs&... args) const;
-
-	template<class... TArgs>
-	void AsyncInvoke(std::unique_ptr<MAssIpcData> inplace_send_buffer, const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TArgs&... args) const;
+	void AsyncInvoke(InvokeSetting settings, const TArgs&... args) const;
 
 
 	template<class TRet, class... TArgs>
@@ -108,10 +113,9 @@ private:
 	static void SerializeCall(MAssIpcCallDataStream& call_info, const MAssIpcCallInternal::MAssIpcRawString& proc_name, bool send_return, const TArgs&... args);
 
 	template<class TRet, class... TArgs>
-	TRet WaitInvokeRetUnified(std::unique_ptr<MAssIpcData>& inplace_send_buffer, const MAssIpcCallInternal::MAssIpcRawString& proc_name, bool process_incoming_calls, const TArgs&... args) const;
+	TRet WaitInvokeRetUnified(InvokeSetting& settings, bool process_incoming_calls, const TArgs&... args) const;
 	template<class TRet, class... TArgs>
-	void InvokeUnified(std::unique_ptr<MAssIpcData>& inplace_send_buffer,
-					   const MAssIpcCallInternal::MAssIpcRawString& proc_name, MAssIpcCallDataStream* result_buf_wait_return,
+	void InvokeUnified(InvokeSetting& settings, MAssIpcCallDataStream* result_buf_wait_return,
 					   bool process_incoming_calls,
 					   const TArgs&... args) const;
 	void InvokeRemote(MAssIpcCallDataStream& call_info_data, MAssIpcCallDataStream* result_buf_wait_return,
@@ -264,34 +268,33 @@ void MAssIpcCall::SerializeCall(MAssIpcCallDataStream& call_info, const MAssIpcC
 }
 
 template<class TRet, class... TArgs>
-void MAssIpcCall::InvokeUnified(std::unique_ptr<MAssIpcData>& inplace_send_buffer, 
-								const MAssIpcCallInternal::MAssIpcRawString& proc_name, MAssIpcCallDataStream* result_buf_wait_return,
+void MAssIpcCall::InvokeUnified(InvokeSetting& settings, MAssIpcCallDataStream* result_buf_wait_return,
 								bool process_incoming_calls,
 								const TArgs&... args) const
 {
 	auto new_id = NewCallId();
 
 	MAssIpcCallDataStream measure_size;
-	SerializeCall<TRet>(measure_size, proc_name, (result_buf_wait_return!=nullptr), args...);
+	SerializeCall<TRet>(measure_size, settings.proc_name, (result_buf_wait_return!=nullptr), args...);
 
 	MAssIpcCallDataStream call_info;
-	if( inplace_send_buffer )
-		call_info = CreateDataStreamInplace(inplace_send_buffer, measure_size.GetWritePos(), MAssIpcCallInternal::MAssIpcPacketParser::PacketType::pt_call, new_id);
+	if( settings.inplace_send_buffer )
+		call_info = CreateDataStreamInplace(std::move(settings.inplace_send_buffer), measure_size.GetWritePos(), MAssIpcCallInternal::MAssIpcPacketParser::PacketType::pt_call, new_id);
 	else
 		call_info = CreateDataStream(m_int->m_transport, measure_size.GetWritePos(), MAssIpcCallInternal::MAssIpcPacketParser::PacketType::pt_call, new_id);
 
-	SerializeCall<TRet>(call_info, proc_name, (result_buf_wait_return!=nullptr), args...);
+	SerializeCall<TRet>(call_info, settings.proc_name, (result_buf_wait_return!=nullptr), args...);
 
 	InvokeRemote(call_info, result_buf_wait_return, new_id, process_incoming_calls);
 }
 
 template<class TRet, class... TArgs>
-TRet MAssIpcCall::WaitInvokeRetUnified(std::unique_ptr<MAssIpcData>& inplace_send_buffer, const MAssIpcCallInternal::MAssIpcRawString& proc_name, bool process_incoming_calls, const TArgs&... args) const
+TRet MAssIpcCall::WaitInvokeRetUnified(InvokeSetting& settings, bool process_incoming_calls, const TArgs&... args) const
 {
 	static_assert(!std::is_same<TRet,void>::value, "can not be implicit void use function call explicitely return void");
 
 	MAssIpcCallDataStream result;
-	InvokeUnified<TRet>(inplace_send_buffer, proc_name, &result, process_incoming_calls, args...);
+	InvokeUnified<TRet>(settings, &result, process_incoming_calls, args...);
 	{
 		TRet res = {};
 		if( result.IsReadBufferPresent() )
@@ -303,74 +306,40 @@ TRet MAssIpcCall::WaitInvokeRetUnified(std::unique_ptr<MAssIpcData>& inplace_sen
 //-------------------------------------------------------
 
 template<class TRet, class... TArgs>
-TRet MAssIpcCall::WaitInvokeRet(const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TArgs&... args) const
+TRet MAssIpcCall::WaitInvokeRet(InvokeSetting settings, const TArgs&... args) const
 {
 	std::unique_ptr<MAssIpcData> inplace;
-	return WaitInvokeRetUnified<TRet>(inplace, proc_name, false, args...);
+	return WaitInvokeRetUnified<TRet>(settings, false, args...);
 }
 
 template<class... TArgs>
-void MAssIpcCall::WaitInvoke(const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TArgs&... args) const
+void MAssIpcCall::WaitInvoke(InvokeSetting settings, const TArgs&... args) const
 {
 	std::unique_ptr<MAssIpcData> inplace;
 	MAssIpcCallDataStream result_buf;
-	InvokeUnified<void>(inplace, proc_name, &result_buf, false, args...);
+	InvokeUnified<void>(settings, &result_buf, false, args...);
 }
 
 template<class... TArgs>
-void MAssIpcCall::AsyncInvoke(const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TArgs&... args) const
+void MAssIpcCall::AsyncInvoke(InvokeSetting settings, const TArgs&... args) const
 {
 	std::unique_ptr<MAssIpcData> inplace;
-	InvokeUnified<void>(inplace, proc_name, nullptr, false, args...);
+	InvokeUnified<void>(settings, nullptr, false, args...);
 }
 
 template<class... TArgs>
-void MAssIpcCall::WaitInvokeAlertable(const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TArgs&... args) const
+void MAssIpcCall::WaitInvokeAlertable(InvokeSetting settings, const TArgs&... args) const
 {
 	std::unique_ptr<MAssIpcData> inplace;
 	MAssIpcCallDataStream result_buf;
-	InvokeUnified<void>(inplace, proc_name, &result_buf, true, args...);
+	InvokeUnified<void>(settings, &result_buf, true, args...);
 }
 
 template<class TRet, class... TArgs>
-TRet MAssIpcCall::WaitInvokeRetAlertable(const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TArgs&... args) const
+TRet MAssIpcCall::WaitInvokeRetAlertable(InvokeSetting settings, const TArgs&... args) const
 {
 	std::unique_ptr<MAssIpcData> inplace;
-	return WaitInvokeRetUnified<TRet>(inplace, proc_name, true, args...);
-}
-
-
-
-template<class TRet, class... TArgs>
-TRet MAssIpcCall::WaitInvokeRet(std::unique_ptr<MAssIpcData> inplace_send_buffer, const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TArgs&... args) const
-{
-	return WaitInvokeRetUnified<TRet>(inplace_send_buffer, proc_name, false, args...);
-}
-
-template<class... TArgs>
-void MAssIpcCall::WaitInvoke(std::unique_ptr<MAssIpcData> inplace_send_buffer, const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TArgs&... args) const
-{
-	MAssIpcCallDataStream result_buf;
-	InvokeUnified<void>(inplace_send_buffer, proc_name, &result_buf, false, args...);
-}
-
-template<class... TArgs>
-void MAssIpcCall::AsyncInvoke(std::unique_ptr<MAssIpcData> inplace_send_buffer, const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TArgs&... args) const
-{
-	InvokeUnified<void>(inplace_send_buffer, proc_name, nullptr, false, args...);
-}
-
-template<class... TArgs>
-void MAssIpcCall::WaitInvokeAlertable(std::unique_ptr<MAssIpcData> inplace_send_buffer, const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TArgs&... args) const
-{
-	MAssIpcCallDataStream result_buf;
-	InvokeUnified<void>(inplace_send_buffer, proc_name, &result_buf, true, args...);
-}
-
-template<class TRet, class... TArgs>
-TRet MAssIpcCall::WaitInvokeRetAlertable(std::unique_ptr<MAssIpcData> inplace_send_buffer, const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TArgs&... args) const
-{
-	return WaitInvokeRetUnified<TRet>(inplace_send_buffer, proc_name, true, args...);
+	return WaitInvokeRetUnified<TRet>(settings, true, args...);
 }
 
 //-------------------------------------------------------

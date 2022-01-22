@@ -32,7 +32,7 @@ MAssIpcCallDataStream CreateDataStream(const std::weak_ptr<MAssIpcPacketTranspor
 }
 
 
-MAssIpcCallDataStream CreateDataStreamInplace(std::unique_ptr<MAssIpcData>& inplace_send_buffer,
+MAssIpcCallDataStream CreateDataStreamInplace(std::unique_ptr<MAssIpcData> inplace_send_buffer,
 											  MAssIpcData::TPacketSize no_header_size,
 											  MAssIpcPacketParser::PacketType pt,
 											  MAssIpcPacketParser::TCallId respond_id)
@@ -42,6 +42,15 @@ MAssIpcCallDataStream CreateDataStreamInplace(std::unique_ptr<MAssIpcData>& inpl
 	MAssIpcCallDataStream result(std::move(inplace_send_buffer));
 	MAssIpcCallInternal::MAssIpcPacketParser::PacketHeaderWrite(result, no_header_size, MAssIpcCallInternal::MAssIpcPacketParser::PacketType::pt_call, respond_id);
 	return std::move(result);
+}
+
+std::unique_ptr<const MAssIpcData> SerializeReturn(const std::weak_ptr<MAssIpcPacketTransport>& transport,
+												   MAssIpcPacketParser::TCallId respond_id)
+{
+	if( respond_id == MAssIpcPacketParser::c_invalid_id )
+		return {};
+	MAssIpcCallDataStream result_stream(CreateDataStream(transport, 0, MAssIpcPacketParser::PacketType::pt_return, respond_id));
+	return result_stream.DetachWrite();
 }
 
 //-------------------------------------------------------

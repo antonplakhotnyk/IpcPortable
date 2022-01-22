@@ -609,7 +609,7 @@ void Main_IpcClient()
 	{
 		auto packet_size = MAssIpcCall::CalcCallSize<void>(true, "NotExistProc", 0);
 		std::unique_ptr<MAssIpcData> ipc_buffer(new IpcPackerTransportMemory::MemoryPacket(packet_size));
- 		call.AsyncInvoke(std::move(ipc_buffer),{"NotExistProc"}, 0);
+ 		call.AsyncInvoke({"NotExistProc", std::move(ipc_buffer)}, 0);
 // 		call.InvokeWait("NotExistProc", std::move(ipc_buffer)).RetArgs<int>();
 //  	call[{std::move(ipc_buffer), "NotExistProc"}];
 	}
