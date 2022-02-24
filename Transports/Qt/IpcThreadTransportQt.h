@@ -1,9 +1,9 @@
 #pragma once
 
-#include "IThreadCallTransport.h"
+#include "MAssCallThreadTransport.h"
 #include "ThreadCallerQt.h"
 
-class IpcThreadTransportQt: public IThreadCallTransport, public ThreadCallerQt
+class IpcThreadTransportQt: public MAssCallThreadTransport, public ThreadCallerQt
 {
 public:
 
@@ -12,18 +12,18 @@ public:
 
 private:
 
-	void			CallFromThread(AVThread::Id thread_id, Job* job) override;
-	AVThread::Id	GetCurrentThreadId() override;
+	void			CallFromThread(MAssIpcThreadTransportTarget::Id thread_id, std::unique_ptr<Job> job) override;
+	MAssIpcThreadTransportTarget::Id	GetResultSendThreadId() override;
 
 private:
 
 	struct JobEvent: public ThreadCallerQt::CallEvent
 	{
-		JobEvent(IThreadCallTransport::Job* job): m_job(job){}
+		JobEvent(std::unique_ptr<MAssCallThreadTransport::Job> job): m_job(std::move(job)){}
 	private:
 		void CallFromTargetThread() override;
 	private:
-		OPtr<IThreadCallTransport::Job> m_job;
+		std::unique_ptr<MAssCallThreadTransport::Job> m_job;
 	};
 
 };

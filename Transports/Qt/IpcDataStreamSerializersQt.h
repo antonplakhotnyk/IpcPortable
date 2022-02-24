@@ -1,12 +1,12 @@
 #pragma once
 
-#include "IpcCallDataStream.h"
-#include <QString>
+#include "MAssIpcCallDataStream.h"
+#include <QtCore/QString>
 
-IpcCallDataStream& operator<<(IpcCallDataStream& stream, const QString& v);
-IpcCallDataStream& operator>>(IpcCallDataStream& stream, QString& v);
+MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const QString& v);
+MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, QString& v);
 
-AV_IPC_TYPE_SIGNATURE(QString);
+MASS_IPC_TYPE_SIGNATURE(QString);
 
 //-------------------------------------------------------
 

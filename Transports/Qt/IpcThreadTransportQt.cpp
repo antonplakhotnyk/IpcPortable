@@ -1,8 +1,6 @@
-#include "stdafx.h"
 #include "IpcThreadTransportQt.h"
-#include <QThread>
-#include <QCoreApplication>
-#include "InternalThread2.h"
+#include <QtCore/QThread>
+#include <QtCore/QCoreApplication>
 
 IpcThreadTransportQt::IpcThreadTransportQt()
 {
@@ -14,15 +12,15 @@ IpcThreadTransportQt::~IpcThreadTransportQt()
 }
 
 
-void IpcThreadTransportQt::CallFromThread(AVThread::Id thread_id, Job* job)
+void IpcThreadTransportQt::CallFromThread(MAssIpcThreadTransportTarget::Id thread_id, std::unique_ptr<Job> job)
 {
-	JobEvent* call_take_ownership = new JobEvent(job);
+	JobEvent* call_take_ownership = new JobEvent(std::move(job));
 	ThreadCallerQt::CallFromThread(thread_id, call_take_ownership, nullptr);
 }
 
-AVThread::Id IpcThreadTransportQt::GetCurrentThreadId()
+MAssIpcThreadTransportTarget::Id	IpcThreadTransportQt::GetResultSendThreadId()
 {
-	return InternalThread2::GetCurrentThreadId();
+	return MAssIpcThreadTransportTarget::Id();
 }
 
 //-------------------------------------------------------

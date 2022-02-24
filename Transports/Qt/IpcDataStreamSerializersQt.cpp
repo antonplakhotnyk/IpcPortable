@@ -1,7 +1,6 @@
-#include "stdafx.h"
 #include "IpcDataStreamSerializersQt.h"
 
-IpcCallDataStream& operator<<(IpcCallDataStream& stream, const QString& v)
+MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const QString& v)
 {
 	QByteArray data = v.toUtf8();
 	uint32_t data_size = data.size();
@@ -10,7 +9,7 @@ IpcCallDataStream& operator<<(IpcCallDataStream& stream, const QString& v)
 	return stream;
 }
 
-IpcCallDataStream& operator>>(IpcCallDataStream& stream, QString& v)
+MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, QString& v)
 {
 	uint32_t data_size = 0;
 	stream>>data_size;
