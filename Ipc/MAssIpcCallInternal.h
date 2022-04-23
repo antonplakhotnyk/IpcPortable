@@ -493,7 +493,6 @@ class MAssIpcData_Vector: public MAssIpcData
 {
 public:
 
-	MAssIpcData_Vector() = default;
 	MAssIpcData_Vector(MAssIpcData::TPacketSize size)
 		: m_storage(std::make_unique<uint8_t[]>(size))
 		, m_storage_size(size)

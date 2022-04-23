@@ -20,18 +20,16 @@ public:
 
 	template<class T, typename = typename std::enable_if<!std::is_array<T>::value>::type>
 	MAssIpcRawString(const T str)
-		:m_str(str)
-		, m_len(strlen(str))
+		:MAssIpcRawString(str, ConvertCheckStrLen(strlen(str)))
 	{
 	}
 
 	MAssIpcRawString(const std::string& str)
-		:m_str(str.data())
-		, m_len(str.length())
+		:MAssIpcRawString(str.data(), ConvertCheckStrLen(str.length()))
 	{
 	}
 
-	constexpr MAssIpcRawString(const char* str, size_t len)
+	constexpr MAssIpcRawString(const char* str, MAssIpcData::TPacketSize len)
 		: m_str(str)
 		, m_len(len)
 	{
@@ -77,8 +75,12 @@ public:
 
 private:
 
+	static MAssIpcData::TPacketSize ConvertCheckStrLen(size_t str_len);
+
+private:
+
 	const char* const m_str;
-	const size_t m_len;
+	const MAssIpcData::TPacketSize m_len;
 };
 
 }

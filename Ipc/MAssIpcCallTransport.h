@@ -12,6 +12,8 @@ class MAssIpcPacketTransport
 {
 public:
 
+	virtual ~MAssIpcPacketTransport() = default;
+
 	virtual std::unique_ptr<MAssIpcData> Create(MAssIpcData::TPacketSize size) = 0;
 	virtual void Write(std::unique_ptr<const MAssIpcData> packet) = 0;
 	// return meaning same as MAssIpcCallTransport::WaitRespond

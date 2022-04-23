@@ -30,7 +30,7 @@ private:
 		}
 
 		InvokeSetting(const std::string& str)
-			: proc_name{str.data(),str.length()}
+			: proc_name{str}
 		{
 		}
 

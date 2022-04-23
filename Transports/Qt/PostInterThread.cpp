@@ -1,4 +1,3 @@
-#include "StdAfx.h"
 #include "PostInterThread.h"
 #include <QtCore/QEvent>
 #include <QtCore/QObject>
@@ -15,7 +14,8 @@ struct PostInterThread_Imp: public QObject
 	{
 	}
 
-	enum EventType {et_simple=QEvent::User, et_with_id=QEvent::User+1};
+	static constexpr QEvent::Type et_simple = QEvent::User;
+	static constexpr QEvent::Type et_with_id = QEvent::Type(QEvent::User+1);
 
 	class IdParamEvent: public QEvent
 	{

@@ -24,7 +24,7 @@ MAssIpcCallDataStream CreateDataStream(const std::weak_ptr<MAssIpcPacketTranspor
 		{
 			MAssIpcCallDataStream result(std::move(data_buffer));
 			MAssIpcPacketParser::PacketHeaderWrite(result, no_header_size, pt, respond_id);
-			return std::move(result);
+			return result;
 		}
 	}
 
@@ -41,7 +41,7 @@ MAssIpcCallDataStream CreateDataStreamInplace(std::unique_ptr<MAssIpcData> inpla
 	mass_return_x_if_equal(inplace_send_buffer->Size() < packet_size, true, {});
 	MAssIpcCallDataStream result(std::move(inplace_send_buffer));
 	MAssIpcCallInternal::MAssIpcPacketParser::PacketHeaderWrite(result, no_header_size, MAssIpcCallInternal::MAssIpcPacketParser::PacketType::pt_call, respond_id);
-	return std::move(result);
+	return result;
 }
 
 std::unique_ptr<const MAssIpcData> SerializeReturn(const std::weak_ptr<MAssIpcPacketTransport>& transport,

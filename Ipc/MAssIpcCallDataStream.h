@@ -104,23 +104,33 @@ public:
 	template<class T>
 	static void WriteUnsafe(uint8_t* bytes, T t)
 	{
-		for( MAssIpcData::TPacketSize i = 0; i<sizeof(T); i++ )
+		if( sizeof(T)==1 )
+			bytes[0] = uint8_t(t);
+		else
 		{
-			bytes[i] = (0xFF & t);
-			t >>= 8;
+			for( MAssIpcData::TPacketSize i = 0; i<sizeof(T); i++ )
+			{
+				bytes[i] = (0xFF & t);
+				t >>= 8;
+			}
 		}
 	}
 
 	template<class T>
 	static T ReadUnsafe(const uint8_t* bytes)
 	{
-		T t = 0;
-		for( MAssIpcData::TPacketSize i = 0; i<sizeof(T); i++ )
+		if( sizeof(T)==1 )
+			return T(bytes[0]);
+		else
 		{
-			t <<= 8;
-			t |= bytes[sizeof(T)-1-i];
+			T t = 0;
+			for( MAssIpcData::TPacketSize i = 0; i<sizeof(T); i++ )
+			{
+				t <<= 8;
+				t |= bytes[sizeof(T)-1-i];
+			}
+			return t;
 		}
-		return t;
 	}
 
 

@@ -1,6 +1,9 @@
 #pragma once
 
-class MAssAssert
+#define MASS_ASSERT_STR(msg_a) msg_a
+// #define MASS_ASSERT_STR(msg_a) L ## msg_a
+
+class MAssIpcAssert
 {
 public:
 
