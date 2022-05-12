@@ -130,9 +130,10 @@ public:
 
 	std::shared_ptr<const CallInfo> FindCallInfo(const MAssIpcRawString& name, const MAssIpcRawString& params_type) const;
 	MAssIpcCall_EnumerateData EnumerateHandlers() const;
-	void AddProcSignature(const std::shared_ptr<MAssIpcCallInternal::CallInfo>& call_info, const std::string& comment);
+	void AddProcSignature(const std::shared_ptr<MAssIpcCallInternal::CallInfo>& call_info, const std::string& comment, const void* tag);
 	void AddAllProcs(const ProcMap& other);
 	void ClearAllProcs();
+	void ClearProcsWithTag(const void* tag);
 
 public:
 
@@ -140,6 +141,7 @@ public:
 	{
 		std::shared_ptr<CallInfo> call_info;
 		std::string comment;
+		const void*	tag = nullptr;
 	};
 
 private:

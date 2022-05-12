@@ -44,6 +44,11 @@ void MAssIpcCall::ClearAllHandlers()
 	m_int->m_proc_map.ClearAllProcs();
 }
 
+void MAssIpcCall::ClearHandlersWithTag(const void* tag)
+{
+	m_int->m_proc_map.ClearProcsWithTag(tag);
+}
+
 MAssIpcCall::DeserializedFindCallInfo MAssIpcCall::DeserializeNameSignature(MAssIpcCallDataStream& call_info)
 {
 	bool send_return = false;
@@ -152,6 +157,9 @@ MAssIpcCall::CallDataBuffer MAssIpcCall::ReceiveCallDataBuffer(std::unique_ptr<c
 	return res;
 }
 
+// Looks like it multi-thread write - multi-thread read consumer - producer queue with 
+// optional exclusive callback which pushing producer and 
+// optional wait for specific item in queue
 MAssIpcCallDataStream MAssIpcCall::ProcessTransportResponse(MAssIpcCallInternal::MAssIpcPacketParser::TCallId wait_response_id,
 										   bool process_incoming_calls) const
 {
@@ -179,13 +187,20 @@ MAssIpcCallDataStream MAssIpcCall::ProcessTransportResponse(MAssIpcCallInternal:
 					{
 						buffer = std::move(t_int->m_pending_responses.m_data_incoming_call.front());
 						t_int->m_pending_responses.m_data_incoming_call.pop_front();
-						break;
+						break;// process packet extracted from queue
 					}
 
-					if( !t_int->m_pending_responses.m_thread_waiting_transport.IsLocked() )
+					if( t_int->m_pending_responses.m_thread_waiting_transport.IsLocked() )
+					{
+						if( wait_incoming_packet )
+							t_int->m_pending_responses.m_write_cond.wait(lock);
+						else
+							return {};// currently another thread inside transport read call, but must not wait
+					}
+					else
 					{
 						lock_thread_waiting_transport.lock();
-						break;
+						break;// invoke transport read
 					}
 				}
 				else
@@ -194,8 +209,6 @@ MAssIpcCallDataStream MAssIpcCall::ProcessTransportResponse(MAssIpcCallInternal:
 					t_int->m_pending_responses.m_id_data_return.erase(it);
 					break;
 				}
-
-				t_int->m_pending_responses.m_write_cond.wait(lock);
 			}
 		}
 

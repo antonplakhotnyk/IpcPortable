@@ -3,16 +3,11 @@
 // IpcClientNet* IpcClientNet::s_instance=nullptr;
 
 IpcClientNet::IpcClientNet()
-	:m_constructor_thread_id(ThreadCallerQt::GetCurrentThreadId())
+	:m_transport(std::make_shared<IpcClientTcpTransport>())
+	, m_ipc_net(m_transport)
 {
 // 	mass_assert_if_not_equal(s_instance,nullptr);
 // 	s_instance = this;
-
-	m_transport = std::make_shared<IpcClientTcpTransport>();
-	m_thread_transport = std::make_shared<IpcThreadTransportQt>();
-	m_ipc_call = std::make_unique<MAssIpcCall>(m_transport, m_thread_transport);
-
-	QObject::connect(m_transport.get(), &IpcTcpTransportQt::HandlerProcessTransport, this, std::bind(&MAssIpcCall::ProcessTransport, m_ipc_call.get()));
 }
 
 IpcClientNet::~IpcClientNet(void)
@@ -21,9 +16,9 @@ IpcClientNet::~IpcClientNet(void)
 // 		s_instance = nullptr;
 }
 
-void IpcClientNet::Init(const char* remote_address, uint16_t target_port)
+void IpcClientNet::Init(const IpcClientTcpTransport::Addr& addr)
 {
-	m_transport->Init(remote_address, target_port);
+	m_transport->Init(addr);
 }
 
 void IpcClientNet::WaitConnection()
@@ -33,7 +28,7 @@ void IpcClientNet::WaitConnection()
 
 MAssIpcCall& IpcClientNet::Ipc()
 {
-	return *m_ipc_call;
+	return m_ipc_net.Call();
 }
 
 // bool IpcClientNet::IsExist()

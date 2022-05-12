@@ -13,7 +13,13 @@ public:
 	IpcClientTcpTransport(void);
 	~IpcClientTcpTransport();
 
-	void Init(QString address, uint16_t target_port);
+	struct Addr
+	{
+		QString host_name;
+		uint16_t target_port;
+	};
+
+	void Init(const Addr& addr);
 
 	void WaitConnection();
 

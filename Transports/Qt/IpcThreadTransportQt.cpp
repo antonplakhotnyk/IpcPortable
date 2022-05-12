@@ -14,8 +14,8 @@ IpcThreadTransportQt::~IpcThreadTransportQt()
 
 void IpcThreadTransportQt::CallFromThread(MAssIpcThreadTransportTarget::Id thread_id, std::unique_ptr<Job> job)
 {
-	JobEvent* call_take_ownership = new JobEvent(std::move(job));
-	ThreadCallerQt::CallFromThread(thread_id, call_take_ownership, nullptr);
+	std::unique_ptr<JobEvent> call(std::make_unique<JobEvent>(std::move(job)));
+	ThreadCallerQt::CallFromThread(thread_id, std::move(call), nullptr);
 }
 
 MAssIpcThreadTransportTarget::Id	IpcThreadTransportQt::GetResultSendThreadId()

@@ -3,7 +3,8 @@
 #include "MAssIpcCall.h"
 #include "IpcServerTcpTransport.h"
 #include "IpcThreadTransportQt.h"
-
+#include "CallTransportFromQThread.h"
+#include "IpcNet.h"
 
 class IpcServerNet: public QObject
 {
@@ -13,14 +14,13 @@ public:
 
 	void Init();
 
-	MAssIpcCall& Call();
+	MAssIpcCall& Call() const;
 
 	IpcServerTcpTransport& GetIpcServerTcpTransport();
 
 private:
 
 	std::shared_ptr<IpcServerTcpTransport> m_transport;
-	std::shared_ptr<IpcThreadTransportQt> m_thread_transport;
-	std::unique_ptr<MAssIpcCall> m_ipc_call;
+	IpcNet	m_ipc_net;
 };
 

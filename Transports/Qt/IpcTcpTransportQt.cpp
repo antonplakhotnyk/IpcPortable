@@ -48,7 +48,7 @@ bool IpcTcpTransportQt::WaitRespond(size_t expected_size)
 	if( m_connection->state()!=QAbstractSocket::ConnectedState )
 		return false;
 
-	return false;
+	return true;
 
 // 	LockInt lock(&m_wait_respound);
 // 
@@ -111,4 +111,3 @@ void IpcTcpTransportQt::OnError(QAbstractSocket::SocketError er)
 // {
 // 	return (m_wait_respound!=0);
 // }
-

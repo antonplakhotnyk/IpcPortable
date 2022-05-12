@@ -149,7 +149,7 @@ MAssIpcCall_EnumerateData ProcMap::EnumerateHandlers() const
 	return res;
 }
 
-void ProcMap::AddProcSignature(const std::shared_ptr<MAssIpcCallInternal::CallInfo>& new_call_info, const std::string& comment)
+void ProcMap::AddProcSignature(const std::shared_ptr<MAssIpcCallInternal::CallInfo>& new_call_info, const std::string& comment, const void* tag)
 {
 	MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(m_lock);
 
@@ -158,7 +158,7 @@ void ProcMap::AddProcSignature(const std::shared_ptr<MAssIpcCallInternal::CallIn
 	auto key{new_call_info->GetSignatureKey()};
 	auto it_name_params = m_name_procs.find(key);
 	mass_return_if_equal((it_name_params!=m_name_procs.end()) && (it_name_params->second.call_info->IsCallable()), true);
-	m_name_procs[key] = {ownership_call_info, comment};
+	m_name_procs[key] = {ownership_call_info, comment, tag};
 }
 
 void ProcMap::AddAllProcs(const ProcMap& other)
@@ -175,6 +175,18 @@ void ProcMap::ClearAllProcs()
 	MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(m_lock);
 	m_name_procs.clear();
 }
+
+void ProcMap::ClearProcsWithTag(const void* tag)
+{
+	MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(m_lock);
+
+	for( auto it = m_name_procs.begin(); it!=m_name_procs.end(); )
+		if( it->second.tag == tag )
+			it = m_name_procs.erase(it);
+		else
+			it++;
+}
+
 
 
 }// namespace MAssIpcCallInternal;

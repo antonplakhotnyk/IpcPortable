@@ -26,7 +26,7 @@ template<>															  	\
 struct MAssIpcType<type>												\
 {																		\
 	static constexpr const char name_value[sizeof(#type)] = #type;		\
-	static constexpr size_t NameLength()								\
+	static constexpr MAssIpcData::TPacketSize NameLength()								\
 	{																	\
 		return std::extent<decltype(name_value)>::value-1;				\
 	}																	\

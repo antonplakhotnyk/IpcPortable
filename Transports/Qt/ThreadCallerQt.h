@@ -18,7 +18,7 @@ public:
 	static MAssIpcThreadTransportTarget::Id	GetCurrentThreadId();
 	static MAssIpcThreadTransportTarget::Id	GetId(QThread* thread);
 
-protected:
+public:
 
 
 
@@ -26,17 +26,13 @@ protected:
 	{
 	public:
 
-		CallWaiter(std::shared_ptr<QMutex> wait_call_sync)
-		{
-		};
-
 		void WaitProcessing();
 		void CallDone();
 
 	private:
 		bool m_call_done;
-		QWaitCondition	m_call_done_condition;
-		std::shared_ptr<QMutex> m_wait_call_sync;
+		std::condition_variable	m_call_done_condition;
+		std::mutex m_wait_call_sync;
 	};
 
 
@@ -83,28 +79,26 @@ private:
 		std::shared_ptr<QMutex> m_wait_call_sync = std::shared_ptr<QMutex>(new QMutex);
 	};
 
-protected:
+public:
 
-	void CallFromThread(MAssIpcThreadTransportTarget::Id thread_id, CallEvent* call_take_ownership,
+	void CallFromThread(MAssIpcThreadTransportTarget::Id thread_id, std::unique_ptr<CallEvent> call,
 						std::shared_ptr<CallWaiter>* call_waiter);
-	void CallNoThread(CallEvent* call_take_ownership);
+protected:
+	void CallNoThread(std::unique_ptr<CallEvent> call);
 	
 	static void ProcessCalls();
 
 private:
 
-
-
-
 	struct Internals
 	{
-		QMutex	lock_thread_receivers;
+		std::mutex	lock_thread_receivers;
 		std::map<MAssIpcThreadTransportTarget::Id, std::unique_ptr<ThreadCallReceiver> > thread_receivers;
 	};
 
 	std::shared_ptr<Internals> m_int;
 	static std::weak_ptr<Internals> s_int_inter_thread;
-	static QMutex	s_lock_int_inter_thread;
+	static std::mutex	s_lock_int_inter_thread;
 
 	CallReceiver	m_receiver_no_thread;
 };

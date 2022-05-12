@@ -16,7 +16,7 @@ private:
 
 	struct InvokeSetting
 	{
-		template<size_t N>
+		template<MAssIpcData::TPacketSize N>
 		constexpr InvokeSetting(const char(&str)[N])
 			:proc_name{str,(N-1)}
 		{
@@ -71,6 +71,7 @@ public:
 	void SetTransport(const std::weak_ptr<MAssIpcPacketTransport>& transport);
 	void AddAllHandlers(const MAssIpcCall& other);
 	void ClearAllHandlers();
+	void ClearHandlersWithTag(const void* tag);
 
 	template<class TRet, class... TArgs>
 	TRet WaitInvokeRet(InvokeSetting settings, const TArgs&... args) const;
@@ -94,6 +95,9 @@ public:
 	template<class TDelegateW>
 	void AddHandler(const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TDelegateW& del, const std::string& comment,
 					MAssIpcThreadTransportTarget::Id thread_id = MAssCallThreadTransport::NoThread());
+	template<class TDelegateW>
+	void AddHandler(const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TDelegateW& del, const std::string& comment,
+					MAssIpcThreadTransportTarget::Id thread_id, const void* tag);
 
 	void SetErrorHandler(TErrorHandler OnInvalidRemoteCall);
 
@@ -217,17 +221,24 @@ private:
 template<class TDelegateW>
 void MAssIpcCall::AddHandler(const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TDelegateW& del, MAssIpcThreadTransportTarget::Id thread_id)
 {
-	AddHandler(proc_name, del, std::string(), thread_id);
+	AddHandler(proc_name, del, std::string(), thread_id, nullptr);
 }
 
 template<class TDelegateW>
 void MAssIpcCall::AddHandler(const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TDelegateW& del, const std::string& comment,
-						 MAssIpcThreadTransportTarget::Id thread_id)
+							 MAssIpcThreadTransportTarget::Id thread_id)
+{
+	AddHandler(proc_name, del, std::string(), thread_id, nullptr);
+}
+
+template<class TDelegateW>
+void MAssIpcCall::AddHandler(const MAssIpcCallInternal::MAssIpcRawString& proc_name, const TDelegateW& del, const std::string& comment,
+						 MAssIpcThreadTransportTarget::Id thread_id, const void* tag)
 {
 	static_assert(!std::is_bind_expression<TDelegateW>::value, "can not deduce signature from bind_expression, use std::function<>(std::bind())");
 	const std::shared_ptr<MAssIpcCallInternal::CallInfo> call_info(std::make_shared<typename MAssIpcCallInternal::Impl_Selector<TDelegateW>::Res>(del, thread_id, proc_name));
 
-	m_int->m_proc_map.AddProcSignature(call_info, comment);
+	m_int->m_proc_map.AddProcSignature(call_info, comment, tag);
 }
 
 template<class TRet, class... TArgs>

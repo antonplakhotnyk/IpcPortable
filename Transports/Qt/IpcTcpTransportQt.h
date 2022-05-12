@@ -3,7 +3,6 @@
 #include <QtNetwork/QTcpSocket>
 #include <QtCore/QPointer>
 #include "MAssIpcCall.h"
-#include "ScopedPtrQtSafe.h"
 
 class IpcTcpTransportQt: public QObject, public MAssIpcCallTransport
 {
