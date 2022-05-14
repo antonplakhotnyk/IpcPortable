@@ -14,14 +14,12 @@ public:
 
 	MAssIpcCall& Ipc();
 
-	void Init(const IpcClientTcpTransport::Addr& addr);
-
 	void WaitConnection();
 
 // 	static bool IsExist();
 // 	static MAssIpcCall& Get();
 
-	IpcTcpTransportQt& GetTransportQt();
+	IpcClientTcpTransport& GetIpcClientTcpTransport();
 
 private:
 

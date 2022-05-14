@@ -16,11 +16,6 @@ IpcClientNet::~IpcClientNet(void)
 // 		s_instance = nullptr;
 }
 
-void IpcClientNet::Init(const IpcClientTcpTransport::Addr& addr)
-{
-	m_transport->Init(addr);
-}
-
 void IpcClientNet::WaitConnection()
 {
 	m_transport->WaitConnection();
@@ -42,7 +37,7 @@ MAssIpcCall& IpcClientNet::Ipc()
 // 	return s_instance->Ipc();
 // }
 
-IpcTcpTransportQt& IpcClientNet::GetTransportQt()
+IpcClientTcpTransport& IpcClientNet::GetIpcClientTcpTransport()
 {
 	return *m_transport.get();
 }

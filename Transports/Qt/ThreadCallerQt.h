@@ -20,19 +20,27 @@ public:
 
 public:
 
-
+	struct WaitSync
+	{
+		std::condition_variable	condition;
+		std::mutex mutex_sync;
+	};
 
 	class CallWaiter
 	{
 	public:
 
+		CallWaiter(std::shared_ptr<WaitSync> wait_return_processing_calls)
+			:m_wait_return_processing_calls(wait_return_processing_calls)
+		{
+		}
+
 		void WaitProcessing();
 		void CallDone();
 
 	private:
-		bool m_call_done;
-		std::condition_variable	m_call_done_condition;
-		std::mutex m_wait_call_sync;
+		bool m_call_done = false;
+		std::shared_ptr<WaitSync> m_wait_return_processing_calls;
 	};
 
 
@@ -56,7 +64,6 @@ public:
 	};
 
 
-
 private:
 
 
@@ -72,11 +79,11 @@ private:
 	{
 		void OnFinished_ReceiverThread();
 
-		std::shared_ptr<QMutex> GetWaitCallSync();
+		std::shared_ptr<WaitSync> GetWaitCallSync() const;
 
 	private:
 
-		std::shared_ptr<QMutex> m_wait_call_sync = std::shared_ptr<QMutex>(new QMutex);
+		std::shared_ptr<WaitSync> m_wait_return_processing_calls = std::make_shared<WaitSync>();
 	};
 
 public:

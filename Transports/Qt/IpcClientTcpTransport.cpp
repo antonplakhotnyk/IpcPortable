@@ -9,7 +9,7 @@ IpcClientTcpTransport::~IpcClientTcpTransport()
 {
 }
 
-void IpcClientTcpTransport::Init(const Addr& addr)
+void IpcClientTcpTransport::StartConnection(const Addr& addr)
 {
 	QTcpSocket* connection = new QTcpSocket();
 	AssignConnection(connection);
@@ -17,9 +17,9 @@ void IpcClientTcpTransport::Init(const Addr& addr)
 	connection->connectToHost(addr.host_name, addr.target_port);
 }
 
-void IpcClientTcpTransport::WaitConnection()
+bool IpcClientTcpTransport::WaitConnection()
 {
-	bool br = GetConnection()->waitForConnected();
-	mass_return_if_equal(br, false);
+	mass_return_x_if_equal(connection, false, false);
+	return GetConnection()->waitForConnected();
 }
 

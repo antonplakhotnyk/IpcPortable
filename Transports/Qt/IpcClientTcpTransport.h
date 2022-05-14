@@ -19,9 +19,8 @@ public:
 		uint16_t target_port;
 	};
 
-	void Init(const Addr& addr);
-
-	void WaitConnection();
+	void StartConnection(const Addr& addr);
+	bool WaitConnection();
 
 private:
 };

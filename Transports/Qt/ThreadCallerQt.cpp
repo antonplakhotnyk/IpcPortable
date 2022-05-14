@@ -73,20 +73,24 @@ void ThreadCallerQt::CallFromThread(MAssIpcThreadTransportTarget::Id thread_id, 
 	if( thread_id == MAssIpcThreadTransportTarget::Id() )
 		thread_id = ThreadCallerQt::GetCurrentThreadId();
 
+	std::shared_ptr<WaitSync> wait_return_processing_calls;
 	{
 		std::unique_lock lock(m_int->lock_thread_receivers);
 
 		auto it = m_int->thread_receivers.find(thread_id);
 		mass_return_if_equal(it, m_int->thread_receivers.end());
+		wait_return_processing_calls = it->second->GetWaitCallSync();
 
 		if( call_waiter )
 		{
-			std::shared_ptr<CallWaiter> call_waiter_new(std::make_shared<CallWaiter>());
+			std::shared_ptr<CallWaiter> call_waiter_new = std::make_shared<CallWaiter>(wait_return_processing_calls);
 			call->SetCallWaiter(call_waiter_new);
 			*call_waiter = call_waiter_new;
 		}
 		QCoreApplication::postEvent(it->second.get(), call.release());
 	}
+	if( wait_return_processing_calls )
+		wait_return_processing_calls->condition.notify_all();
 }
 
 void ThreadCallerQt::ProcessCalls()
@@ -166,9 +170,9 @@ void ThreadCallerQt::ThreadCallReceiver::OnFinished_ReceiverThread()
 	}
 }
 
-std::shared_ptr<QMutex> ThreadCallerQt::ThreadCallReceiver::GetWaitCallSync()
+std::shared_ptr<ThreadCallerQt::WaitSync> ThreadCallerQt::ThreadCallReceiver::GetWaitCallSync() const
 {
-	return m_wait_call_sync;
+	return m_wait_return_processing_calls;
 }
 
 //-------------------------------------------------------
@@ -177,11 +181,11 @@ void ThreadCallerQt::CallWaiter::WaitProcessing()
 	while(true)
 	{
 		{
-			std::unique_lock lock(m_wait_call_sync);
+			std::unique_lock lock(m_wait_return_processing_calls->mutex_sync);
 			if( m_call_done )
 				break;
 
-			m_call_done_condition.wait(lock);
+			m_wait_return_processing_calls->condition.wait(lock);
 			if( m_call_done )
 				break;
 		}
@@ -192,7 +196,7 @@ void ThreadCallerQt::CallWaiter::WaitProcessing()
 
 void ThreadCallerQt::CallWaiter::CallDone()
 {
-	std::unique_lock lock(m_wait_call_sync);
+	std::unique_lock lock(m_wait_return_processing_calls->mutex_sync);
 	m_call_done = true;
-	m_call_done_condition.notify_all();
+	m_wait_return_processing_calls->condition.notify_all();
 }
