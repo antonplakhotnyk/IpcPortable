@@ -11,7 +11,7 @@ ThreadCallerQt::ThreadCallerQt()
 	std::shared_ptr<Internals> new_int = std::shared_ptr<Internals>(new Internals);
 
 	{
-		std::unique_lock lock(s_lock_int_inter_thread);
+		std::unique_lock<std::mutex> lock(s_lock_int_inter_thread);
 		m_int = s_int_inter_thread.lock();
 		if( !m_int )
 		{
@@ -39,7 +39,7 @@ MAssIpcThreadTransportTarget::Id ThreadCallerQt::AddTargetThread(QThread* receiv
 {
 	std::shared_ptr<Internals> int_inter_thread;
 	{
-		std::unique_lock lock(s_lock_int_inter_thread);
+		std::unique_lock<std::mutex> lock(s_lock_int_inter_thread);
 		int_inter_thread = s_int_inter_thread.lock();
 	}
 	// instance of ThreadCallerQt - does not exist
@@ -48,7 +48,7 @@ MAssIpcThreadTransportTarget::Id ThreadCallerQt::AddTargetThread(QThread* receiv
 	MAssIpcThreadTransportTarget::Id receiver_id = ThreadCallerQt::GetId(receiver);
 	bool is_receiver_absent;
 	{
-		std::unique_lock lock(int_inter_thread->lock_thread_receivers);
+		std::unique_lock<std::mutex> lock(int_inter_thread->lock_thread_receivers);
 		is_receiver_absent = (int_inter_thread->thread_receivers.find(receiver_id)==int_inter_thread->thread_receivers.end());
 	}
 
@@ -58,7 +58,7 @@ MAssIpcThreadTransportTarget::Id ThreadCallerQt::AddTargetThread(QThread* receiv
 		QObject::connect(receiver, &QThread::finished, thread_receiver.get(), &ThreadCallReceiver::OnFinished_ReceiverThread);
 
 		{
-			std::unique_lock lock(int_inter_thread->lock_thread_receivers);
+			std::unique_lock<std::mutex> lock(int_inter_thread->lock_thread_receivers);
 			thread_receiver->moveToThread(receiver);
 			int_inter_thread->thread_receivers[receiver_id] = std::move(thread_receiver);
 		}
@@ -75,7 +75,7 @@ void ThreadCallerQt::CallFromThread(MAssIpcThreadTransportTarget::Id thread_id, 
 
 	std::shared_ptr<WaitSync> wait_return_processing_calls;
 	{
-		std::unique_lock lock(m_int->lock_thread_receivers);
+		std::unique_lock<std::mutex> lock(m_int->lock_thread_receivers);
 
 		auto it = m_int->thread_receivers.find(thread_id);
 		mass_return_if_equal(it, m_int->thread_receivers.end());
@@ -99,13 +99,13 @@ void ThreadCallerQt::ProcessCalls()
 	std::shared_ptr<Internals> int_inter_thread;
 
 	{
-		std::unique_lock lock(s_lock_int_inter_thread);
+		std::unique_lock<std::mutex> lock(s_lock_int_inter_thread);
 		int_inter_thread = s_int_inter_thread.lock();
 	}
 
 	ThreadCallReceiver* thread_receiver;
 	{
-		std::unique_lock lock(int_inter_thread->lock_thread_receivers);
+		std::unique_lock<std::mutex> lock(int_inter_thread->lock_thread_receivers);
 
 		auto it = int_inter_thread->thread_receivers.find(thread_id);
 		mass_return_if_equal(it, int_inter_thread->thread_receivers.end());
@@ -153,13 +153,13 @@ void ThreadCallerQt::ThreadCallReceiver::OnFinished_ReceiverThread()
 	std::unique_ptr<ThreadCallReceiver> safe_delete_lifetime;
 
 	{
-		std::unique_lock lock(s_lock_int_inter_thread);
+		std::unique_lock<std::mutex> lock(s_lock_int_inter_thread);
 		std::shared_ptr<Internals> int_inter_thread;
 
 		int_inter_thread = s_int_inter_thread.lock();
 		if( int_inter_thread )
 		{
-			std::unique_lock lock(int_inter_thread->lock_thread_receivers);
+			std::unique_lock<std::mutex> lock(int_inter_thread->lock_thread_receivers);
 			auto it = int_inter_thread->thread_receivers.find(current_thread_id);
 			if( it != int_inter_thread->thread_receivers.end() )
 			{
@@ -181,7 +181,7 @@ void ThreadCallerQt::CallWaiter::WaitProcessing()
 	while(true)
 	{
 		{
-			std::unique_lock lock(m_wait_return_processing_calls->mutex_sync);
+			std::unique_lock<std::mutex> lock(m_wait_return_processing_calls->mutex_sync);
 			if( m_call_done )
 				break;
 
@@ -196,7 +196,7 @@ void ThreadCallerQt::CallWaiter::WaitProcessing()
 
 void ThreadCallerQt::CallWaiter::CallDone()
 {
-	std::unique_lock lock(m_wait_return_processing_calls->mutex_sync);
+	std::unique_lock<std::mutex> lock(m_wait_return_processing_calls->mutex_sync);
 	m_call_done = true;
 	m_wait_return_processing_calls->condition.notify_all();
 }

@@ -1,1 +1,11 @@
 *.user
+*.obj
+*.suo
+*.log
+*.tlog
+*.exe
+*.ilk
+*.pch
+*.db
+*.pdb
+*.idb
