@@ -1,11 +1,13 @@
 #include "IpcClientNet.h"
+#include "IpcQt_Global.h"
 
 // IpcClientNet* IpcClientNet::s_instance=nullptr;
 
 IpcClientNet::IpcClientNet()
-	:m_transport(std::make_shared<IpcClientTcpTransport>())
-	, m_ipc_net(m_transport)
+	:m_transport_client(std::make_shared<IpcClientTcpTransport>())
+	, m_ipc_net(IpcClient(), m_transport_client)
 {
+
 // 	mass_assert_if_not_equal(s_instance,nullptr);
 // 	s_instance = this;
 }
@@ -18,12 +20,7 @@ IpcClientNet::~IpcClientNet(void)
 
 void IpcClientNet::WaitConnection()
 {
-	m_transport->WaitConnection();
-}
-
-MAssIpcCall& IpcClientNet::Ipc()
-{
-	return m_ipc_net.Call();
+	m_transport_client->WaitConnection();
 }
 
 // bool IpcClientNet::IsExist()
@@ -39,6 +36,6 @@ MAssIpcCall& IpcClientNet::Ipc()
 
 IpcClientTcpTransport& IpcClientNet::GetIpcClientTcpTransport()
 {
-	return *m_transport.get();
+	return *m_transport_client.get();
 }
 

@@ -12,8 +12,6 @@ public:
 	IpcClientNet();
 	~IpcClientNet();
 
-	MAssIpcCall& Ipc();
-
 	void WaitConnection();
 
 // 	static bool IsExist();
@@ -26,7 +24,7 @@ private:
 // 	std::vector<std::string> m_thread_messages;
 // 	std::mutex	m_thread_messages_lock;
 
-	std::shared_ptr<IpcClientTcpTransport> m_transport;
+	std::shared_ptr<IpcClientTcpTransport> m_transport_client;
 	IpcNet	m_ipc_net;
 
 //	static IpcClientNet* s_instance;

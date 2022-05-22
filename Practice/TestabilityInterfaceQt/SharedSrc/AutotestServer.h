@@ -25,7 +25,9 @@ private:
 private:
 
 	ThreadCallerQt	m_thread_caller;
-	IpcServerNet	m_ipc_server;
+	std::shared_ptr<IpcServerTcpTransport> m_transport_server;
+	MAssIpcCall		m_ipc_connection;
+	IpcNet			m_ipc_net;
 
 	decltype(Params::autotest_container)		m_autotest_container;
 	std::unique_ptr<SutHandlerThread>	m_sut_handler;

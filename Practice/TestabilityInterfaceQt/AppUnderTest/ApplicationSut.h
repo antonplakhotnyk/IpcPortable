@@ -24,6 +24,9 @@ private:
 
 private:
 
+	void AutotestServerReady();
+	bool m_server_ready_request_pending = false;
+
 	QPointer<ApplicationUnderTest> m_score_component;
 	TestabilityClientQt		m_testability;
 

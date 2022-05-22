@@ -2,16 +2,10 @@
 #include <QtCore/QEventLoop>
 
 TestabilityClientQt::TestabilityClientQt(const IpcClientTcpTransport::Addr& connect_to_address)
-	:m_background_thread(QThread::create(&TestabilityClientQt::Background_Main, this, connect_to_address))
-	,m_ipc_call({})
+	:m_background_thread(new BackgroundThread(this, connect_to_address))
 {
 	ThreadCallerQt::AddTargetThread(QThread::currentThread());
 	ThreadCallerQt::AddTargetThread(m_background_thread.get());
-	m_background_thread->start();
-	m_int_ready.Wait();
-
-	if( auto internals = m_int.lock() )
-		m_ipc_call = internals->m_ipc_net.Ipc();
 }
 
 TestabilityClientQt::~TestabilityClientQt()
@@ -20,17 +14,12 @@ TestabilityClientQt::~TestabilityClientQt()
 	m_background_thread->wait();
 }
 
-MAssIpcCall& TestabilityClientQt::Ipc()
+void TestabilityClientQt::Start()
 {
-	return m_ipc_call;
+	m_background_thread->start();
+	m_int_ready.Wait();
 }
 
-// static void AutotestServerConnected()
-// {
-// // 	QThread::sleep(10);
-// 	qDebug()<<__FUNCTION__;
-// 	volatile int a = 0;
-// }
 
 void TestabilityClientQt::Background_Main(const IpcClientTcpTransport::Addr& connect_to_address)
 {
@@ -39,17 +28,19 @@ void TestabilityClientQt::Background_Main(const IpcClientTcpTransport::Addr& con
 	m_int = internals;
 	m_int_ready.SetReady();
 
+	internals->StartConnection();
+
 	//	m_ipc_net.Ipc().AddHandler("AutotestServerConnected", std::function<void()>(&AutotestServerConnected));
 
-	{// Connection logic should be more sofisticated
-		while( true )
-		{
-			internals->m_ipc_net.GetIpcClientTcpTransport().StartConnection(connect_to_address);
-			if( internals->m_ipc_net.GetIpcClientTcpTransport().WaitConnection() )
-				break;
-			QThread::sleep(5);// retry connect after 5 secconds
-		}
-	}
+// 	{// Connection logic should be more sofisticated
+// 		while( true )
+// 		{
+// 			internals->m_ipc_net.GetIpcClientTcpTransport().StartConnection(connect_to_address);
+// 			if( internals->m_ipc_net.GetIpcClientTcpTransport().WaitConnection() )
+// 				break;
+// 			QThread::sleep(5);// retry connect after 5 secconds
+// 		}
+// 	}
 
 	// 	m_ipc_net.Ipc().WaitInvoke("TestProc");
 
@@ -60,11 +51,23 @@ void TestabilityClientQt::Background_Main(const IpcClientTcpTransport::Addr& con
 //--------------------------------------------------
 
 TestabilityClientQt::Internals::Internals(const IpcClientTcpTransport::Addr& connect_to_address)
+	:m_connect_to_address(connect_to_address)
 {
+	QObject::connect(&m_ipc_net.GetIpcClientTcpTransport(), &IpcTcpTransportQt::HandlerOnDisconnected, this, &Internals::OnDisconnected, Qt::QueuedConnection);
 }
 
 TestabilityClientQt::Internals::~Internals()
 {
+}
+
+void TestabilityClientQt::Internals::StartConnection()
+{
+	m_ipc_net.GetIpcClientTcpTransport().StartConnection(m_connect_to_address);
+}
+
+void TestabilityClientQt::Internals::OnDisconnected()
+{
+	StartConnection();
 }
 
 //--------------------------------------------------

@@ -168,7 +168,7 @@ public:
 
 		MAssIpcData::TPacketSize Size() const override
 		{
-			return m_data.size();
+			return MAssIpcData::TPacketSize(m_data.size());
 		}
 
 		uint8_t* Data() override
@@ -519,6 +519,15 @@ MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, DataStruct2*& v
 	return stream>>v->a>>v->b>>v->c;
 }
 
+static std::vector<std::string> s_calls;
+
+void CallCountChanged(std::shared_ptr<const MAssIpcCall::CallInfo> call_info)
+{
+	uint32_t count = call_info->GetCallCount();
+	std::string call_data = "CallCountChanged:" + std::to_string(count) + std::string(" ") + call_info->GetName();
+	s_calls.push_back(call_data);
+}
+
 void Main_IpcService(std::shared_ptr<IpcPackerTransportMemory> transport_buffer)
 {
 	std::shared_ptr<MAssCallThreadTransport_Stub> thread_transport(new MAssCallThreadTransport_Stub);
@@ -526,6 +535,8 @@ void Main_IpcService(std::shared_ptr<IpcPackerTransportMemory> transport_buffer)
 	bool run = true;
 
 	call.SetErrorHandler(MAssIpcCall::TErrorHandler(&OnInvalidRemoteCall));
+
+	std::shared_ptr<const MAssIpcCall::CallInfo> call_info;
 
 	// 	call.AddHandler("Ipc_Proc1", DelegateW<std::string(uint8_t, std::string, uint32_t)>().BindS(&Ipc_Proc1));
 	call.AddHandler("IsLinkUp_Sta", std::function<bool()>(&IsLinkUp), CreateCustomId(3));
@@ -539,6 +550,8 @@ void Main_IpcService(std::shared_ptr<IpcPackerTransportMemory> transport_buffer)
 	call.AddHandler("ServerStop", std::function<void()>(std::bind(&ServerStop, &run)));
 
 	call.SetTransport(transport_buffer);
+
+	call.SetCallCountChanged(&CallCountChanged);
 
 
 	while( true )
@@ -580,6 +593,7 @@ void ClientProc(uint8_t a, uint32_t b)
 }
 
 //-------------------------------------------------------
+
 
 void StrProc(const MAssIpcCallInternal::MAssIpcRawString& str)
 {
@@ -624,12 +638,14 @@ void Main_IpcClient()
 	std::string res2 = call.WaitInvokeRet<std::string>("Ipc_Proc1",a, b, c);
 	mass_return_if_not_equal(res2, "Ipc_Proc1 result 123456789012345");
 	mass_return_if_not_equal(s_state_error_et, MAssIpcCall::ErrorType::unknown_error);
+	mass_return_if_not_equal(s_calls.empty(), false);
 
 	c = 654321;
 	const char* string_pointer_Ipc_Proc1 = "Ipc_Proc1";
 	res2 = call.WaitInvokeRet<std::string>(string_pointer_Ipc_Proc1, a, b, c);
 	mass_return_if_not_equal(res2, "Ipc_Proc1 result 1234567654321");
 	mass_return_if_not_equal(s_state_error_et, MAssIpcCall::ErrorType::unknown_error);
+	mass_return_if_not_equal(s_calls[s_calls.size()-1], "CallCountChanged:2 Ipc_Proc1");
 
 	s_state_error_et = MAssIpcCall::ErrorType::unknown_error;
 	std::string res3 = call.WaitInvokeRet<std::string>("NotExistProc", a, b, c);
@@ -656,7 +672,6 @@ void Main_IpcClient()
 	DataStruct2* ds2 = new DataStruct2({4,5,6});
 	call.WaitInvoke("Ipc_UniquePtr1", ds1);
 	call.WaitInvoke("Ipc_UniquePtr2", ds2);
-
 
 	call.WaitInvoke("ServerStop");
 

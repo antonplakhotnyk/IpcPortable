@@ -54,7 +54,7 @@ std::unique_ptr<const MAssIpcData> SerializeReturn(const std::weak_ptr<MAssIpcPa
 }
 
 //-------------------------------------------------------
-CallInfo::CallInfo(MAssIpcThreadTransportTarget::Id thread_id, const MAssIpcRawString& proc_name, std::string params_type)
+CallInfoImpl::CallInfoImpl(MAssIpcThreadTransportTarget::Id thread_id, const MAssIpcRawString& proc_name, std::string params_type)
 	:m_thread_id(thread_id)
 	, m_name(proc_name.Std_String())
 	, m_params_type(std::move(params_type))
@@ -85,10 +85,12 @@ void ResultJob::Invoke(const std::weak_ptr<MAssIpcPacketTransport>& transport, s
 
 CallJob::CallJob(const std::weak_ptr<MAssIpcPacketTransport>& transport, 
 				 const std::weak_ptr<MAssCallThreadTransport>& inter_thread,
+				 const std::shared_ptr<const TCallCountChanged>& call_count_changed,
 				 MAssIpcCallDataStream& call_info_data, MAssIpcPacketParser::TCallId respond_id,
-				 std::shared_ptr<const CallInfo> call_info)
+				 std::shared_ptr<const CallInfoImpl> call_info)
 	: m_call_info_data(std::move(call_info_data))
 	, m_transport(transport)
+	, m_call_count_changed(call_count_changed)
 	, m_inter_thread(inter_thread)
 	, m_respond_id(respond_id)
 	, m_call_info(call_info)
@@ -102,14 +104,22 @@ MAssIpcPacketParser::TCallId CallJob::CalcRespondId(bool send_return, MAssIpcPac
 
 void CallJob::Invoke()
 {
-	Invoke(m_transport, m_inter_thread, m_call_info_data, m_call_info, m_respond_id);
+	Invoke(m_transport, m_inter_thread, m_call_count_changed, m_call_info_data, m_call_info, m_respond_id);
 }
 
 void CallJob::Invoke(const std::weak_ptr<MAssIpcPacketTransport>& transport, const std::weak_ptr<MAssCallThreadTransport>& inter_thread,
-					 MAssIpcCallDataStream& call_info_data, std::shared_ptr<const CallInfo> call_info, 
+					 const std::shared_ptr<const TCallCountChanged>& call_count_changed,
+					 MAssIpcCallDataStream& call_info_data, std::shared_ptr<const CallInfoImpl> call_info, 
 					 MAssIpcPacketParser::TCallId respond_id)
 {
 	auto result = call_info->Invoke(transport, respond_id, call_info_data);
+	
+	{
+		const TCallCountChanged& call_count_changed_proc = *call_count_changed.get();
+		if( call_count_changed_proc )
+			call_count_changed_proc(call_info);
+	}
+
 	if( respond_id!=MAssIpcPacketParser::c_invalid_id )
 	{
 		if( auto inter_thread_strong = inter_thread.lock() )
@@ -125,11 +135,11 @@ void CallJob::Invoke(const std::weak_ptr<MAssIpcPacketTransport>& transport, con
 
 //-------------------------------------------------------
 
-std::shared_ptr<const CallInfo> ProcMap::FindCallInfo(const MAssIpcRawString& name, const MAssIpcRawString& params_type) const
+std::shared_ptr<CallInfoImpl> ProcMap::FindCallInfo(const MAssIpcRawString& name, const MAssIpcRawString& params_type) const
 {
 	MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(m_lock);
 
-	const CallInfo::SignatureKey key{name,params_type};
+	const CallInfoImpl::SignatureKey key{name,params_type};
 	auto it_procs_signature = m_name_procs.find(key);
 	if( it_procs_signature==m_name_procs.end() )
 		return {};
@@ -149,16 +159,17 @@ MAssIpcCall_EnumerateData ProcMap::EnumerateHandlers() const
 	return res;
 }
 
-void ProcMap::AddProcSignature(const std::shared_ptr<MAssIpcCallInternal::CallInfo>& new_call_info, const std::string& comment, const void* tag)
+std::shared_ptr<const CallInfo> ProcMap::AddProcSignature(const std::shared_ptr<MAssIpcCallInternal::CallInfoImpl>& new_call_info, const std::string& comment, const void* tag)
 {
 	MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(m_lock);
 
-	std::shared_ptr<MAssIpcCallInternal::CallInfo> ownership_call_info(new_call_info);
+	std::shared_ptr<MAssIpcCallInternal::CallInfoImpl> ownership_call_info(new_call_info);
 
 	auto key{new_call_info->GetSignatureKey()};
 	auto it_name_params = m_name_procs.find(key);
-	mass_return_if_equal((it_name_params!=m_name_procs.end()) && (it_name_params->second.call_info->IsCallable()), true);
-	m_name_procs[key] = {ownership_call_info, comment, tag};
+	mass_return_x_if_equal((it_name_params!=m_name_procs.end()) && (it_name_params->second.call_info->IsCallable()), true, {});
+	auto add_res = m_name_procs.emplace(key, CallData{ownership_call_info, comment, tag} );
+	return add_res.first->second.call_info;
 }
 
 void ProcMap::AddAllProcs(const ProcMap& other)

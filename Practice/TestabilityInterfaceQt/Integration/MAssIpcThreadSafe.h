@@ -3,6 +3,7 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <atomic>
 
 class MAssIpcThreadSafe
 {
@@ -13,6 +14,7 @@ public:
 	template<class TMutex>
 	using unique_lock = std::unique_lock<TMutex>;
 	using defer_lock_t = std::defer_lock_t;
+	using atomic_uint32_t = std::atomic<uint32_t>;
 
 	using id = std::thread::id;
 

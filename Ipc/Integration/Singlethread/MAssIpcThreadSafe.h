@@ -83,4 +83,6 @@ public:
 	{
 		return 1;
 	}
+	
+	using atomic_uint32_t = uint32_t;
 };

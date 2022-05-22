@@ -41,9 +41,19 @@ class IsConvertible: public decltype(DeduceAvailable<TFrom, TTo>(0))
 class CallInfo
 {
 public:
+	virtual ~CallInfo() = default;
+	virtual uint32_t GetCallCount() const = 0;
+	virtual const std::string& GetName() const = 0;
+};
+
+typedef std::function<void(std::shared_ptr<const CallInfo> call_info)> TCallCountChanged;
+
+class CallInfoImpl: public CallInfo
+{
+public:
 
 
-	CallInfo(MAssIpcThreadTransportTarget::Id thread_id, const MAssIpcRawString& proc_name, std::string params_type);
+	CallInfoImpl(MAssIpcThreadTransportTarget::Id thread_id, const MAssIpcRawString& proc_name, std::string params_type);
 
 	virtual std::unique_ptr<const MAssIpcData> Invoke(const std::weak_ptr<MAssIpcPacketTransport>& transport, 
 												MAssIpcPacketParser::TCallId respond_id,
@@ -72,14 +82,30 @@ public:
 	template<class TDelegate>
 	static std::string MakeParamsType();
 
+	void IncrementCallCount()
+	{
+		m_call_count.fetch_add(1);
+	}
+
+	uint32_t GetCallCount() const override
+	{
+		return m_call_count.load();
+	}
+
+	const std::string& GetName() const override
+	{
+		return m_name;
+	}
+
 public:
 
 	const MAssIpcThreadTransportTarget::Id m_thread_id;
 
 protected:
 
-	const std::string m_name;
-	const std::string m_params_type;
+	MAssIpcThreadSafe::atomic_uint32_t	m_call_count = 0;
+	const std::string		m_name;
+	const std::string		m_params_type;
 };
 
 
@@ -105,16 +131,19 @@ public:
 
 	CallJob(const std::weak_ptr<MAssIpcPacketTransport>& transport, 
 			const std::weak_ptr<MAssCallThreadTransport>& inter_thread,
+			const std::shared_ptr<const TCallCountChanged>& call_count_changed,
 			MAssIpcCallDataStream& call_info_data, MAssIpcPacketParser::TCallId respond_id,
-			std::shared_ptr<const CallInfo> call_info);
+			std::shared_ptr<const CallInfoImpl> call_info);
 	void Invoke() override;
 	static void Invoke(const std::weak_ptr<MAssIpcPacketTransport>& transport, const std::weak_ptr<MAssCallThreadTransport>& inter_thread,
-					   MAssIpcCallDataStream& call_info_data, std::shared_ptr<const CallInfo> call_info, 
+					   const std::shared_ptr<const TCallCountChanged>& call_count_changed,
+					   MAssIpcCallDataStream& call_info_data, std::shared_ptr<const CallInfoImpl> call_info, 
 					   MAssIpcPacketParser::TCallId respond_id);
 	static MAssIpcPacketParser::TCallId CalcRespondId(bool send_return, MAssIpcPacketParser::TCallId respond_id);
 
+	const std::shared_ptr<const TCallCountChanged>	m_call_count_changed;
 	MAssIpcCallDataStream					m_call_info_data;
-	const std::shared_ptr<const CallInfo>	m_call_info;
+	const std::shared_ptr<const CallInfoImpl>	m_call_info;
 	const MAssIpcPacketParser::TCallId		m_respond_id;
 
 private:
@@ -128,9 +157,9 @@ class ProcMap
 {
 public:
 
-	std::shared_ptr<const CallInfo> FindCallInfo(const MAssIpcRawString& name, const MAssIpcRawString& params_type) const;
+	std::shared_ptr<CallInfoImpl> FindCallInfo(const MAssIpcRawString& name, const MAssIpcRawString& params_type) const;
 	MAssIpcCall_EnumerateData EnumerateHandlers() const;
-	void AddProcSignature(const std::shared_ptr<MAssIpcCallInternal::CallInfo>& call_info, const std::string& comment, const void* tag);
+	std::shared_ptr<const CallInfo> AddProcSignature(const std::shared_ptr<MAssIpcCallInternal::CallInfoImpl>& call_info, const std::string& comment, const void* tag);
 	void AddAllProcs(const ProcMap& other);
 	void ClearAllProcs();
 	void ClearProcsWithTag(const void* tag);
@@ -139,16 +168,16 @@ public:
 
 	struct CallData
 	{
-		std::shared_ptr<CallInfo> call_info;
+		std::shared_ptr<CallInfoImpl> call_info;
 		std::string comment;
-		const void*	tag = nullptr;
+		const void* const	tag = nullptr;
 	};
 
 private:
 
 
 	mutable MAssIpcThreadSafe::mutex	m_lock;
-	std::map<MAssIpcCallInternal::CallInfo::SignatureKey, CallData>	m_name_procs;
+	std::map<MAssIpcCallInternal::CallInfoImpl::SignatureKey, CallData>	m_name_procs;
 };
 
 
@@ -376,7 +405,7 @@ class Sig_RetVoid<void(*)(TArgs...)>
 public:
 
 	template<class TDelegate>
-	class Imp: public CallInfo
+	class Imp: public CallInfoImpl
 	{
 	private:
 
@@ -407,7 +436,7 @@ public:
 	public:
 
 		Imp(const TDelegate& del, MAssIpcThreadTransportTarget::Id thread_id, const MAssIpcRawString& name)
-			:CallInfo(thread_id, name, CallInfo::MakeParamsType<TDelegate>() ), m_del(del)
+			:CallInfoImpl(thread_id, name, CallInfoImpl::MakeParamsType<TDelegate>() ), m_del(del)
 		{
 		};
 	};
@@ -419,7 +448,7 @@ class Sig_RetVoidNo<TRet(*)(TArgs...)>
 public:
 
 	template<class TDelegate>
-	class Imp: public CallInfo
+	class Imp: public CallInfoImpl
 	{
 	private:
 
@@ -450,7 +479,7 @@ public:
 	public:
 
 		Imp(const TDelegate& del, MAssIpcThreadTransportTarget::Id thread_id, const MAssIpcRawString& name)
-			:CallInfo(thread_id, name, CallInfo::MakeParamsType<TDelegate>()), m_del(del)
+			:CallInfoImpl(thread_id, name, CallInfoImpl::MakeParamsType<TDelegate>()), m_del(del)
 		{
 		};
 	};
@@ -477,7 +506,7 @@ public:
 //-------------------------------------------------------
 
 template<class TDelegate>
-std::string CallInfo::MakeParamsType()
+std::string CallInfoImpl::MakeParamsType()
 {
 	MAssIpcCallInternal::ParamsTypeHolder_TPacketSize params_type_calc;
 	using TreatProc = typename MAssIpcCallInternal::Impl_Selector<TDelegate>::TDelProcUnified;

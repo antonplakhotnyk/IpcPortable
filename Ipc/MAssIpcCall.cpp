@@ -90,7 +90,7 @@ MAssIpcCall::Internals::AnalizeInvokeDataRes MAssIpcCall::Internals::AnalizeInvo
 {
 	DeserializedFindCallInfo find_call_info = DeserializeNameSignature(call_info_data);
 
-	std::shared_ptr<const CallInfo> call_info = m_proc_map.FindCallInfo(find_call_info.name, find_call_info.params_type);
+	std::shared_ptr<MAssIpcCallInternal::CallInfoImpl> call_info = m_proc_map.FindCallInfo(find_call_info.name, find_call_info.params_type);
 	if( !bool(call_info) )
 		return ReportError_FindCallInfo(find_call_info, ErrorType::no_matching_call_name_parameters);
 
@@ -120,17 +120,18 @@ void MAssIpcCall::Internals::InvokeLocal(MAssIpcCallDataStream& call_info_data, 
 
 	if( invoke.call_info )
 	{
+		invoke.call_info->IncrementCallCount();
 		auto inter_thread_nullable = m_inter_thread_nullable.lock();
 		auto respond_id = CallJob::CalcRespondId(invoke.send_return, id);
 		if( inter_thread_nullable )
 		{
 			auto thread_id = invoke.call_info->m_thread_id;
 
-			std::unique_ptr<CallJob> call_job(std::make_unique<CallJob>(transport, m_inter_thread_nullable, call_info_data, respond_id, invoke.call_info));
+			std::unique_ptr<CallJob> call_job(std::make_unique<CallJob>(transport, m_inter_thread_nullable, m_OnCallCountChanged, call_info_data, respond_id, invoke.call_info));
 			inter_thread_nullable->CallFromThread(thread_id, std::move(call_job));
 		}
 		else
-			CallJob::Invoke(transport, m_inter_thread_nullable, call_info_data, invoke.call_info, respond_id);
+			CallJob::Invoke(transport, m_inter_thread_nullable, m_OnCallCountChanged, call_info_data, invoke.call_info, respond_id);
 	}
 	else
 	{// fail to call
@@ -394,6 +395,11 @@ MAssIpcCall_EnumerateData MAssIpcCall::EnumerateLocal() const
 void MAssIpcCall::SetErrorHandler(TErrorHandler OnInvalidRemoteCall)
 {
 	m_int->m_OnInvalidRemoteCall = OnInvalidRemoteCall;
+}
+
+TCallCountChanged MAssIpcCall::SetCallCountChanged(const TCallCountChanged& OnCallCountChanged)
+{
+	return m_int->SetCallCountChanged(OnCallCountChanged);
 }
 
 MAssIpcCallInternal::MAssIpcPacketParser::TCallId MAssIpcCall::NewCallId() const

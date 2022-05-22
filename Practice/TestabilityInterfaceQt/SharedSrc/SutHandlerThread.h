@@ -17,7 +17,9 @@ public:
 
 	~SutHandlerThread()
 	{
-		terminate();
+		requestInterruption();
+		exit();
+		ThreadCallerQt::CancelDisableWaitingCall(ThreadCallerQt::GetId(this));
 		wait();
 	}
 

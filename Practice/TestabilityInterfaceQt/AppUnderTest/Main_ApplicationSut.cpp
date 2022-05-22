@@ -15,8 +15,7 @@
 
 int main(int argc, char* argv[])
 {
-	QApplication app(argc, argv);
-	app.setAutoSipEnabled(false);
+	ApplicationWithEvents app(argc, argv);
 
 	ApplicationSut::Init({"localhost", 2233});
 	

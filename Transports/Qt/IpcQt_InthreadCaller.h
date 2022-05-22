@@ -6,29 +6,24 @@
 #include <QtCore/QMutex>
 #include <QtCore/QWaitCondition>
 #include "MAssIpcThreadTransportTarget.h"
-#include <set>
 
-class ThreadCallerQt: public QObject
+class IpcQt_InthreadCaller: public QObject
 {
 public:
-	ThreadCallerQt();
-	~ThreadCallerQt();
+	IpcQt_InthreadCaller();
+	~IpcQt_InthreadCaller();
 
-	static MAssIpcThreadTransportTarget::Id	AddTargetThread(QThread* sender_or_receiver);
+	static MAssIpcThreadTransportTarget::Id	AddTargetThread(QThread* receiver);
 
 	static MAssIpcThreadTransportTarget::Id	GetCurrentThreadId();
 	static MAssIpcThreadTransportTarget::Id	GetId(QThread* thread);
-	static void CancelDisableWaitingCall(MAssIpcThreadTransportTarget::Id thread_waiting_call);
 
 public:
 
 	struct WaitSync
 	{
-		bool receiver_thread_finished = false;
 		std::condition_variable	condition;
 		std::mutex mutex_sync;
-
-		void SetReceiverThreadFinished();
 	};
 
 	class CallWaiter
@@ -42,16 +37,9 @@ public:
 
 		void WaitProcessing();
 		void CallDone();
-		void CallCancel();
 
 	private:
-		enum CallState: uint8_t
-		{
-			cs_inprogress,
-			cs_canceled,
-			cs_done,
-		};
-		CallState m_call_state = cs_inprogress;
+		bool m_call_done = false;
 		std::shared_ptr<WaitSync> m_wait_return_processing_calls;
 	};
 
@@ -75,29 +63,6 @@ public:
 		std::shared_ptr<CallWaiter> m_call_waiter;
 	};
 
-	struct CancelHolder
-	{
-		CancelHolder(std::shared_ptr<std::set<CancelHolder*> > sender_waiting_calls, const std::shared_ptr<CallWaiter>& call_waiter)
-			: m_call_waiter_cancel(call_waiter)
-			, m_sender_waiting_calls(sender_waiting_calls)
-		{
-			if( m_sender_waiting_calls )
-				m_sender_waiting_calls->insert(this);
-		}
-
-		~CancelHolder()
-		{
-			if( m_sender_waiting_calls )
-				m_sender_waiting_calls->erase(this);
-		}
-
-		std::shared_ptr<CallWaiter> m_call_waiter_cancel;
-
-	private:
-
-		std::shared_ptr<std::set<CancelHolder*> > m_sender_waiting_calls;
-	};
-
 
 private:
 
@@ -116,16 +81,15 @@ private:
 
 		std::shared_ptr<WaitSync> GetWaitCallSync() const;
 
-		std::shared_ptr<std::set<CancelHolder*> > m_sender_waiting_calls = std::make_shared<std::set<CancelHolder*>>();
-
 	private:
-		const std::shared_ptr<WaitSync> m_sender_wait_return_receiver_processing_calls = std::make_shared<WaitSync>();
+
+		std::shared_ptr<WaitSync> m_wait_return_processing_calls = std::make_shared<WaitSync>();
 	};
 
 public:
 
-	void CallFromThread(MAssIpcThreadTransportTarget::Id receiver_thread_id, std::unique_ptr<CallEvent> call,
-						std::unique_ptr<CancelHolder>* call_waiter);
+	void CallFromThread(MAssIpcThreadTransportTarget::Id thread_id, std::unique_ptr<CallEvent> call,
+						std::shared_ptr<CallWaiter>* call_waiter);
 protected:
 	void CallNoThread(std::unique_ptr<CallEvent> call);
 	
@@ -135,8 +99,8 @@ private:
 
 	struct Internals
 	{
-		std::mutex	lock_threads;
-		std::map<MAssIpcThreadTransportTarget::Id, std::unique_ptr<ThreadCallReceiver> > threads;
+		std::mutex	lock_thread_receivers;
+		std::map<MAssIpcThreadTransportTarget::Id, std::unique_ptr<ThreadCallReceiver> > thread_receivers;
 	};
 
 	std::shared_ptr<Internals> m_int;

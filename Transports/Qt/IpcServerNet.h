@@ -14,13 +14,15 @@ public:
 
 	void Init();
 
-	MAssIpcCall& Call() const;
+	MAssIpcCall& Call();
 
 	IpcServerTcpTransport& GetIpcServerTcpTransport();
 
 private:
 
 	std::shared_ptr<IpcServerTcpTransport> m_transport;
-	IpcNet	m_ipc_net;
+	
+	MAssIpcCall		m_ipc_connection;
+	IpcNet			m_ipc_net;
 };
 
