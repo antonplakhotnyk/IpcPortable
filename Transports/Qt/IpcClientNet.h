@@ -9,7 +9,7 @@ class IpcClientNet: public QObject
 {
 public:
 
-	IpcClientNet();
+	IpcClientNet(MAssIpcCall& ipc_connection);
 	~IpcClientNet();
 
 	void WaitConnection();

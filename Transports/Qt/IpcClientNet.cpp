@@ -1,11 +1,10 @@
 #include "IpcClientNet.h"
-#include "IpcQt_Global.h"
 
 // IpcClientNet* IpcClientNet::s_instance=nullptr;
 
-IpcClientNet::IpcClientNet()
+IpcClientNet::IpcClientNet(MAssIpcCall& ipc_connection)
 	:m_transport_client(std::make_shared<IpcClientTcpTransport>())
-	, m_ipc_net(IpcClient(), m_transport_client)
+	, m_ipc_net(ipc_connection, m_transport_client)
 {
 
 // 	mass_assert_if_not_equal(s_instance,nullptr);

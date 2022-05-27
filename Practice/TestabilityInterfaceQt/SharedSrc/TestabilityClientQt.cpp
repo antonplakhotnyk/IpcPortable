@@ -1,8 +1,8 @@
 #include "TestabilityClientQt.h"
 #include <QtCore/QEventLoop>
 
-TestabilityClientQt::TestabilityClientQt(const IpcClientTcpTransport::Addr& connect_to_address)
-	:m_background_thread(new BackgroundThread(this, connect_to_address))
+TestabilityClientQt::TestabilityClientQt(MAssIpcCall& ipc_connection, const IpcClientTcpTransport::Addr& connect_to_address)
+	:m_background_thread(new BackgroundThread(this, ipc_connection, connect_to_address))
 {
 	ThreadCallerQt::AddTargetThread(QThread::currentThread());
 	ThreadCallerQt::AddTargetThread(m_background_thread.get());
@@ -21,10 +21,10 @@ void TestabilityClientQt::Start()
 }
 
 
-void TestabilityClientQt::Background_Main(const IpcClientTcpTransport::Addr& connect_to_address)
+void TestabilityClientQt::Background_Main(MAssIpcCall& ipc_connection, const IpcClientTcpTransport::Addr& connect_to_address)
 {
 	QEventLoop event_loop;
-	std::shared_ptr<Internals> internals = std::make_shared<Internals>(connect_to_address);
+	std::shared_ptr<Internals> internals = std::make_shared<Internals>(ipc_connection, connect_to_address);
 	m_int = internals;
 	m_int_ready.SetReady();
 
@@ -50,8 +50,9 @@ void TestabilityClientQt::Background_Main(const IpcClientTcpTransport::Addr& con
 
 //--------------------------------------------------
 
-TestabilityClientQt::Internals::Internals(const IpcClientTcpTransport::Addr& connect_to_address)
+TestabilityClientQt::Internals::Internals(MAssIpcCall& ipc_connection, const IpcClientTcpTransport::Addr& connect_to_address)
 	:m_connect_to_address(connect_to_address)
+	, m_ipc_net(ipc_connection)
 {
 	QObject::connect(&m_ipc_net.GetIpcClientTcpTransport(), &IpcTcpTransportQt::HandlerOnDisconnected, this, &Internals::OnDisconnected, Qt::QueuedConnection);
 }

@@ -6,7 +6,7 @@
 std::shared_ptr<ApplicationSut> ApplicationSut::m_int;
 
 ApplicationSut::ApplicationSut(const IpcClientTcpTransport::Addr& connect_to_address)
-	:m_testability(connect_to_address)
+	:m_testability(IpcClient(), connect_to_address)
 {
 
 	{
