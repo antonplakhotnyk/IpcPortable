@@ -1,8 +1,8 @@
 #pragma once
 
 #include "SutHandlerThread.h"
-#include "ThreadCallerQt.h"
-#include "IpcServerNet.h"
+#include "IpcQt_TransthreadCaller.h"
+#include "IpcQt_NetServer.h"
 
 
 class AutotestServer: public QObject
@@ -25,10 +25,10 @@ private:
 
 private:
 
-	ThreadCallerQt	m_thread_caller;
-	std::shared_ptr<IpcServerTcpTransport> m_transport_server;
+	IpcQt_TransthreadCaller	m_thread_caller;
+	std::shared_ptr<IpcQt_TransportTcpServer> m_transport_server;
 	MAssIpcCall		m_ipc_connection;
-	IpcNet			m_ipc_net;
+	IpcQt_Net			m_ipc_net;
 
 	decltype(Params::autotest_container)		m_autotest_container;
 	std::unique_ptr<SutHandlerThread>	m_sut_handler;

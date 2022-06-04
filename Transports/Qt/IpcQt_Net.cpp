@@ -1,10 +1,10 @@
-#include "IpcNet.h"
+#include "IpcQt_Net.h"
 
-IpcNet::IpcNet(MAssIpcCall& ipc_connection, std::shared_ptr<IpcTcpTransportQt> transport)
+IpcQt_Net::IpcQt_Net(MAssIpcCall& ipc_connection, std::shared_ptr<IpcQt_TransporTcp> transport)
 {
-	MAssIpcThreadTransportTarget::Id ipc_transport_thread = ThreadCallerQt::GetCurrentThreadId();
-	m_thread_transport = std::make_shared<IpcThreadTransportQt>();
-	m_transport_from_thread = std::make_shared<CallTransportFromQThread>(ipc_transport_thread, transport, m_thread_transport);
+	MAssIpc_TransthreadTarget::Id ipc_transport_thread = IpcQt_TransthreadCaller::GetCurrentThreadId();
+	m_thread_transport = std::make_shared<IpcQt_Transthread>();
+	m_transport_from_thread = std::make_shared<IpcQt_TransthreadTransportCopy>(ipc_transport_thread, transport, m_thread_transport);
 	
 	{
 		MAssIpcCall new_ipc(m_transport_from_thread, m_thread_transport);
@@ -12,5 +12,5 @@ IpcNet::IpcNet(MAssIpcCall& ipc_connection, std::shared_ptr<IpcTcpTransportQt> t
 		ipc_connection = new_ipc;
 	}
 
-	QObject::connect(transport.get(), &IpcTcpTransportQt::HandlerProcessTransport, this, std::bind(&MAssIpcCall::ProcessTransport, &ipc_connection));
+	QObject::connect(transport.get(), &IpcQt_TransporTcp::HandlerProcessTransport, this, std::bind(&MAssIpcCall::ProcessTransport, &ipc_connection));
 }

@@ -5,7 +5,7 @@
 #include <condition_variable>
 #include <atomic>
 
-class MAssIpcThreadSafe
+class MAssIpc_ThreadSafe
 {
 public:
 

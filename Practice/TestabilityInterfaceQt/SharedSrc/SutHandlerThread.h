@@ -1,7 +1,7 @@
 #pragma once
 
 #include "AutotestBase.h"
-#include "IpcThreadTransportQt.h"
+#include "IpcQt_Transthread.h"
 
 class SutHandlerThread: public QThread
 {
@@ -11,7 +11,7 @@ public:
 		:m_autotest_container(autotest_container)
 		, m_sut_ipc(sut_ipc)
 	{
-		IpcThreadTransportQt::AddTargetThread(this);
+		IpcQt_Transthread::AddTargetThread(this);
 		start();
 	}
 
@@ -19,7 +19,7 @@ public:
 	{
 		requestInterruption();
 		exit();
-		ThreadCallerQt::CancelDisableWaitingCall(ThreadCallerQt::GetId(this));
+		IpcQt_TransthreadCaller::CancelDisableWaitingCall(IpcQt_TransthreadCaller::GetId(this));
 		wait();
 	}
 

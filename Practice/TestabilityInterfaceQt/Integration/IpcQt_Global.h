@@ -2,7 +2,19 @@
 
 #include "MAssIpcCall.h"
 
-void SutInit(const QString host_name, uint16_t target_port);
-void SutRegister(QObject* sut_object);
+#include "MAssIpc_TransthreadTarget.h"
+#include "IpcQt_Serializers.h"
 
-MAssIpcCall& IpcClient();
+class Ipc
+{
+public:
+
+	static void InitClient(const QString host_name, uint16_t target_port);
+	static void SutRegister(QObject* sut_object);
+
+	static MAssIpc_TransthreadTarget::Id CurrentThread();
+	static const void* HandlersTag();
+
+
+	static class MAssIpcCall& Inst();
+};

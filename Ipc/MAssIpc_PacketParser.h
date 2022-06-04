@@ -2,13 +2,13 @@
 
 #include <vector>
 #include <memory>
-#include "MAssIpcCallTransport.h"
-#include "MAssIpcCallDataStream.h"
+#include "MAssIpc_Transport.h"
+#include "MAssIpc_DataStream.h"
 
 namespace MAssIpcCallInternal
 {
 
-class MAssIpcPacketParser
+class MAssIpc_PacketParser
 {
 public:
 
@@ -25,34 +25,34 @@ public:
 		pt_return_enumerate,
 		pt_count_not_a_type,// for calculating count of values
 	};
-	static constexpr int c_net_call_packet_header_size = sizeof(MAssIpcData::TPacketSize) + sizeof(PacketType) + sizeof(TCallId);
-	static constexpr MAssIpcData::TPacketSize c_invalid_packet_size = -1;
+	static constexpr int c_net_call_packet_header_size = sizeof(MAssIpc_Data::TPacketSize) + sizeof(PacketType) + sizeof(TCallId);
+	static constexpr MAssIpc_Data::TPacketSize c_invalid_packet_size = -1;
 	static constexpr TCallId c_invalid_id = 0;
 
 
-	MAssIpcPacketParser();
-	~MAssIpcPacketParser();
+	MAssIpc_PacketParser();
+	~MAssIpc_PacketParser();
 
-	size_t				ReadNeededDataSize(const std::shared_ptr<MAssIpcCallTransport>& in_data, std::unique_ptr<const MAssIpcData>* packet_data);
+	size_t				ReadNeededDataSize(const std::shared_ptr<MAssIpc_TransportCopy>& in_data, std::unique_ptr<const MAssIpc_Data>* packet_data);
 
 	struct Header
 	{
-		MAssIpcData::TPacketSize size = c_invalid_packet_size;
+		MAssIpc_Data::TPacketSize size = c_invalid_packet_size;
 		PacketType type = PacketType::pt_undefined;
 		TCallId id = c_invalid_id;
 	};
 
 
-	static Header	ReadHeader(MAssIpcCallDataStream& connection_stream);
-	static void		PacketHeaderWrite(MAssIpcCallDataStream& packet_data, MAssIpcData::TPacketSize no_header_size, MAssIpcPacketParser::PacketType pt, MAssIpcPacketParser::TCallId id);
+	static Header	ReadHeader(MAssIpc_DataStream& connection_stream);
+	static void		PacketHeaderWrite(MAssIpc_DataStream& packet_data, MAssIpc_Data::TPacketSize no_header_size, MAssIpc_PacketParser::PacketType pt, MAssIpc_PacketParser::TCallId id);
 
 private:
-	void ReceiveReadHeader(const std::shared_ptr<MAssIpcCallTransport>& in_data);
+	void ReceiveReadHeader(const std::shared_ptr<MAssIpc_TransportCopy>& in_data);
 
 private:
 
-	std::unique_ptr<MAssIpcData> m_incoming_packet_header_data;
-	MAssIpcData::TPacketSize m_incoming_packet_size = c_invalid_packet_size;
+	std::unique_ptr<MAssIpc_Data> m_incoming_packet_header_data;
+	MAssIpc_Data::TPacketSize m_incoming_packet_size = c_invalid_packet_size;
 };
 
 }

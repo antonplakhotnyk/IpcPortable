@@ -1,15 +1,15 @@
-#include "IpcClientTcpTransport.h"
-#include "MAssMacros.h"
+#include "IpcQt_TransportTcpClient.h"
+#include "MAssIpc_Macros.h"
 
-IpcClientTcpTransport::IpcClientTcpTransport(void)
+IpcQt_TransportTcpClient::IpcQt_TransportTcpClient(void)
 {
 }
 
-IpcClientTcpTransport::~IpcClientTcpTransport()
+IpcQt_TransportTcpClient::~IpcQt_TransportTcpClient()
 {
 }
 
-void IpcClientTcpTransport::StartConnection(const Addr& addr)
+void IpcQt_TransportTcpClient::StartConnection(const Addr& addr)
 {
 	QTcpSocket* connection = new QTcpSocket();
 	AssignConnection(connection);
@@ -17,7 +17,7 @@ void IpcClientTcpTransport::StartConnection(const Addr& addr)
 	connection->connectToHost(addr.host_name, addr.target_port);
 }
 
-bool IpcClientTcpTransport::WaitConnection()
+bool IpcQt_TransportTcpClient::WaitConnection()
 {
 	QTcpSocket* connection = GetConnection();
 	mass_return_x_if_equal(connection, nullptr, false);

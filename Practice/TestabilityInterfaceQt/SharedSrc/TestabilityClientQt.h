@@ -2,20 +2,20 @@
 
 #include <QtCore/QObject>
 #include <QtCore/QThread>
-#include "IpcClientNet.h"
+#include "IpcQt_NetClient.h"
 
 class TestabilityClientQt: public QThread
 {
 public:
 
-	TestabilityClientQt(MAssIpcCall& ipc_connection, const IpcClientTcpTransport::Addr& connect_to_address);
+	TestabilityClientQt(MAssIpcCall& ipc_connection, const IpcQt_TransportTcpClient::Addr& connect_to_address);
 	~TestabilityClientQt();
 
 	void Start();
 
 private:
 
-	void Background_Main(MAssIpcCall& ipc_connection, const IpcClientTcpTransport::Addr& connect_to_address);
+	void Background_Main(MAssIpcCall& ipc_connection, const IpcQt_TransportTcpClient::Addr& connect_to_address);
 
 private:
 
@@ -26,7 +26,7 @@ private:
 		//	BackgroundThread must be removed and replaced by 
 		//	:m_background_thread(QThread::create(&TestabilityClientQt::Background_Main, this, connect_to_address))
 		//	it can not be done right now because of Qt targeting Android fails compile that string
-		BackgroundThread(TestabilityClientQt* parent, MAssIpcCall& ipc_connection, const IpcClientTcpTransport::Addr& connect_to_address)
+		BackgroundThread(TestabilityClientQt* parent, MAssIpcCall& ipc_connection, const IpcQt_TransportTcpClient::Addr& connect_to_address)
 			: m_ipc_connection(ipc_connection)
 			, m_connect_to_address(connect_to_address)
 			, m_parent(parent)
@@ -41,19 +41,19 @@ private:
 	private:
 
 		MAssIpcCall&				m_ipc_connection;
-		IpcClientTcpTransport::Addr m_connect_to_address;
+		IpcQt_TransportTcpClient::Addr m_connect_to_address;
 		TestabilityClientQt* m_parent;
 	};
 
 	class Internals: public QObject  
 	{
 	public:
-		Internals(MAssIpcCall& ipc_connection, const IpcClientTcpTransport::Addr& connect_to_address);
+		Internals(MAssIpcCall& ipc_connection, const IpcQt_TransportTcpClient::Addr& connect_to_address);
 		~Internals();
 
 		void StartConnection();
 
-		IpcClientNet	m_ipc_net;
+		IpcQt_NetClient	m_ipc_net;
 
 	private:
 
@@ -61,7 +61,7 @@ private:
 
 	private:
 
-		IpcClientTcpTransport::Addr m_connect_to_address;
+		IpcQt_TransportTcpClient::Addr m_connect_to_address;
 	};
 
 	class WaitReady
@@ -76,7 +76,7 @@ private:
 		void SetReady();
 	};
 
-	ThreadCallerQt m_thread_caller;
+	IpcQt_TransthreadCaller m_thread_caller;
 	WaitReady	m_int_ready;
 	std::weak_ptr<Internals> m_int;
 

@@ -3,7 +3,7 @@
 #include <QtWidgets/QWidget>
 #include <QtWidgets/QMainWindow>
 #include <QtCore/QDebug>
-#include "ApplicationWithEvents.h"
+#include "ApplicationStatic.h"
 
 #include <iostream>
 
@@ -15,7 +15,7 @@
 
 int main(int argc, char* argv[])
 {
-	ApplicationWithEvents app(argc, argv);
+	ApplicationStatic app(argc, argv);
 
 	Ipc::InitClient("localhost", 2233);
 	

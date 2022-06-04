@@ -137,7 +137,7 @@ void CallJob::Invoke(const std::weak_ptr<MAssIpc_TransportShare>& transport, con
 
 std::shared_ptr<CallInfoImpl> ProcMap::FindCallInfo(const MAssIpc_RawString& name, const MAssIpc_RawString& params_type) const
 {
-	MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(m_lock);
+	MAssIpc_ThreadSafe::unique_lock<MAssIpc_ThreadSafe::mutex> lock(m_lock);
 
 	const CallInfoImpl::SignatureKey key{name,params_type};
 	auto it_procs_signature = m_name_procs.find(key);
@@ -149,7 +149,7 @@ std::shared_ptr<CallInfoImpl> ProcMap::FindCallInfo(const MAssIpc_RawString& nam
 
 MAssIpcCall_EnumerateData ProcMap::EnumerateHandlers() const
 {
-	MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(m_lock);
+	MAssIpc_ThreadSafe::unique_lock<MAssIpc_ThreadSafe::mutex> lock(m_lock);
 
 	MAssIpcCall_EnumerateData res;
 
@@ -161,7 +161,7 @@ MAssIpcCall_EnumerateData ProcMap::EnumerateHandlers() const
 
 std::shared_ptr<const CallInfo> ProcMap::AddProcSignature(const std::shared_ptr<MAssIpcCallInternal::CallInfoImpl>& new_call_info, const std::string& comment, const void* tag)
 {
-	MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(m_lock);
+	MAssIpc_ThreadSafe::unique_lock<MAssIpc_ThreadSafe::mutex> lock(m_lock);
 
 	std::shared_ptr<MAssIpcCallInternal::CallInfoImpl> ownership_call_info(new_call_info);
 
@@ -174,8 +174,8 @@ std::shared_ptr<const CallInfo> ProcMap::AddProcSignature(const std::shared_ptr<
 
 void ProcMap::AddAllProcs(const ProcMap& other)
 {
-	MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(m_lock);
-	MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock_other(other.m_lock);
+	MAssIpc_ThreadSafe::unique_lock<MAssIpc_ThreadSafe::mutex> lock(m_lock);
+	MAssIpc_ThreadSafe::unique_lock<MAssIpc_ThreadSafe::mutex> lock_other(other.m_lock);
 
 	for( auto other_it : other.m_name_procs )
 		m_name_procs.insert(other_it);
@@ -183,13 +183,13 @@ void ProcMap::AddAllProcs(const ProcMap& other)
 
 void ProcMap::ClearAllProcs()
 {
-	MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(m_lock);
+	MAssIpc_ThreadSafe::unique_lock<MAssIpc_ThreadSafe::mutex> lock(m_lock);
 	m_name_procs.clear();
 }
 
 void ProcMap::ClearProcsWithTag(const void* tag)
 {
-	MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(m_lock);
+	MAssIpc_ThreadSafe::unique_lock<MAssIpc_ThreadSafe::mutex> lock(m_lock);
 
 	for( auto it = m_name_procs.begin(); it!=m_name_procs.end(); )
 		if( it->second.tag == tag )

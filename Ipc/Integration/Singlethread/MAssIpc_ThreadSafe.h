@@ -1,6 +1,6 @@
 #pragma once
 
-class MAssIpcThreadSafe
+class MAssIpc_ThreadSafe
 {
 public:
 

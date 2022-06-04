@@ -1,30 +1,30 @@
-#include "MAssIpcPacketTransportDefault.h"
-#include "MAssMacros.h"
-#include "MAssIpcCallInternal.h"
+#include "MAssIpc_TransportProxy.h"
+#include "MAssIpc_Macros.h"
+#include "MAssIpc_Internals.h "
 
 namespace MAssIpcCallInternal
 {
 
-MAssIpcPacketTransportDefault::MAssIpcPacketTransportDefault(const std::weak_ptr<MAssIpcCallTransport>& transport)
+TransportProxy::TransportProxy(const std::weak_ptr<MAssIpc_TransportCopy>& transport)
 	:m_transport(transport)
 {
 }
 
-std::unique_ptr<MAssIpcData> MAssIpcPacketTransportDefault::Create(MAssIpcData::TPacketSize size)
+std::unique_ptr<MAssIpc_Data> TransportProxy::Create(MAssIpc_Data::TPacketSize size)
 {
-	return std::unique_ptr<MAssIpcData>(std::make_unique<MAssIpcData_Vector>(size));
+	return std::unique_ptr<MAssIpc_Data>(std::make_unique<MAssIpcData_Vector>(size));
 }
 
-void MAssIpcPacketTransportDefault::Write(std::unique_ptr<const MAssIpcData> packet)
+void TransportProxy::Write(std::unique_ptr<const MAssIpc_Data> packet)
 {
-	std::shared_ptr<MAssIpcCallTransport> transport = m_transport.lock();
+	std::shared_ptr<MAssIpc_TransportCopy> transport = m_transport.lock();
 	mass_return_if_equal(bool(transport), false);
 	transport->Write(packet->Data(), packet->Size());
 }
 
-bool MAssIpcPacketTransportDefault::Read(bool wait_incoming_packet, std::unique_ptr<const MAssIpcData>* packet)
+bool TransportProxy::Read(bool wait_incoming_packet, std::unique_ptr<const MAssIpc_Data>* packet)
 {
-	std::shared_ptr<MAssIpcCallTransport> transport = m_transport.lock();
+	std::shared_ptr<MAssIpc_TransportCopy> transport = m_transport.lock();
 	mass_return_x_if_equal(bool(transport), false, {});
 
 	size_t needed_data_size = 0;

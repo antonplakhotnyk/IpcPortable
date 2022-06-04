@@ -1,29 +1,29 @@
-#include "IpcServerTcpTransport.h"
+#include "IpcQt_TransportTcpServer.h"
 
 
-IpcServerTcpTransport::IpcServerTcpTransport(uint16_t listen_port)
+IpcQt_TransportTcpServer::IpcQt_TransportTcpServer(uint16_t listen_port)
 	:m_listen_port(listen_port)
 {
-	QObject::connect(&m_server, &QTcpServer::newConnection, this, &IpcServerTcpTransport::NewConnection);
+	QObject::connect(&m_server, &QTcpServer::newConnection, this, &IpcQt_TransportTcpServer::NewConnection);
 }
 
-IpcServerTcpTransport::~IpcServerTcpTransport()
+IpcQt_TransportTcpServer::~IpcQt_TransportTcpServer()
 {
 }
 
-bool IpcServerTcpTransport::ListenRestart()
+bool IpcQt_TransportTcpServer::ListenRestart()
 {
 	return m_server.listen(QHostAddress::Any, m_listen_port);
 }
 
-void IpcServerTcpTransport::NewConnection()
+void IpcQt_TransportTcpServer::NewConnection()
 {
 	QTcpSocket* connection = m_server.nextPendingConnection();
 	AssignConnection(connection);
 	m_server.close();
 }
 
-QTcpServer* IpcServerTcpTransport::Server()
+QTcpServer* IpcQt_TransportTcpServer::Server()
 {
 	return &m_server;
 }

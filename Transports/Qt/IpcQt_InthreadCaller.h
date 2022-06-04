@@ -5,7 +5,7 @@
 #include <memory>
 #include <QtCore/QMutex>
 #include <QtCore/QWaitCondition>
-#include "MAssIpcThreadTransportTarget.h"
+#include "MAssIpc_TransthreadTarget.h"
 
 class IpcQt_InthreadCaller: public QObject
 {
@@ -13,10 +13,10 @@ public:
 	IpcQt_InthreadCaller();
 	~IpcQt_InthreadCaller();
 
-	static MAssIpcThreadTransportTarget::Id	AddTargetThread(QThread* receiver);
+	static MAssIpc_TransthreadTarget::Id	AddTargetThread(QThread* receiver);
 
-	static MAssIpcThreadTransportTarget::Id	GetCurrentThreadId();
-	static MAssIpcThreadTransportTarget::Id	GetId(QThread* thread);
+	static MAssIpc_TransthreadTarget::Id	GetCurrentThreadId();
+	static MAssIpc_TransthreadTarget::Id	GetId(QThread* thread);
 
 public:
 
@@ -88,7 +88,7 @@ private:
 
 public:
 
-	void CallFromThread(MAssIpcThreadTransportTarget::Id thread_id, std::unique_ptr<CallEvent> call,
+	void CallFromThread(MAssIpc_TransthreadTarget::Id thread_id, std::unique_ptr<CallEvent> call,
 						std::shared_ptr<CallWaiter>* call_waiter);
 protected:
 	void CallNoThread(std::unique_ptr<CallEvent> call);
@@ -100,7 +100,7 @@ private:
 	struct Internals
 	{
 		std::mutex	lock_thread_receivers;
-		std::map<MAssIpcThreadTransportTarget::Id, std::unique_ptr<ThreadCallReceiver> > thread_receivers;
+		std::map<MAssIpc_TransthreadTarget::Id, std::unique_ptr<ThreadCallReceiver> > thread_receivers;
 	};
 
 	std::shared_ptr<Internals> m_int;

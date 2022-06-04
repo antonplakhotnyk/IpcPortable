@@ -1,17 +1,17 @@
 #pragma once
 
-#include "MAssIpcCallTransport.h"
-#include "MAssCallThreadTransport.h"
-#include "MAssIpcThreadTransportTarget.h"
-#include "ThreadCallerQt.h"
+#include "MAssIpc_Transport.h"
+#include "MAssIpc_Transthread.h"
+#include "MAssIpc_TransthreadTarget.h"
+#include "IpcQt_TransthreadCaller.h"
 
-class CallTransportFromQThread: public MAssIpcCallTransport, public QObject
+class IpcQt_TransthreadTransportCopy: public MAssIpc_TransportCopy, public QObject
 {
 public:
 
-	CallTransportFromQThread(MAssIpcThreadTransportTarget::Id transport_thread_id, 
-							 const std::shared_ptr<MAssIpcCallTransport>& transport, 
-							 const std::shared_ptr<ThreadCallerQt>& inter_thread);
+	IpcQt_TransthreadTransportCopy(MAssIpc_TransthreadTarget::Id transport_thread_id, 
+							 const std::shared_ptr<MAssIpc_TransportCopy>& transport, 
+							 const std::shared_ptr<IpcQt_TransthreadCaller>& inter_thread);
 
 	bool	WaitRespond(size_t expected_size) override;
 
@@ -23,10 +23,10 @@ private:
 
 	void CallFromThread(std::function<void()> invoke_proc);
 
-	class Call: public ThreadCallerQt::CallEvent
+	class Call: public IpcQt_TransthreadCaller::CallEvent
 	{
 	public:
-		Call(std::shared_ptr<MAssIpcCallTransport> transport, std::function<void()> invoke_proc)
+		Call(std::shared_ptr<MAssIpc_TransportCopy> transport, std::function<void()> invoke_proc)
 			:m_invoke_proc(invoke_proc)
 		{
 		}
@@ -43,7 +43,7 @@ private:
 
 private:
 
-	std::shared_ptr<MAssIpcCallTransport>	m_transport;
-	std::shared_ptr<ThreadCallerQt>			m_inter_thread;
-	const MAssIpcThreadTransportTarget::Id	m_transport_thread_id;
+	std::shared_ptr<MAssIpc_TransportCopy>	m_transport;
+	std::shared_ptr<IpcQt_TransthreadCaller>			m_inter_thread;
+	const MAssIpc_TransthreadTarget::Id	m_transport_thread_id;
 };

@@ -1,7 +1,7 @@
 #include "IpcQt_InthreadCaller.h"
 #include <QtCore/QCoreApplication>
 #include <QtCore/QMutexLocker>
-#include "MAssMacros.h"
+#include "MAssIpc_Macros.h"
 
 std::weak_ptr<IpcQt_InthreadCaller::Internals> IpcQt_InthreadCaller::s_int_inter_thread;
 std::mutex	IpcQt_InthreadCaller::s_lock_int_inter_thread;
@@ -25,17 +25,17 @@ IpcQt_InthreadCaller::~IpcQt_InthreadCaller()
 {
 }
 
-MAssIpcThreadTransportTarget::Id IpcQt_InthreadCaller::GetCurrentThreadId()
+MAssIpc_TransthreadTarget::Id IpcQt_InthreadCaller::GetCurrentThreadId()
 {
 	return QThread::currentThread();
 }
 
-MAssIpcThreadTransportTarget::Id	IpcQt_InthreadCaller::GetId(QThread* thread)
+MAssIpc_TransthreadTarget::Id	IpcQt_InthreadCaller::GetId(QThread* thread)
 {
 	return thread;
 }
 
-MAssIpcThreadTransportTarget::Id IpcQt_InthreadCaller::AddTargetThread(QThread* receiver)
+MAssIpc_TransthreadTarget::Id IpcQt_InthreadCaller::AddTargetThread(QThread* receiver)
 {
 	std::shared_ptr<Internals> int_inter_thread;
 	{
@@ -43,9 +43,9 @@ MAssIpcThreadTransportTarget::Id IpcQt_InthreadCaller::AddTargetThread(QThread* 
 		int_inter_thread = s_int_inter_thread.lock();
 	}
 	// instance of IpcQt_InthreadCaller - does not exist
-	mass_return_x_if_equal(bool(int_inter_thread),false, MAssIpcThreadTransportTarget::Id());
+	mass_return_x_if_equal(bool(int_inter_thread),false, MAssIpc_TransthreadTarget::Id());
 
-	MAssIpcThreadTransportTarget::Id receiver_id = IpcQt_InthreadCaller::GetId(receiver);
+	MAssIpc_TransthreadTarget::Id receiver_id = IpcQt_InthreadCaller::GetId(receiver);
 	bool is_receiver_absent;
 	{
 		std::unique_lock<std::mutex> lock(int_inter_thread->lock_thread_receivers);
@@ -67,10 +67,10 @@ MAssIpcThreadTransportTarget::Id IpcQt_InthreadCaller::AddTargetThread(QThread* 
 	return receiver_id;
 }
 
-void IpcQt_InthreadCaller::CallFromThread(MAssIpcThreadTransportTarget::Id thread_id, std::unique_ptr<CallEvent> call,
+void IpcQt_InthreadCaller::CallFromThread(MAssIpc_TransthreadTarget::Id thread_id, std::unique_ptr<CallEvent> call,
 									std::shared_ptr<CallWaiter>* call_waiter)
 {
-	if( thread_id == MAssIpcThreadTransportTarget::Id() )
+	if( thread_id == MAssIpc_TransthreadTarget::Id() )
 		thread_id = IpcQt_InthreadCaller::GetCurrentThreadId();
 
 	std::shared_ptr<WaitSync> wait_return_processing_calls;
@@ -95,7 +95,7 @@ void IpcQt_InthreadCaller::CallFromThread(MAssIpcThreadTransportTarget::Id threa
 
 void IpcQt_InthreadCaller::ProcessCalls()
 {
-	MAssIpcThreadTransportTarget::Id thread_id = IpcQt_InthreadCaller::GetCurrentThreadId();
+	MAssIpc_TransthreadTarget::Id thread_id = IpcQt_InthreadCaller::GetCurrentThreadId();
 	std::shared_ptr<Internals> int_inter_thread;
 
 	{

@@ -1,11 +1,11 @@
 #include "ApplicationSut.h"
-#include "IpcDataStreamSerializersQt.h"
+#include "IpcQt_Serializers.h"
 #include "IpcQt_Global.h"
 
 
 std::shared_ptr<ApplicationSut> ApplicationSut::m_int;
 
-ApplicationSut::ApplicationSut(const IpcClientTcpTransport::Addr& connect_to_address)
+ApplicationSut::ApplicationSut(const IpcQt_TransportTcpClient::Addr& connect_to_address)
 	:m_testability(Ipc::Inst(), connect_to_address)
 {
 
@@ -14,7 +14,7 @@ ApplicationSut::ApplicationSut(const IpcClientTcpTransport::Addr& connect_to_add
 		{
 			m_server_ready_request_pending = true;
 			AutotestServerReady();
-		}), {}, ThreadCallerQt::GetCurrentThreadId(), this);
+		}), {}, IpcQt_TransthreadCaller::GetCurrentThreadId(), this);
 	}
 
 	m_testability.Start();
@@ -49,8 +49,8 @@ void ApplicationSut::Register(ApplicationUnderTest* score_component)
 
 	MAssIpcCall& ipc = Ipc::Inst();
 
-	ipc.AddHandler("OpenFile", std::function<bool(QByteArray)>(std::bind(&ApplicationSut::OpenFile, this, std::placeholders::_1)), {}, ThreadCallerQt::GetCurrentThreadId(), score_component);
-	ipc.AddHandler("TransfetString", std::function<QString(QString)>(std::bind(&ApplicationSut::TransfetString, this, std::placeholders::_1)), {}, ThreadCallerQt::GetCurrentThreadId(), score_component);
+	ipc.AddHandler("OpenFile", std::function<bool(QByteArray)>(std::bind(&ApplicationSut::OpenFile, this, std::placeholders::_1)), {}, IpcQt_TransthreadCaller::GetCurrentThreadId(), score_component);
+	ipc.AddHandler("TransfetString", std::function<QString(QString)>(std::bind(&ApplicationSut::TransfetString, this, std::placeholders::_1)), {}, IpcQt_TransthreadCaller::GetCurrentThreadId(), score_component);
 
 	AutotestServerReady();
 }
@@ -87,7 +87,7 @@ void Ipc::InitClient(const QString host_name, uint16_t target_port)
 
 void Ipc::SutRegister(QObject* sut_object)
 {
-	return_if_equal(bool(ApplicationSut::m_int), false);
+	mass_return_if_equal(bool(ApplicationSut::m_int), false);
 	if( ApplicationUnderTest* score_component = dynamic_cast<ApplicationUnderTest*>(sut_object) )
 		ApplicationSut::m_int->Register(score_component);
 }

@@ -3,12 +3,12 @@
 #include <QtWidgets/QWidget>
 #include <QtWidgets/QMainWindow>
 #include <QtCore/QDebug>
-#include "ApplicationWithEvents.h"
+#include "ApplicationStatic.h"
 
 #include <iostream>
 
-#include "IpcServerNet.h"
-#include "IpcDataStreamSerializersQt.h"
+#include "IpcQt_NetServer.h"
+#include "IpcQt_Serializers.h"
 #include "AutotestServer.h"
 
 
@@ -24,7 +24,7 @@ public:
 	Autotest1(MAssIpcCall& sut_ipc)
 		:AutotestBase(sut_ipc)
 	{
-// 		m_sut_ipc.AddHandler("TestProc", std::function<void()>(std::bind(&Autotest1::TestProc, this)), {}, ThreadCallerQt::GetCurrentThreadId(), Tag());
+// 		m_sut_ipc.AddHandler("TestProc", std::function<void()>(std::bind(&Autotest1::TestProc, this)), {}, IpcQt_TransthreadCaller::GetCurrentThreadId(), Tag());
 	}
 
 	void TestProc()
@@ -148,8 +148,7 @@ private:
 
 int main(int argc, char* argv[])
 {
-	QApplication app(argc, argv);
-	app.setAutoSipEnabled(false);
+	ApplicationStatic app(argc, argv);
 
 // 	TestThread();
 

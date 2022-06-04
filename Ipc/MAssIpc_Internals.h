@@ -84,12 +84,12 @@ public:
 
 	void IncrementCallCount()
 	{
-		m_call_count.fetch_add(1);
+		m_call_count++;
 	}
 
 	uint32_t GetCallCount() const override
 	{
-		return m_call_count.load();
+		return m_call_count;
 	}
 
 	const std::string& GetName() const override
@@ -103,7 +103,7 @@ public:
 
 protected:
 
-	MAssIpcThreadSafe::atomic_uint32_t	m_call_count = 0;
+	MAssIpc_ThreadSafe::atomic_uint32_t	m_call_count = 0;
 	const std::string		m_name;
 	const std::string		m_params_type;
 };
@@ -176,7 +176,7 @@ public:
 private:
 
 
-	mutable MAssIpcThreadSafe::mutex	m_lock;
+	mutable MAssIpc_ThreadSafe::mutex	m_lock;
 	std::map<MAssIpcCallInternal::CallInfoImpl::SignatureKey, CallData>	m_name_procs;
 };
 

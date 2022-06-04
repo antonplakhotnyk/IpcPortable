@@ -7,7 +7,7 @@
 class ApplicationSut: public QObject
 {
 public:
-	ApplicationSut(const IpcClientTcpTransport::Addr& connect_to_address);
+	ApplicationSut(const IpcQt_TransportTcpClient::Addr& connect_to_address);
 	~ApplicationSut();
 
 	static void ApplicationUnderTest_Register(ApplicationUnderTest* score_component);

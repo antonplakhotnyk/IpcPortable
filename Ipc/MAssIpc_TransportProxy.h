@@ -1,28 +1,28 @@
 #pragma once
 
 #include <vector>
-#include "MAssIpcCallTransport.h"
-#include "MAssIpcPacketParser.h"
+#include "MAssIpc_Transport.h"
+#include "MAssIpc_PacketParser.h"
 
 namespace MAssIpcCallInternal
 {
 
-class MAssIpcPacketTransportDefault: public MAssIpcPacketTransport
+class TransportProxy: public MAssIpc_TransportShare
 {
 public:
 
-	MAssIpcPacketTransportDefault(const std::weak_ptr<MAssIpcCallTransport>& transport);
+	TransportProxy(const std::weak_ptr<MAssIpc_TransportCopy>& transport);
 
-	std::unique_ptr<MAssIpcData> Create(MAssIpcData::TPacketSize size) override;
-	void Write(std::unique_ptr<const MAssIpcData> packet) override;
-	bool Read(bool wait_incoming_packet, std::unique_ptr<const MAssIpcData>* packet) override;
-
-private:
+	std::unique_ptr<MAssIpc_Data> Create(MAssIpc_Data::TPacketSize size) override;
+	void Write(std::unique_ptr<const MAssIpc_Data> packet) override;
+	bool Read(bool wait_incoming_packet, std::unique_ptr<const MAssIpc_Data>* packet) override;
 
 private:
 
-	MAssIpcCallInternal::MAssIpcPacketParser		m_packet_parser;
-	const std::weak_ptr<MAssIpcCallTransport>		m_transport;
+private:
+
+	MAssIpcCallInternal::MAssIpc_PacketParser		m_packet_parser;
+	const std::weak_ptr<MAssIpc_TransportCopy>		m_transport;
 };
 
 }

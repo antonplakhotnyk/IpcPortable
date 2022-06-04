@@ -164,11 +164,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\Ipc\MAssIpcCall.cpp" />
-    <ClCompile Include="..\Ipc\MAssIpcCallDataStream.cpp" />
-    <ClCompile Include="..\Ipc\MAssIpcCallInternal.cpp" />
-    <ClCompile Include="..\Ipc\MAssIpcPacketParser.cpp" />
-    <ClCompile Include="..\Ipc\MAssIpcPacketTransportDefault.cpp" />
-    <ClCompile Include="..\Ipc\MAssIpcRawString.cpp" />
+    <ClCompile Include="..\Ipc\MAssIpc_DataStream.cpp" />
+    <ClCompile Include="..\Ipc\MAssIpc_Internals.cpp" />
+    <ClCompile Include="..\Ipc\MAssIpc_PacketParser.cpp" />
+    <ClCompile Include="..\Ipc\MAssIpc_RawString.cpp" />
+    <ClCompile Include="..\Ipc\MAssIpc_TransportProxy.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -178,21 +178,20 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\Ipc\Integration\MAssIpcAssert.h" />
-    <ClInclude Include="..\Ipc\Integration\MAssIpcThreadTransportTarget.h" />
-    <ClInclude Include="..\Ipc\Integration\Multithread\MAssIpcThreadSafe.h" />
-    <ClInclude Include="..\Ipc\Integration\Singlethread\MAssIpcThreadSafe.h" />
+    <ClInclude Include="..\Ipc\Integration\MAssIpc_Assert.h" />
+    <ClInclude Include="..\Ipc\Integration\MAssIpc_TransthreadTarget.h" />
+    <ClInclude Include="..\Ipc\Integration\Multithread\MAssIpc_ThreadSafe.h" />
+    <ClInclude Include="..\Ipc\Integration\Singlethread\MAssIpc_ThreadSafe.h" />
     <ClInclude Include="..\Ipc\MAssIpcCall.h" />
-    <ClInclude Include="..\Ipc\MAssIpcCallInternal.h" />
-    <ClInclude Include="..\Ipc\MAssIpcCallDataStream.h" />
-    <ClInclude Include="..\Ipc\MAssIpcCallTransport.h" />
-    <ClInclude Include="..\Ipc\MAssCallThreadTransport.h" />
-    <ClInclude Include="..\Ipc\MAssIpcData.h" />
-    <ClInclude Include="..\Ipc\MAssIpcPacketParser.h" />
-    <ClInclude Include="..\Ipc\MAssIpcPacketTransportDefault.h" />
-    <ClInclude Include="..\Ipc\MAssIpcRawString.h" />
-    <ClInclude Include="..\Ipc\MAssMacros.h" />
-    <ClInclude Include="CompilerSpecific.h" />
+    <ClInclude Include="..\Ipc\MAssIpc_Data.h" />
+    <ClInclude Include="..\Ipc\MAssIpc_DataStream.h" />
+    <ClInclude Include="..\Ipc\MAssIpc_Internals.h" />
+    <ClInclude Include="..\Ipc\MAssIpc_Macros.h" />
+    <ClInclude Include="..\Ipc\MAssIpc_PacketParser.h" />
+    <ClInclude Include="..\Ipc\MAssIpc_RawString.h" />
+    <ClInclude Include="..\Ipc\MAssIpc_Transport.h" />
+    <ClInclude Include="..\Ipc\MAssIpc_TransportProxy.h" />
+    <ClInclude Include="..\Ipc\MAssIpc_Transthread.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -4,7 +4,7 @@
 #include <mutex>
 #include "../Ipc/MAssIpcCall.h"
 #include <functional>
-#include "../Ipc/MAssMacros.h"
+#include "../Ipc/MAssIpc_Macros.h"
 #include <sstream>
 #include <mutex>
 #include <condition_variable>
@@ -32,9 +32,9 @@
 // 	//...
 // }
 
-static MAssIpcThreadTransportTarget::Id CreateCustomId(size_t value)
+static MAssIpc_TransthreadTarget::Id CreateCustomId(size_t value)
 {
-	MAssIpcThreadTransportTarget::Id id;
+	MAssIpc_TransthreadTarget::Id id;
 	static_assert(sizeof(id)==sizeof(value), "unexpected size");
 	size_t* id_value = reinterpret_cast<size_t*>(&id);
 	*id_value = value;
@@ -42,7 +42,7 @@ static MAssIpcThreadTransportTarget::Id CreateCustomId(size_t value)
 }
 
 
-class IpcTransportMemory: public MAssIpcCallTransport
+class IpcTransportMemory: public MAssIpc_TransportCopy
 {
 private:
 	struct SyncData
@@ -140,7 +140,7 @@ private:
 
 //-------------------------------------------------------
 
-class IpcPackerTransportMemory: public MAssIpcPacketTransport
+class IpcPackerTransportMemory: public MAssIpc_TransportShare
 {
 private:
 	struct SyncData
@@ -150,12 +150,12 @@ private:
 		bool incoming_data = false;
 		bool cancel_wait_respond = false;
 		std::condition_variable cond;
-		std::list<std::unique_ptr<const MAssIpcData> > data;
+		std::list<std::unique_ptr<const MAssIpc_Data> > data;
 	};
 
 public:
 
-	class MemoryPacket: public MAssIpcData
+	class MemoryPacket: public MAssIpc_Data
 	{
 	public:
 
@@ -166,9 +166,9 @@ public:
 
 	private:
 
-		MAssIpcData::TPacketSize Size() const override
+		MAssIpc_Data::TPacketSize Size() const override
 		{
-			return MAssIpcData::TPacketSize(m_data.size());
+			return MAssIpc_Data::TPacketSize(m_data.size());
 		}
 
 		uint8_t* Data() override
@@ -218,12 +218,12 @@ public:
 			m_read->cond.wait(lock);
 	}
 
-	std::unique_ptr<MAssIpcData> Create(MAssIpcData::TPacketSize size) override
+	std::unique_ptr<MAssIpc_Data> Create(MAssIpc_Data::TPacketSize size) override
 	{
-		return std::unique_ptr<MAssIpcData>(new MemoryPacket(size));
+		return std::unique_ptr<MAssIpc_Data>(new MemoryPacket(size));
 	}
 
-	bool	Read(bool wait_incoming_packet, std::unique_ptr<const MAssIpcData>* packet) override
+	bool	Read(bool wait_incoming_packet, std::unique_ptr<const MAssIpc_Data>* packet) override
 	{
 		std::unique_lock<std::mutex> lock(m_read->lock);
 		if( m_read->on_read )
@@ -243,7 +243,7 @@ public:
 		return true;
 	}
 
-	void	Write(std::unique_ptr<const MAssIpcData> packet) override
+	void	Write(std::unique_ptr<const MAssIpc_Data> packet) override
 	{
 		std::lock_guard<std::mutex> lock(m_write->lock);
 		SyncData& sync = *m_write;
@@ -268,16 +268,16 @@ private:
 };
 
 //-------------------------------------------------------
-class MAssCallThreadTransport_Stub: public MAssCallThreadTransport
+class MAssCallThreadTransport_Stub: public MAssIpc_Transthread
 {
 public:
 
-	void			CallFromThread(MAssIpcThreadTransportTarget::Id thread_id, std::unique_ptr<Job> job) override
+	void			CallFromThread(MAssIpc_TransthreadTarget::Id thread_id, std::unique_ptr<Job> job) override
 	{
 		job->Invoke();
 	}
 
-	MAssIpcThreadTransportTarget::Id	GetResultSendThreadId() override
+	MAssIpc_TransthreadTarget::Id	GetResultSendThreadId() override
 	{
 		return CreateCustomId(2);
 	}
@@ -331,7 +331,7 @@ void TestThreads_Handler(std::shared_ptr<IpcPackerTransportMemory> transport_buf
 void TestThreads_Sender(std::shared_ptr<IpcPackerTransportMemory> transport_buffer, MAssIpcCall call)
 {
 	std::stringstream ss;
-	ss<<MAssIpcThreadSafe::get_id();
+	ss<<MAssIpc_ThreadSafe::get_id();
 
 	uint8_t a = 1;
 	std::string b = ss.str();
@@ -466,6 +466,30 @@ static void ServerStop(bool* run)
 	*run = false;
 }
 
+template<typename TVal>
+std::vector<TVal> VectorT(std::vector<TVal> val)
+{
+	std::vector<TVal> ret(val.rbegin(), val.rend());
+	return ret;
+}
+
+template<typename TVal>
+std::vector<TVal> MakeVectorT()
+{
+	std::vector<TVal> ret;
+	ret.resize(10);
+	for( size_t i = 0; i<ret.size(); i++ )
+		ret[i] = TVal(i+1);
+
+	return ret;
+}
+
+template<typename TVal>
+void CheckVectorT(const std::vector<TVal>& val)
+{
+	for( size_t i = 0; i<val.size(); i++ )
+		mass_return_if_not_equal(val[i], TVal(10-i));
+}
 
 struct DataStruct1
 {
@@ -481,12 +505,12 @@ void Ipc_UniquePtr1(std::unique_ptr<DataStruct1> data)
 
 MASS_IPC_TYPE_SIGNATURE(std::unique_ptr<DataStruct1>)
 
-MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const std::unique_ptr<DataStruct1>& v)
+MAssIpc_DataStream& operator<<(MAssIpc_DataStream& stream, const std::unique_ptr<DataStruct1>& v)
 {
 	return stream<<v->a<<v->b<<v->c;
 }
 
-MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, std::unique_ptr<DataStruct1>& v)
+MAssIpc_DataStream& operator>>(MAssIpc_DataStream& stream, std::unique_ptr<DataStruct1>& v)
 {
 	v.reset(new DataStruct1);
 	return stream>>v->a>>v->b>>v->c;
@@ -508,12 +532,12 @@ void Ipc_Ptr2(DataStruct2* data)
 
 MASS_IPC_TYPE_SIGNATURE(DataStruct2*)
 
-MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const DataStruct2* v)
+MAssIpc_DataStream& operator<<(MAssIpc_DataStream& stream, const DataStruct2* v)
 {
 	return stream<<v->a<<v->b<<v->c;
 }
 
-MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, DataStruct2*& v)
+MAssIpc_DataStream& operator>>(MAssIpc_DataStream& stream, DataStruct2*& v)
 {
 	v = new DataStruct2;
 	return stream>>v->a>>v->b>>v->c;
@@ -547,6 +571,15 @@ void Main_IpcService(std::shared_ptr<IpcPackerTransportMemory> transport_buffer)
 	call.AddHandler("Ipc_UniquePtr2", std::function<void(DataStruct2*)>(&Ipc_Ptr2));
 	//	call.AddHandler("IsLinkUp_Sta", std::function<void(uint8_t, std::string, uint32_t)>(&Ipc_Proc3));
 
+	call.AddHandler("VectorU8", std::function<std::vector<uint8_t>(std::vector<uint8_t>)>(&VectorT<uint8_t>));
+	call.AddHandler("VectorU16", std::function<std::vector<uint16_t>(std::vector<uint16_t>)>(&VectorT<uint16_t>));
+	call.AddHandler("VectorU32", std::function<std::vector<uint32_t>(std::vector<uint32_t>)>(&VectorT<uint32_t>));
+	call.AddHandler("VectorU64", std::function<std::vector<uint64_t>(std::vector<uint64_t>)>(&VectorT<uint64_t>));
+	call.AddHandler("VectorI8", std::function<std::vector<int8_t>(std::vector<int8_t>)>(&VectorT<int8_t>));
+	call.AddHandler("VectorI16", std::function<std::vector<int16_t>(std::vector<int16_t>)>(&VectorT<int16_t>));
+	call.AddHandler("VectorI32", std::function<std::vector<int32_t>(std::vector<int32_t>)>(&VectorT<int32_t>));
+	call.AddHandler("VectorI64", std::function<std::vector<int64_t>(std::vector<int64_t>)>(&VectorT<int64_t>));
+
 	call.AddHandler("ServerStop", std::function<void()>(std::bind(&ServerStop, &run)));
 
 	call.SetTransport(transport_buffer);
@@ -572,13 +605,13 @@ enum struct TestEnum1: uint8_t
 };
 
 
-MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const TestEnum1& v)
+MAssIpc_DataStream& operator<<(MAssIpc_DataStream& stream, const TestEnum1& v)
 {
 	stream<<std::underlying_type<TestEnum1>::type(v);
 	return stream;
 }
 
-MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, TestEnum1& v)
+MAssIpc_DataStream& operator>>(MAssIpc_DataStream& stream, TestEnum1& v)
 {
 	return stream >> reinterpret_cast<std::underlying_type<TestEnum1>::type&>(v);
 }
@@ -595,7 +628,7 @@ void ClientProc(uint8_t a, uint32_t b)
 //-------------------------------------------------------
 
 
-void StrProc(const MAssIpcCallInternal::MAssIpcRawString& str)
+void StrProc(const MAssIpcCallInternal::MAssIpc_RawString& str)
 {
 }
 
@@ -622,7 +655,7 @@ void Main_IpcClient()
 
 	{
 		auto packet_size = MAssIpcCall::CalcCallSize<void>(true, "NotExistProc", 0);
-		std::unique_ptr<MAssIpcData> ipc_buffer(new IpcPackerTransportMemory::MemoryPacket(packet_size));
+		std::unique_ptr<MAssIpc_Data> ipc_buffer(new IpcPackerTransportMemory::MemoryPacket(packet_size));
  		call.AsyncInvoke({"NotExistProc", std::move(ipc_buffer)}, 0);
 // 		call.InvokeWait("NotExistProc", std::move(ipc_buffer)).RetArgs<int>();
 //  	call[{std::move(ipc_buffer), "NotExistProc"}];
@@ -672,6 +705,24 @@ void Main_IpcClient()
 	DataStruct2* ds2 = new DataStruct2({4,5,6});
 	call.WaitInvoke("Ipc_UniquePtr1", ds1);
 	call.WaitInvoke("Ipc_UniquePtr2", ds2);
+
+	std::vector<uint8_t> 	val_uint8_t  = call.WaitInvokeRet <std::vector<uint8_t> >("VectorU8", MakeVectorT<uint8_t>());
+	std::vector<uint16_t>	val_uint16_t = call.WaitInvokeRet<std::vector<uint16_t>	>("VectorU16", MakeVectorT<uint16_t>());
+	std::vector<uint32_t>	val_uint32_t = call.WaitInvokeRet<std::vector<uint32_t>	>("VectorU32", MakeVectorT<uint32_t>());
+	std::vector<uint64_t>	val_uint64_t = call.WaitInvokeRet<std::vector<uint64_t>	>("VectorU64", MakeVectorT<uint64_t>());
+	std::vector<int8_t> 	val_int8_t   = call.WaitInvokeRet  <std::vector<int8_t> >("VectorI8", MakeVectorT<int8_t>());
+	std::vector<int16_t>	val_int16_t  = call.WaitInvokeRet <std::vector<int16_t>	>("VectorI16", MakeVectorT<int16_t>());
+	std::vector<int32_t>	val_int32_t  = call.WaitInvokeRet <std::vector<int32_t>	>("VectorI32", MakeVectorT<int32_t>());
+	std::vector<int64_t>	val_int64_t  = call.WaitInvokeRet <std::vector<int64_t>	>("VectorI64", MakeVectorT<int64_t>());
+	CheckVectorT(val_uint8_t);
+	CheckVectorT(val_uint16_t);
+	CheckVectorT(val_uint32_t);
+	CheckVectorT(val_uint64_t);
+	CheckVectorT(val_int8_t);
+	CheckVectorT(val_int16_t);
+	CheckVectorT(val_int32_t);
+	CheckVectorT(val_int64_t);
+
 
 	call.WaitInvoke("ServerStop");
 

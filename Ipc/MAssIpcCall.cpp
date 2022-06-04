@@ -1,34 +1,34 @@
 #include "MAssIpcCall.h"
-#include "MAssMacros.h"
-#include "MAssIpcPacketTransportDefault.h"
+#include "MAssIpc_Macros.h"
+#include "MAssIpc_TransportProxy.h"
 
 using namespace MAssIpcCallInternal;
 
-MAssIpcCall::MAssIpcCall(const std::weak_ptr<MAssCallThreadTransport>& inter_thread_nullable)
+MAssIpcCall::MAssIpcCall(const std::weak_ptr<MAssIpc_Transthread>& inter_thread_nullable)
 	:m_int(std::make_shared<Internals>())
 {
 	m_int->m_inter_thread_nullable = inter_thread_nullable;
 }
 
-MAssIpcCall::MAssIpcCall(const std::weak_ptr<MAssIpcCallTransport>& transport, const std::weak_ptr<MAssCallThreadTransport>& inter_thread_nullable)
+MAssIpcCall::MAssIpcCall(const std::weak_ptr<MAssIpc_TransportCopy>& transport, const std::weak_ptr<MAssIpc_Transthread>& inter_thread_nullable)
 	: MAssIpcCall(inter_thread_nullable)
 {
 	SetTransport(transport);
 }
 
-MAssIpcCall::MAssIpcCall(const std::weak_ptr<MAssIpcPacketTransport>& transport, const std::weak_ptr<MAssCallThreadTransport>& inter_thread_nullable)
+MAssIpcCall::MAssIpcCall(const std::weak_ptr<MAssIpc_TransportShare>& transport, const std::weak_ptr<MAssIpc_Transthread>& inter_thread_nullable)
 	: MAssIpcCall(inter_thread_nullable)
 {
 	SetTransport(transport);
 }
 
-void MAssIpcCall::SetTransport(const std::weak_ptr<MAssIpcCallTransport>& transport)
+void MAssIpcCall::SetTransport(const std::weak_ptr<MAssIpc_TransportCopy>& transport)
 {
-	m_int->m_transport_default = std::make_shared<MAssIpcPacketTransportDefault>(transport);
+	m_int->m_transport_default = std::make_shared<TransportProxy>(transport);
 	m_int->m_transport = m_int->m_transport_default;
 }
 
-void MAssIpcCall::SetTransport(const std::weak_ptr<MAssIpcPacketTransport>& transport)
+void MAssIpcCall::SetTransport(const std::weak_ptr<MAssIpc_TransportShare>& transport)
 {
 	m_int->m_transport_default.reset();
 	m_int->m_transport = transport;
@@ -49,15 +49,15 @@ void MAssIpcCall::ClearHandlersWithTag(const void* tag)
 	m_int->m_proc_map.ClearProcsWithTag(tag);
 }
 
-MAssIpcCall::DeserializedFindCallInfo MAssIpcCall::DeserializeNameSignature(MAssIpcCallDataStream& call_info)
+MAssIpcCall::DeserializedFindCallInfo MAssIpcCall::DeserializeNameSignature(MAssIpc_DataStream& call_info)
 {
 	bool send_return = false;
 
 	// read sequence defined by packet format
-	MAssIpcRawString name			= MAssIpcRawString::Read(call_info);
+	MAssIpc_RawString name			= MAssIpc_RawString::Read(call_info);
 	call_info>>send_return;
-	MAssIpcRawString return_type	= MAssIpcRawString::Read(call_info);
-	MAssIpcRawString params_type	= MAssIpcRawString::Read(call_info);
+	MAssIpc_RawString return_type	= MAssIpc_RawString::Read(call_info);
+	MAssIpc_RawString params_type	= MAssIpc_RawString::Read(call_info);
 
 	return {name, send_return, return_type, params_type};
 }
@@ -84,9 +84,9 @@ MAssIpcCall::Internals::AnalizeInvokeDataRes MAssIpcCall::Internals::ReportError
 	return res;
 }
 
-MAssIpcCall::Internals::AnalizeInvokeDataRes MAssIpcCall::Internals::AnalizeInvokeData(const std::shared_ptr<MAssIpcPacketTransport>& transport,
-																			   MAssIpcCallDataStream& call_info_data,
-																			   MAssIpcCallInternal::MAssIpcPacketParser::TCallId id) const
+MAssIpcCall::Internals::AnalizeInvokeDataRes MAssIpcCall::Internals::AnalizeInvokeData(const std::shared_ptr<MAssIpc_TransportShare>& transport,
+																			   MAssIpc_DataStream& call_info_data,
+																			   MAssIpcCallInternal::MAssIpc_PacketParser::TCallId id) const
 {
 	DeserializedFindCallInfo find_call_info = DeserializeNameSignature(call_info_data);
 
@@ -96,7 +96,7 @@ MAssIpcCall::Internals::AnalizeInvokeDataRes MAssIpcCall::Internals::AnalizeInvo
 
 	if( find_call_info.return_type.Length()!=0 )
 	{
-		const MAssIpcRawString return_type_call(call_info->GetSignature_RetType());
+		const MAssIpc_RawString return_type_call(call_info->GetSignature_RetType());
 		if( find_call_info.return_type != return_type_call )
 			return ReportError_FindCallInfo(find_call_info, ErrorType::no_matching_call_return_type);
 	}
@@ -104,16 +104,16 @@ MAssIpcCall::Internals::AnalizeInvokeDataRes MAssIpcCall::Internals::AnalizeInvo
 	return {call_info, find_call_info.send_return};
 }
 
-void MAssIpcCall::Internals::StoreReturnFailCall(MAssIpcCallDataStream* result_str, const AnalizeInvokeDataRes& call_job, 
-												 MAssIpcCallInternal::MAssIpcPacketParser::TCallId id)
+void MAssIpcCall::Internals::StoreReturnFailCall(MAssIpc_DataStream* result_str, const AnalizeInvokeDataRes& call_job, 
+												 MAssIpcCallInternal::MAssIpc_PacketParser::TCallId id)
 {
 	(*result_str)<<call_job.error;
 	(*result_str)<<call_job.message;
 }
 
-void MAssIpcCall::Internals::InvokeLocal(MAssIpcCallDataStream& call_info_data, MAssIpcCallInternal::MAssIpcPacketParser::TCallId id) const
+void MAssIpcCall::Internals::InvokeLocal(MAssIpc_DataStream& call_info_data, MAssIpcCallInternal::MAssIpc_PacketParser::TCallId id) const
 {
-	std::shared_ptr<MAssIpcPacketTransport> transport = m_transport.lock();
+	std::shared_ptr<MAssIpc_TransportShare> transport = m_transport.lock();
 	mass_return_if_equal(bool(transport), false);
 
 	AnalizeInvokeDataRes invoke = AnalizeInvokeData(transport, call_info_data, id);
@@ -137,9 +137,9 @@ void MAssIpcCall::Internals::InvokeLocal(MAssIpcCallDataStream& call_info_data, 
 	{// fail to call
 		if( invoke.send_return )
 		{
-			MAssIpcCallDataStream measure_size;
+			MAssIpc_DataStream measure_size;
 			StoreReturnFailCall(&measure_size, invoke, id);
-			MAssIpcCallDataStream result_str(CreateDataStream(m_transport, measure_size.GetWritePos(), MAssIpcPacketParser::PacketType::pt_return_fail_call, id));
+			MAssIpc_DataStream result_str(CreateDataStream(m_transport, measure_size.GetWritePos(), MAssIpc_PacketParser::PacketType::pt_return_fail_call, id));
 			StoreReturnFailCall(&result_str, invoke, id);
 
 			// send error result message always from current thread same as message processing thread
@@ -151,30 +151,30 @@ void MAssIpcCall::Internals::InvokeLocal(MAssIpcCallDataStream& call_info_data, 
 	}
 }
 
-MAssIpcCall::CallDataBuffer MAssIpcCall::ReceiveCallDataBuffer(std::unique_ptr<const MAssIpcData>& packet) const
+MAssIpcCall::CallDataBuffer MAssIpcCall::ReceiveCallDataBuffer(std::unique_ptr<const MAssIpc_Data>& packet) const
 {
 	CallDataBuffer res = {std::move(packet),{}};
-	res.header = MAssIpcPacketParser::ReadHeader(res.data);
+	res.header = MAssIpc_PacketParser::ReadHeader(res.data);
 	return res;
 }
 
 // Looks like it multi-thread write - multi-thread read consumer - producer queue with 
 // optional exclusive callback which pushing producer and 
 // optional wait for specific item in queue
-MAssIpcCallDataStream MAssIpcCall::ProcessTransportResponse(MAssIpcCallInternal::MAssIpcPacketParser::TCallId wait_response_id,
+MAssIpc_DataStream MAssIpcCall::ProcessTransportResponse(MAssIpcCallInternal::MAssIpc_PacketParser::TCallId wait_response_id,
 										   bool process_incoming_calls) const
 {
 	std::shared_ptr<Internals> t_int(m_int);
-	MAssIpcThreadSafe::unique_lock<LockCurrentThreadId> lock_thread_waiting_transport(t_int->m_pending_responses.m_thread_waiting_transport, MAssIpcThreadSafe::defer_lock_t());
+	MAssIpc_ThreadSafe::unique_lock<LockCurrentThreadId> lock_thread_waiting_transport(t_int->m_pending_responses.m_thread_waiting_transport, MAssIpc_ThreadSafe::defer_lock_t());
 
-	const bool wait_incoming_packet = (wait_response_id!=MAssIpcPacketParser::c_invalid_id);
+	const bool wait_incoming_packet = (wait_response_id!=MAssIpc_PacketParser::c_invalid_id);
 
 	while( true )
 	{
 		CallDataBuffer buffer;
 
 		{// ReadBuffer
-			MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(t_int->m_pending_responses.m_lock);
+			MAssIpc_ThreadSafe::unique_lock<MAssIpc_ThreadSafe::mutex> lock(t_int->m_pending_responses.m_lock);
 
 			if( t_int->m_pending_responses.m_thread_waiting_transport.IsCurrent() )
 				return {};// transport read introduce reentrance (from same thread)
@@ -214,13 +214,13 @@ MAssIpcCallDataStream MAssIpcCall::ProcessTransportResponse(MAssIpcCallInternal:
 		}
 
 
-		if( buffer.header.type!=MAssIpcPacketParser::PacketType::pt_undefined )
+		if( buffer.header.type!=MAssIpc_PacketParser::PacketType::pt_undefined )
 		{
 			bool response_precessed = (buffer.header.id == wait_response_id) &&
-				((buffer.header.type >= MAssIpcPacketParser::PacketType::pt_return) &&
-				 (buffer.header.type < MAssIpcPacketParser::PacketType::pt_count_not_a_type));
+				((buffer.header.type >= MAssIpc_PacketParser::PacketType::pt_return) &&
+				 (buffer.header.type < MAssIpc_PacketParser::PacketType::pt_count_not_a_type));
 
-			MAssIpcCallDataStream result(t_int->ProcessBuffer(std::move(buffer)));
+			MAssIpc_DataStream result(t_int->ProcessBuffer(std::move(buffer)));
 			if( response_precessed )
 				return result;// wait response always return as soon as response received
 		}
@@ -233,7 +233,7 @@ MAssIpcCallDataStream MAssIpcCall::ProcessTransportResponse(MAssIpcCallInternal:
 				auto transport = t_int->m_transport.lock();
 				if( transport )
 				{
-					std::unique_ptr<const MAssIpcData> packet;
+					std::unique_ptr<const MAssIpc_Data> packet;
 					transport_ok = transport->Read(wait_incoming_packet, &packet);
 					if( packet )
 						call_data_buffer = ReceiveCallDataBuffer(packet);
@@ -244,13 +244,13 @@ MAssIpcCallDataStream MAssIpcCall::ProcessTransportResponse(MAssIpcCallInternal:
 			bool new_return_buffer = false;
 
 			{// WriteBuffer
-				MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(t_int->m_pending_responses.m_lock);
+				MAssIpc_ThreadSafe::unique_lock<MAssIpc_ThreadSafe::mutex> lock(t_int->m_pending_responses.m_lock);
 				
 				lock_thread_waiting_transport.unlock();
 
-				if( call_data_buffer.header.type!=MAssIpcPacketParser::PacketType::pt_undefined )
+				if( call_data_buffer.header.type!=MAssIpc_PacketParser::PacketType::pt_undefined )
 				{
-					if( call_data_buffer.header.type <= MAssIpcPacketParser::PacketType::pt_call )
+					if( call_data_buffer.header.type <= MAssIpc_PacketParser::PacketType::pt_call )
 						t_int->m_pending_responses.m_data_incoming_call.push_back(std::move(call_data_buffer));
 					else
 					{
@@ -276,32 +276,32 @@ MAssIpcCallDataStream MAssIpcCall::ProcessTransportResponse(MAssIpcCallInternal:
 
 void MAssIpcCall::LockCurrentThreadId::lock()
 {
-	mass_assert_if_not_equal(m_locked_id, MAssIpcThreadSafe::id());
-	m_locked_id = MAssIpcThreadSafe::get_id();
+	mass_assert_if_not_equal(m_locked_id, MAssIpc_ThreadSafe::id());
+	m_locked_id = MAssIpc_ThreadSafe::get_id();
 	}
 
 void MAssIpcCall::LockCurrentThreadId::unlock()
 {
-	m_locked_id = MAssIpcThreadSafe::id();
+	m_locked_id = MAssIpc_ThreadSafe::id();
 }
 
 bool MAssIpcCall::LockCurrentThreadId::IsLocked() const
 {
-	return (m_locked_id != MAssIpcThreadSafe::id());
+	return (m_locked_id != MAssIpc_ThreadSafe::id());
 }
 
 bool MAssIpcCall::LockCurrentThreadId::IsCurrent() const
 {
-	return (m_locked_id == MAssIpcThreadSafe::get_id());
+	return (m_locked_id == MAssIpc_ThreadSafe::get_id());
 }
 
 void MAssIpcCall::ProcessTransport()
 {
-	ProcessTransportResponse(MAssIpcPacketParser::c_invalid_id, true);
+	ProcessTransportResponse(MAssIpc_PacketParser::c_invalid_id, true);
 }
 
-void MAssIpcCall::InvokeRemote(MAssIpcCallDataStream& call_info_data, MAssIpcCallDataStream* result_buf_wait_return,
-							   MAssIpcPacketParser::TCallId response_id, bool process_incoming_calls) const
+void MAssIpcCall::InvokeRemote(MAssIpc_DataStream& call_info_data, MAssIpc_DataStream* result_buf_wait_return,
+							   MAssIpc_PacketParser::TCallId response_id, bool process_incoming_calls) const
 {
 	{
 		auto transport = m_int->m_transport.lock();
@@ -317,16 +317,16 @@ void MAssIpcCall::InvokeRemote(MAssIpcCallDataStream& call_info_data, MAssIpcCal
 		*result_buf_wait_return = ProcessTransportResponse(response_id, process_incoming_calls);
 }
 
-MAssIpcCallDataStream MAssIpcCall::Internals::ProcessBuffer(CallDataBuffer buffer) const
+MAssIpc_DataStream MAssIpcCall::Internals::ProcessBuffer(CallDataBuffer buffer) const
 {
 	switch( buffer.header.type )
 	{
-		case MAssIpcPacketParser::PacketType::pt_call:
+		case MAssIpc_PacketParser::PacketType::pt_call:
 		{
 			InvokeLocal(buffer.data, buffer.header.id);
 		}
 		break;
-		case MAssIpcPacketParser::PacketType::pt_return_fail_call:
+		case MAssIpc_PacketParser::PacketType::pt_return_fail_call:
 		{
 			MAssIpcCall::ErrorType error = ErrorType::unknown_error;
 			std::string message;
@@ -344,21 +344,21 @@ MAssIpcCallDataStream MAssIpcCall::Internals::ProcessBuffer(CallDataBuffer buffe
 				m_OnInvalidRemoteCall(error, message);
 		}
 		break;
-		case MAssIpcPacketParser::PacketType::pt_return_enumerate:
-		case MAssIpcPacketParser::PacketType::pt_return:
+		case MAssIpc_PacketParser::PacketType::pt_return_enumerate:
+		case MAssIpc_PacketParser::PacketType::pt_return:
 			return std::move(buffer.data);
 		break;
-		case MAssIpcPacketParser::PacketType::pt_enumerate:
+		case MAssIpc_PacketParser::PacketType::pt_enumerate:
 		{
 			mass_return_x_if_not_equal(buffer.header.size, 0, {});// invalid packet
 			MAssIpcCall_EnumerateData res = m_proc_map.EnumerateHandlers();
 
-			MAssIpcCallDataStream measure_size;
+			MAssIpc_DataStream measure_size;
 			measure_size<<res;
 
-			MAssIpcCallDataStream respond_str(CreateDataStream(m_transport, measure_size.GetWritePos(), MAssIpcPacketParser::PacketType::pt_return_enumerate, buffer.header.id));
+			MAssIpc_DataStream respond_str(CreateDataStream(m_transport, measure_size.GetWritePos(), MAssIpc_PacketParser::PacketType::pt_return_enumerate, buffer.header.id));
 			respond_str<<res;
-			std::shared_ptr<MAssIpcPacketTransport> transport = m_transport.lock();
+			std::shared_ptr<MAssIpc_TransportShare> transport = m_transport.lock();
 			mass_return_x_if_equal(bool(transport), false, {});
 			auto data(respond_str.DetachWrite());
 			if( data )
@@ -377,10 +377,10 @@ MAssIpcCall_EnumerateData MAssIpcCall::EnumerateRemote() const
 {
 	MAssIpcCall_EnumerateData res;
 
-	MAssIpcCallDataStream result;
+	MAssIpc_DataStream result;
 	auto new_id = NewCallId();
 
-	MAssIpcCallDataStream call_info_data_stream = CreateDataStream(m_int->m_transport, 0, MAssIpcPacketParser::PacketType::pt_enumerate, new_id);
+	MAssIpc_DataStream call_info_data_stream = CreateDataStream(m_int->m_transport, 0, MAssIpc_PacketParser::PacketType::pt_enumerate, new_id);
 	InvokeRemote(call_info_data_stream, &result, new_id, false);
 	result>>res;
 
@@ -402,13 +402,13 @@ TCallCountChanged MAssIpcCall::SetCallCountChanged(const TCallCountChanged& OnCa
 	return m_int->SetCallCountChanged(OnCallCountChanged);
 }
 
-MAssIpcCallInternal::MAssIpcPacketParser::TCallId MAssIpcCall::NewCallId() const
+MAssIpcCallInternal::MAssIpc_PacketParser::TCallId MAssIpcCall::NewCallId() const
 {
-	MAssIpcThreadSafe::unique_lock<MAssIpcThreadSafe::mutex> lock(m_int->m_pending_responses.m_lock);
-	MAssIpcCallInternal::MAssIpcPacketParser::TCallId new_id;
+	MAssIpc_ThreadSafe::unique_lock<MAssIpc_ThreadSafe::mutex> lock(m_int->m_pending_responses.m_lock);
+	MAssIpcCallInternal::MAssIpc_PacketParser::TCallId new_id;
 
 	{
-		if( m_int->m_pending_responses.m_incremental_id==MAssIpcCallInternal::MAssIpcPacketParser::c_invalid_id )
+		if( m_int->m_pending_responses.m_incremental_id==MAssIpcCallInternal::MAssIpc_PacketParser::c_invalid_id )
 			m_int->m_pending_responses.m_incremental_id++;
 
 		new_id = m_int->m_pending_responses.m_incremental_id++;
@@ -420,13 +420,13 @@ MAssIpcCallInternal::MAssIpcPacketParser::TCallId MAssIpcCall::NewCallId() const
 
 //-------------------------------------------------------
 
-MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const MAssIpcCall::ErrorType& v)
+MAssIpc_DataStream& operator<<(MAssIpc_DataStream& stream, const MAssIpcCall::ErrorType& v)
 {
 	stream<<std::underlying_type<MAssIpcCall::ErrorType>::type(v);
 	return stream;
 }
 
-MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, MAssIpcCall::ErrorType& v)
+MAssIpc_DataStream& operator>>(MAssIpc_DataStream& stream, MAssIpcCall::ErrorType& v)
 {
 	return stream >> reinterpret_cast<std::underlying_type<MAssIpcCall::ErrorType>::type&>(v);
 }

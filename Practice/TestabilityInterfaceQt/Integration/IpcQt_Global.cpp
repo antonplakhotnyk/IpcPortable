@@ -1,7 +1,7 @@
 #include "IpcQt_Global.h"
 
 static MAssIpcCall g_ipc_global({});
-MAssIpcCall& IpcClient()
+MAssIpcCall& Ipc::Inst()
 {
 	return g_ipc_global;
 }

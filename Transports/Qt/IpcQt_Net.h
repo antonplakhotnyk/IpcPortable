@@ -1,19 +1,19 @@
 #pragma once
 
 #include "MAssIpcCall.h"
-#include "IpcTcpTransportQt.h"
-#include "IpcThreadTransportQt.h"
-#include "CallTransportFromQThread.h"
+#include "IpcQt_TransporTcp.h"
+#include "IpcQt_Transthread.h"
+#include "IpcQt_TransthreadTransportCopy.h"
 
 
-class IpcNet: public QObject
+class IpcQt_Net: public QObject
 {
 public:
 
-	IpcNet(MAssIpcCall& ipc_connection, std::shared_ptr<IpcTcpTransportQt> transport);
+	IpcQt_Net(MAssIpcCall& ipc_connection, std::shared_ptr<IpcQt_TransporTcp> transport);
 
 private:
 
-	std::shared_ptr<IpcThreadTransportQt>		m_thread_transport;
-	std::shared_ptr<CallTransportFromQThread>	m_transport_from_thread;
+	std::shared_ptr<IpcQt_Transthread>		m_thread_transport;
+	std::shared_ptr<IpcQt_TransthreadTransportCopy>	m_transport_from_thread;
 };

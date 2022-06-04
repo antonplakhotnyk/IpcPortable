@@ -1,9 +1,9 @@
-#include "IpcClientNet.h"
+#include "IpcQt_NetClient.h"
 
-// IpcClientNet* IpcClientNet::s_instance=nullptr;
+// IpcQt_NetClient* IpcQt_NetClient::s_instance=nullptr;
 
-IpcClientNet::IpcClientNet(MAssIpcCall& ipc_connection)
-	:m_transport_client(std::make_shared<IpcClientTcpTransport>())
+IpcQt_NetClient::IpcQt_NetClient(MAssIpcCall& ipc_connection)
+	:m_transport_client(std::make_shared<IpcQt_TransportTcpClient>())
 	, m_ipc_net(ipc_connection, m_transport_client)
 {
 
@@ -11,29 +11,29 @@ IpcClientNet::IpcClientNet(MAssIpcCall& ipc_connection)
 // 	s_instance = this;
 }
 
-IpcClientNet::~IpcClientNet(void)
+IpcQt_NetClient::~IpcQt_NetClient(void)
 {
 // 	if( s_instance==this )
 // 		s_instance = nullptr;
 }
 
-void IpcClientNet::WaitConnection()
+void IpcQt_NetClient::WaitConnection()
 {
 	m_transport_client->WaitConnection();
 }
 
-// bool IpcClientNet::IsExist()
+// bool IpcQt_NetClient::IsExist()
 // {
 // 	return s_instance;
 // }
 // 
-// MAssIpcCall& IpcClientNet::Get()
+// MAssIpcCall& IpcQt_NetClient::Get()
 // {
 // 	mass_return_x_if_equal(s_instance, nullptr, *((MAssIpcCall*)(nullptr)));
 // 	return s_instance->Ipc();
 // }
 
-IpcClientTcpTransport& IpcClientNet::GetIpcClientTcpTransport()
+IpcQt_TransportTcpClient& IpcQt_NetClient::GetIpcClientTcpTransport()
 {
 	return *m_transport_client.get();
 }
