@@ -1,10 +1,10 @@
 #pragma once
 
-#include "MAssIpcAssert.h"
+#include "MAssIpc_Assert.h"
 
 //-------------------------------------------------------
 
-#define mass_assert_msg(assert_msg) {MAssIpcAssert::Raise(__FILE__,__LINE__,__FUNCTION__, assert_msg);}
+#define mass_assert_msg(assert_msg) {MAssIpc_Assert::Raise(__FILE__,__LINE__,__FUNCTION__, assert_msg);}
 #define mass_assert()	{mass_assert_msg(MASS_ASSERT_STR(""));}
 
 //-------------------------------------------------------

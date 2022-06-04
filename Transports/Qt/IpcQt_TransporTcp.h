@@ -4,13 +4,13 @@
 #include <QtCore/QPointer>
 #include "MAssIpcCall.h"
 
-class IpcTcpTransportQt: public QObject, public MAssIpcCallTransport
+class IpcQt_TransporTcp: public QObject, public MAssIpc_TransportCopy
 {
 	Q_OBJECT;
 public:
 
-	IpcTcpTransportQt();
-	~IpcTcpTransportQt();
+	IpcQt_TransporTcp();
+	~IpcQt_TransporTcp();
 
 	QTcpSocket* GetConnection();
 

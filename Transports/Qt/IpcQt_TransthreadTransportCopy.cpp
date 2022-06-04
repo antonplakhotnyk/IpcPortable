@@ -1,22 +1,22 @@
-#include "CallTransportFromQThread.h"
-#include "ThreadCallerQt.h"
+#include "IpcQt_TransthreadTransportCopy.h"
+#include "IpcQt_TransthreadCaller.h"
 
-CallTransportFromQThread::CallTransportFromQThread(MAssIpcThreadTransportTarget::Id transport_thread_id,
-												   const std::shared_ptr<MAssIpcCallTransport>& transport,
-												   const std::shared_ptr<ThreadCallerQt>& inter_thread)
+IpcQt_TransthreadTransportCopy::IpcQt_TransthreadTransportCopy(MAssIpc_TransthreadTarget::Id transport_thread_id,
+												   const std::shared_ptr<MAssIpc_TransportCopy>& transport,
+												   const std::shared_ptr<IpcQt_TransthreadCaller>& inter_thread)
 	:m_transport(transport)
 	, m_inter_thread(inter_thread)
 	, m_transport_thread_id(transport_thread_id)
 {
 }
 
-void CallTransportFromQThread::CallFromThread(std::function<void()> invoke_proc)
+void IpcQt_TransthreadTransportCopy::CallFromThread(std::function<void()> invoke_proc)
 {
-	if( ThreadCallerQt::GetCurrentThreadId() == m_transport_thread_id )
+	if( IpcQt_TransthreadCaller::GetCurrentThreadId() == m_transport_thread_id )
 		invoke_proc();
 	else
 	{
-		std::unique_ptr<ThreadCallerQt::CancelHolder> call_waiter;
+		std::unique_ptr<IpcQt_TransthreadCaller::CancelHolder> call_waiter;
 		std::unique_ptr<Call> call(std::make_unique<Call>(m_transport, invoke_proc));
 		m_inter_thread->CallFromThread(m_transport_thread_id, std::move(call), &call_waiter);
 
@@ -24,7 +24,7 @@ void CallTransportFromQThread::CallFromThread(std::function<void()> invoke_proc)
 	}
 }
 
-bool	CallTransportFromQThread::WaitRespond(size_t expected_size)
+bool	IpcQt_TransthreadTransportCopy::WaitRespond(size_t expected_size)
 {
 	std::shared_ptr<bool> result(std::make_shared<bool>(false));
 	auto invoke_proc = [=, result = result, transport = m_transport]()
@@ -36,7 +36,7 @@ bool	CallTransportFromQThread::WaitRespond(size_t expected_size)
 	return *result.get();
 }
 
-size_t	CallTransportFromQThread::ReadBytesAvailable()
+size_t	IpcQt_TransthreadTransportCopy::ReadBytesAvailable()
 {
 	std::shared_ptr<std::atomic<size_t> > result(std::make_shared<std::atomic<size_t> >(false));
 	auto invoke_proc = [result, transport = m_transport]()
@@ -48,7 +48,7 @@ size_t	CallTransportFromQThread::ReadBytesAvailable()
 	return result->load();
 }
 
-void	CallTransportFromQThread::Read(uint8_t* data, size_t size)
+void	IpcQt_TransthreadTransportCopy::Read(uint8_t* data, size_t size)
 {
 	auto invoke_proc = [=, transport = m_transport]()
 	{
@@ -58,7 +58,7 @@ void	CallTransportFromQThread::Read(uint8_t* data, size_t size)
 	CallFromThread(invoke_proc);
 }
 
-void	CallTransportFromQThread::Write(const uint8_t* data, size_t size)
+void	IpcQt_TransthreadTransportCopy::Write(const uint8_t* data, size_t size)
 {
 	auto invoke_proc = [=, transport = m_transport]()
 	{

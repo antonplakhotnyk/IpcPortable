@@ -1,26 +1,26 @@
 #pragma once
 
 #include <map>
-#include "MAssIpcCallDataStream.h"
-#include "MAssCallThreadTransport.h"
+#include "MAssIpc_DataStream.h"
+#include "MAssIpc_Transthread.h"
 #include <functional>
-#include "MAssIpcPacketParser.h"
-#include "MAssIpcCallTransport.h"
-#include "MAssIpcThreadSafe.h"
-#include "MAssIpcRawString.h"
+#include "MAssIpc_PacketParser.h"
+#include "MAssIpc_Transport.h"
+#include "MAssIpc_ThreadSafe.h"
+#include "MAssIpc_RawString.h"
 
 namespace MAssIpcCallInternal
 {
 
-MAssIpcCallDataStream CreateDataStream(const std::weak_ptr<MAssIpcPacketTransport>& weak_transport,
-									   MAssIpcData::TPacketSize no_header_size,
-									   MAssIpcPacketParser::PacketType pt,
-									   MAssIpcPacketParser::TCallId respond_id);
+MAssIpc_DataStream CreateDataStream(const std::weak_ptr<MAssIpc_TransportShare>& weak_transport,
+									   MAssIpc_Data::TPacketSize no_header_size,
+									   MAssIpc_PacketParser::PacketType pt,
+									   MAssIpc_PacketParser::TCallId respond_id);
 
-MAssIpcCallDataStream CreateDataStreamInplace(std::unique_ptr<MAssIpcData> inplace_send_buffer,
-											  MAssIpcData::TPacketSize no_header_size,
-											  MAssIpcPacketParser::PacketType pt,
-											  MAssIpcPacketParser::TCallId respond_id);
+MAssIpc_DataStream CreateDataStreamInplace(std::unique_ptr<MAssIpc_Data> inplace_send_buffer,
+											  MAssIpc_Data::TPacketSize no_header_size,
+											  MAssIpc_PacketParser::PacketType pt,
+											  MAssIpc_PacketParser::TCallId respond_id);
 
 //-------------------------------------------------------
 
@@ -53,18 +53,18 @@ class CallInfoImpl: public CallInfo
 public:
 
 
-	CallInfoImpl(MAssIpcThreadTransportTarget::Id thread_id, const MAssIpcRawString& proc_name, std::string params_type);
+	CallInfoImpl(MAssIpc_TransthreadTarget::Id thread_id, const MAssIpc_RawString& proc_name, std::string params_type);
 
-	virtual std::unique_ptr<const MAssIpcData> Invoke(const std::weak_ptr<MAssIpcPacketTransport>& transport, 
-												MAssIpcPacketParser::TCallId respond_id,
-												MAssIpcCallDataStream& params) const = 0;
+	virtual std::unique_ptr<const MAssIpc_Data> Invoke(const std::weak_ptr<MAssIpc_TransportShare>& transport, 
+												MAssIpc_PacketParser::TCallId respond_id,
+												MAssIpc_DataStream& params) const = 0;
 	virtual bool IsCallable() const = 0;
-	virtual MAssIpcRawString GetSignature_RetType() const = 0;
+	virtual MAssIpc_RawString GetSignature_RetType() const = 0;
 
 	struct SignatureKey
 	{
-		MAssIpcRawString name;
-		MAssIpcRawString params_type;
+		MAssIpc_RawString name;
+		MAssIpc_RawString params_type;
 
 		bool operator<(const SignatureKey& other) const
 		{
@@ -99,7 +99,7 @@ public:
 
 public:
 
-	const MAssIpcThreadTransportTarget::Id m_thread_id;
+	const MAssIpc_TransthreadTarget::Id m_thread_id;
 
 protected:
 
@@ -109,47 +109,47 @@ protected:
 };
 
 
-class ResultJob: public MAssCallThreadTransport::Job
+class ResultJob: public MAssIpc_Transthread::Job
 {
 public:
 
-	ResultJob(const std::weak_ptr<MAssIpcPacketTransport>& transport, std::unique_ptr<const MAssIpcData>& result);
+	ResultJob(const std::weak_ptr<MAssIpc_TransportShare>& transport, std::unique_ptr<const MAssIpc_Data>& result);
 
 	void Invoke() override;
-	static void Invoke(const std::weak_ptr<MAssIpcPacketTransport>& transport, std::unique_ptr<const MAssIpcData>& result);
+	static void Invoke(const std::weak_ptr<MAssIpc_TransportShare>& transport, std::unique_ptr<const MAssIpc_Data>& result);
 
 private:
 
-	std::weak_ptr<MAssIpcPacketTransport> m_transport;
-	std::unique_ptr<const MAssIpcData> m_result;
+	std::weak_ptr<MAssIpc_TransportShare> m_transport;
+	std::unique_ptr<const MAssIpc_Data> m_result;
 };
 
 
-class CallJob: public MAssCallThreadTransport::Job
+class CallJob: public MAssIpc_Transthread::Job
 {
 public:
 
-	CallJob(const std::weak_ptr<MAssIpcPacketTransport>& transport, 
-			const std::weak_ptr<MAssCallThreadTransport>& inter_thread,
+	CallJob(const std::weak_ptr<MAssIpc_TransportShare>& transport, 
+			const std::weak_ptr<MAssIpc_Transthread>& inter_thread,
 			const std::shared_ptr<const TCallCountChanged>& call_count_changed,
-			MAssIpcCallDataStream& call_info_data, MAssIpcPacketParser::TCallId respond_id,
+			MAssIpc_DataStream& call_info_data, MAssIpc_PacketParser::TCallId respond_id,
 			std::shared_ptr<const CallInfoImpl> call_info);
 	void Invoke() override;
-	static void Invoke(const std::weak_ptr<MAssIpcPacketTransport>& transport, const std::weak_ptr<MAssCallThreadTransport>& inter_thread,
+	static void Invoke(const std::weak_ptr<MAssIpc_TransportShare>& transport, const std::weak_ptr<MAssIpc_Transthread>& inter_thread,
 					   const std::shared_ptr<const TCallCountChanged>& call_count_changed,
-					   MAssIpcCallDataStream& call_info_data, std::shared_ptr<const CallInfoImpl> call_info, 
-					   MAssIpcPacketParser::TCallId respond_id);
-	static MAssIpcPacketParser::TCallId CalcRespondId(bool send_return, MAssIpcPacketParser::TCallId respond_id);
+					   MAssIpc_DataStream& call_info_data, std::shared_ptr<const CallInfoImpl> call_info, 
+					   MAssIpc_PacketParser::TCallId respond_id);
+	static MAssIpc_PacketParser::TCallId CalcRespondId(bool send_return, MAssIpc_PacketParser::TCallId respond_id);
 
 	const std::shared_ptr<const TCallCountChanged>	m_call_count_changed;
-	MAssIpcCallDataStream					m_call_info_data;
+	MAssIpc_DataStream					m_call_info_data;
 	const std::shared_ptr<const CallInfoImpl>	m_call_info;
-	const MAssIpcPacketParser::TCallId		m_respond_id;
+	const MAssIpc_PacketParser::TCallId		m_respond_id;
 
 private:
 
-	const std::weak_ptr<MAssIpcPacketTransport>	m_transport;
-	const std::weak_ptr<MAssCallThreadTransport>	m_inter_thread;
+	const std::weak_ptr<MAssIpc_TransportShare>	m_transport;
+	const std::weak_ptr<MAssIpc_Transthread>	m_inter_thread;
 };
 
 
@@ -157,7 +157,7 @@ class ProcMap
 {
 public:
 
-	std::shared_ptr<CallInfoImpl> FindCallInfo(const MAssIpcRawString& name, const MAssIpcRawString& params_type) const;
+	std::shared_ptr<CallInfoImpl> FindCallInfo(const MAssIpc_RawString& name, const MAssIpc_RawString& params_type) const;
 	MAssIpcCall_EnumerateData EnumerateHandlers() const;
 	std::shared_ptr<const CallInfo> AddProcSignature(const std::shared_ptr<MAssIpcCallInternal::CallInfoImpl>& call_info, const std::string& comment, const void* tag);
 	void AddAllProcs(const ProcMap& other);
@@ -242,7 +242,7 @@ Ret ExpandTupleCall(const TFunc& pf, std::tuple<Args...>& tup)
 //-------------------------------------------------------
 
 template<class... TArgs, size_t... Indexes>
-static inline std::tuple<TArgs...> DeserializeArgs(MAssIpcCallDataStream& call_info, index_tuple< Indexes... >)
+static inline std::tuple<TArgs...> DeserializeArgs(MAssIpc_DataStream& call_info, index_tuple< Indexes... >)
 {
 	std::tuple<TArgs...> tup;
 	int unpack[]{0,((call_info>>std::get<Indexes>(tup)),0)...};
@@ -252,7 +252,7 @@ static inline std::tuple<TArgs...> DeserializeArgs(MAssIpcCallDataStream& call_i
 
 
 template<class... TArgs>
-static inline void SerializeArgs(MAssIpcCallDataStream& call_info, const TArgs&... args)
+static inline void SerializeArgs(MAssIpc_DataStream& call_info, const TArgs&... args)
 {
 	int unpack[]{0,((call_info<<args),0)...};
 	unpack;
@@ -315,7 +315,7 @@ struct ParamsTypeHolder_string
 		m_value.reserve(reserve_size);
 	}
 
-	void AddType(const MAssIpcRawString& string)
+	void AddType(const MAssIpc_RawString& string)
 	{
 		m_value.append(string.C_String(), string.Length());
 		m_value.append(&separator, sizeof(separator));
@@ -327,24 +327,24 @@ struct ParamsTypeHolder_string
 
 struct ParamsTypeHolder_MAssIpcCallDataStream
 {
-	void AddType(const MAssIpcRawString& string)
+	void AddType(const MAssIpc_RawString& string)
 	{
 		m_value.WriteRawData(string.C_String(), string.Length());
 		m_value.WriteRawData(&separator, sizeof(separator));
 	}
 
-	MAssIpcCallDataStream& m_value;
+	MAssIpc_DataStream& m_value;
 };
 
 struct ParamsTypeHolder_TPacketSize
 {
-	void AddType(const MAssIpcRawString& string)
+	void AddType(const MAssIpc_RawString& string)
 	{
 		m_size += string.Length();
 		m_size += sizeof(separator);
 	}
 
-	MAssIpcData::TPacketSize m_size = 0;
+	MAssIpc_Data::TPacketSize m_size = 0;
 };
 
 
@@ -354,7 +354,7 @@ struct ProcSignature<TRet(*)(TArgs... args)>
 	template<class ParamsTypeHolder_T>
 	static inline void GetParams(ParamsTypeHolder_T* params_type)
 	{
-		int unpack[]{0,((params_type->AddType(MAssIpcRawString(MAssIpcType<TArgs>::NameValue(), MAssIpcType<TArgs>::NameLength()))
+		int unpack[]{0,((params_type->AddType(MAssIpc_RawString(MAssIpcType<TArgs>::NameValue(), MAssIpcType<TArgs>::NameLength()))
 #if !(_MSC_VER==1916)// Visual Studio 2017 compiler crashes trying compile this
 						 , CheckSeparatorInName<MAssIpcType<TArgs>::name_value>()
 #endif
@@ -383,18 +383,18 @@ static inline bool IsBoolConvertible_Callable(const TDelegate& del)
 
 //-------------------------------------------------------
 
-std::unique_ptr<const MAssIpcData> SerializeReturn(const std::weak_ptr<MAssIpcPacketTransport>& transport,
-														  MAssIpcPacketParser::TCallId respond_id);
+std::unique_ptr<const MAssIpc_Data> SerializeReturn(const std::weak_ptr<MAssIpc_TransportShare>& transport,
+														  MAssIpc_PacketParser::TCallId respond_id);
 
 template<class TRet>
-std::unique_ptr<const MAssIpcData> SerializeReturn(const TRet& ret, const std::weak_ptr<MAssIpcPacketTransport>& transport,
-												   MAssIpcPacketParser::TCallId respond_id)
+std::unique_ptr<const MAssIpc_Data> SerializeReturn(const TRet& ret, const std::weak_ptr<MAssIpc_TransportShare>& transport,
+												   MAssIpc_PacketParser::TCallId respond_id)
 {
-	if( respond_id == MAssIpcPacketParser::c_invalid_id )
+	if( respond_id == MAssIpc_PacketParser::c_invalid_id )
 		return {};
-	MAssIpcCallDataStream measure_size;
+	MAssIpc_DataStream measure_size;
 	measure_size<<ret;
-	MAssIpcCallDataStream result_stream(CreateDataStream(transport, measure_size.GetWritePos(), MAssIpcPacketParser::PacketType::pt_return, respond_id));
+	MAssIpc_DataStream result_stream(CreateDataStream(transport, measure_size.GetWritePos(), MAssIpc_PacketParser::PacketType::pt_return, respond_id));
 	result_stream<<ret;
 	return result_stream.DetachWrite();
 }
@@ -413,9 +413,9 @@ public:
 
 	private:
 
-		std::unique_ptr<const MAssIpcData> Invoke(const std::weak_ptr<MAssIpcPacketTransport>& transport, 
-											MAssIpcPacketParser::TCallId respond_id,
-											MAssIpcCallDataStream& params) const override
+		std::unique_ptr<const MAssIpc_Data> Invoke(const std::weak_ptr<MAssIpc_TransportShare>& transport, 
+											MAssIpc_PacketParser::TCallId respond_id,
+											MAssIpc_DataStream& params) const override
 		{
 			std::tuple<TArgs...> args = DeserializeArgs<TArgs...>(params, typename make_indexes<TArgs...>::type());
 			ExpandTupleCall<TDelegate, void>(m_del, args);
@@ -428,14 +428,14 @@ public:
 			return IsBoolConvertible_Callable(m_del);
 		}
 
-		MAssIpcRawString GetSignature_RetType() const override
+		MAssIpc_RawString GetSignature_RetType() const override
 		{
 			return {MAssIpcType<void>::NameValue(), MAssIpcType<void>::NameLength()};
 		}
 
 	public:
 
-		Imp(const TDelegate& del, MAssIpcThreadTransportTarget::Id thread_id, const MAssIpcRawString& name)
+		Imp(const TDelegate& del, MAssIpc_TransthreadTarget::Id thread_id, const MAssIpc_RawString& name)
 			:CallInfoImpl(thread_id, name, CallInfoImpl::MakeParamsType<TDelegate>() ), m_del(del)
 		{
 		};
@@ -456,9 +456,9 @@ public:
 
 	private:
 
-		std::unique_ptr<const MAssIpcData> Invoke(const std::weak_ptr<MAssIpcPacketTransport>& transport, 
-											MAssIpcPacketParser::TCallId respond_id,
-											MAssIpcCallDataStream& params) const override
+		std::unique_ptr<const MAssIpc_Data> Invoke(const std::weak_ptr<MAssIpc_TransportShare>& transport, 
+											MAssIpc_PacketParser::TCallId respond_id,
+											MAssIpc_DataStream& params) const override
 		{
 			std::tuple<TArgs...> args = DeserializeArgs<TArgs...>(params, typename make_indexes<TArgs...>::type());
 			TRet ret = ExpandTupleCall<TDelegate, TRet>(m_del, args);
@@ -471,14 +471,14 @@ public:
 			return IsBoolConvertible_Callable(m_del);
 		}
 
-		MAssIpcRawString GetSignature_RetType() const override
+		MAssIpc_RawString GetSignature_RetType() const override
 		{
 			return {MAssIpcType<TRet>::NameValue(), MAssIpcType<TRet>::NameLength()};
 		}
 
 	public:
 
-		Imp(const TDelegate& del, MAssIpcThreadTransportTarget::Id thread_id, const MAssIpcRawString& name)
+		Imp(const TDelegate& del, MAssIpc_TransthreadTarget::Id thread_id, const MAssIpc_RawString& name)
 			:CallInfoImpl(thread_id, name, CallInfoImpl::MakeParamsType<TDelegate>()), m_del(del)
 		{
 		};
@@ -520,17 +520,17 @@ std::string CallInfoImpl::MakeParamsType()
 //-------------------------------------------------------
 
 
-class MAssIpcData_Vector: public MAssIpcData
+class MAssIpcData_Vector: public MAssIpc_Data
 {
 public:
 
-	MAssIpcData_Vector(MAssIpcData::TPacketSize size)
+	MAssIpcData_Vector(MAssIpc_Data::TPacketSize size)
 		: m_storage(std::make_unique<uint8_t[]>(size))
 		, m_storage_size(size)
 	{
 	}
 
-	MAssIpcData::TPacketSize Size() const override
+	MAssIpc_Data::TPacketSize Size() const override
 	{
 		return m_storage_size;
 	}
@@ -548,7 +548,7 @@ public:
 private:
 
 	std::unique_ptr<uint8_t[]> m_storage;
-	const MAssIpcData::TPacketSize m_storage_size;
+	const MAssIpc_Data::TPacketSize m_storage_size;
 };
 
 

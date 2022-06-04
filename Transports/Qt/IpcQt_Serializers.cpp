@@ -1,6 +1,6 @@
-#include "IpcDataStreamSerializersQt.h"
+#include "IpcQt_Serializers.h"
 
-MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const QString& v)
+MAssIpc_DataStream& operator<<(MAssIpc_DataStream& stream, const QString& v)
 {
 	QByteArray data = v.toUtf8();
 	uint32_t data_size = data.size();
@@ -9,7 +9,7 @@ MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const QString& 
 	return stream;
 }
 
-MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, QString& v)
+MAssIpc_DataStream& operator>>(MAssIpc_DataStream& stream, QString& v)
 {
 	uint32_t data_size = 0;
 	stream>>data_size;
@@ -22,7 +22,7 @@ MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, QString& v)
 
 //--------------------------------------------------
 
-MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const QByteArray& v)
+MAssIpc_DataStream& operator<<(MAssIpc_DataStream& stream, const QByteArray& v)
 {
 	uint32_t data_size = v.size();
 	stream<<data_size;
@@ -30,7 +30,7 @@ MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const QByteArra
 	return stream;
 }
 
-MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, QByteArray& v)
+MAssIpc_DataStream& operator>>(MAssIpc_DataStream& stream, QByteArray& v)
 {
 	uint32_t data_size = 0;
 	stream>>data_size;

@@ -1,22 +1,22 @@
-#include "MAssIpcPacketParser.h"
-#include "MAssMacros.h"
-#include "MAssIpcCallInternal.h"
+#include "MAssIpc_PacketParser.h"
+#include "MAssIpc_Macros.h"
+#include "MAssIpc_Internals.h "
 #include <cstring>
 
 namespace MAssIpcCallInternal
 {
 
 
-MAssIpcPacketParser::MAssIpcPacketParser()
+MAssIpc_PacketParser::MAssIpc_PacketParser()
 {
 }
 
 
-MAssIpcPacketParser::~MAssIpcPacketParser()
+MAssIpc_PacketParser::~MAssIpc_PacketParser()
 {
 }
 
-size_t MAssIpcPacketParser::ReadNeededDataSize(const std::shared_ptr<MAssIpcCallTransport>& in_data, std::unique_ptr<const MAssIpcData>* packet_data)
+size_t MAssIpc_PacketParser::ReadNeededDataSize(const std::shared_ptr<MAssIpc_TransportCopy>& in_data, std::unique_ptr<const MAssIpc_Data>* packet_data)
 {
 	if( m_incoming_packet_size == c_invalid_packet_size )
 		if( in_data->ReadBytesAvailable()>=c_net_call_packet_header_size )
@@ -41,19 +41,19 @@ size_t MAssIpcPacketParser::ReadNeededDataSize(const std::shared_ptr<MAssIpcCall
 	return c_net_call_packet_header_size;
 }
 
-void MAssIpcPacketParser::ReceiveReadHeader(const std::shared_ptr<MAssIpcCallTransport>& in_data)
+void MAssIpc_PacketParser::ReceiveReadHeader(const std::shared_ptr<MAssIpc_TransportCopy>& in_data)
 {
 	uint8_t data_raw[c_net_call_packet_header_size] = {};
 	in_data->Read(data_raw, sizeof(data_raw));
 
-	m_incoming_packet_size = MAssIpcCallDataStream::ReadUnsafe<decltype(m_incoming_packet_size)>(data_raw);
+	m_incoming_packet_size = MAssIpc_DataStream::ReadUnsafe<decltype(m_incoming_packet_size)>(data_raw);
 
 	// sanity check? type? size? crc?
 	m_incoming_packet_header_data = std::make_unique<MAssIpcData_Vector>(c_net_call_packet_header_size+m_incoming_packet_size);
 	memcpy(m_incoming_packet_header_data->Data(), data_raw, sizeof(data_raw));
 }
 
-MAssIpcPacketParser::Header MAssIpcPacketParser::ReadHeader(MAssIpcCallDataStream& connection_stream)
+MAssIpc_PacketParser::Header MAssIpc_PacketParser::ReadHeader(MAssIpc_DataStream& connection_stream)
 {
 	Header header;
 	connection_stream>>header.size;
@@ -68,12 +68,12 @@ MAssIpcPacketParser::Header MAssIpcPacketParser::ReadHeader(MAssIpcCallDataStrea
 	return header;
 }
 
-void MAssIpcPacketParser::PacketHeaderWrite(MAssIpcCallDataStream& packet_data,
-											   MAssIpcData::TPacketSize no_header_size,
-											   MAssIpcPacketParser::PacketType pt,
-											   MAssIpcPacketParser::TCallId id)
+void MAssIpc_PacketParser::PacketHeaderWrite(MAssIpc_DataStream& packet_data,
+											   MAssIpc_Data::TPacketSize no_header_size,
+											   MAssIpc_PacketParser::PacketType pt,
+											   MAssIpc_PacketParser::TCallId id)
 {
-	packet_data<<MAssIpcData::TPacketSize(no_header_size)<<std::underlying_type<PacketType>::type(pt)<<TCallId(id);
+	packet_data<<MAssIpc_Data::TPacketSize(no_header_size)<<std::underlying_type<PacketType>::type(pt)<<TCallId(id);
 }
 
 }

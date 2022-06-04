@@ -1,17 +1,17 @@
-#include "IpcTcpTransportQt.h"
-#include "MAssMacros.h"
+#include "IpcQt_TransporTcp.h"
+#include "MAssIpc_Macros.h"
 #include <QtCore/QTimer>
 
-IpcTcpTransportQt::IpcTcpTransportQt()
+IpcQt_TransporTcp::IpcQt_TransporTcp()
 {
 }
 
 
-IpcTcpTransportQt::~IpcTcpTransportQt()
+IpcQt_TransporTcp::~IpcQt_TransporTcp()
 {
 }
 
-void IpcTcpTransportQt::AssignConnection(QTcpSocket* connection)
+void IpcQt_TransporTcp::AssignConnection(QTcpSocket* connection)
 {
 	if( m_connection )
 		m_connection->deleteLater();
@@ -19,24 +19,24 @@ void IpcTcpTransportQt::AssignConnection(QTcpSocket* connection)
 
 	//void error(QAbstractSocket::SocketError);
 
-	QObject::connect(m_connection.data(), &QIODevice::readyRead, this, &IpcTcpTransportQt::OnReadyRead);
-	QObject::connect(m_connection.data(), &QAbstractSocket::disconnected, this, &IpcTcpTransportQt::OnDisconnected);
-	QObject::connect(m_connection.data(), &QAbstractSocket::errorOccurred, this, &IpcTcpTransportQt::OnError);
+	QObject::connect(m_connection.data(), &QIODevice::readyRead, this, &IpcQt_TransporTcp::OnReadyRead);
+	QObject::connect(m_connection.data(), &QAbstractSocket::disconnected, this, &IpcQt_TransporTcp::OnDisconnected);
+	QObject::connect(m_connection.data(), &QAbstractSocket::errorOccurred, this, &IpcQt_TransporTcp::OnError);
 	if( QAbstractSocket::ConnectedState == m_connection->state() )
 		OnConnected();
 	else
 	{
-		QTimer::singleShot(std::chrono::milliseconds(10000), this, &IpcTcpTransportQt::OnConnectionTimeout);
-		QObject::connect(m_connection.data(), &QAbstractSocket::connected, this, &IpcTcpTransportQt::OnConnected);
+		QTimer::singleShot(std::chrono::milliseconds(10000), this, &IpcQt_TransporTcp::OnConnectionTimeout);
+		QObject::connect(m_connection.data(), &QAbstractSocket::connected, this, &IpcQt_TransporTcp::OnConnected);
 	}
 }
 
-QTcpSocket* IpcTcpTransportQt::GetConnection()
+QTcpSocket* IpcQt_TransporTcp::GetConnection()
 {
 	return m_connection.data();
 }
 
-bool IpcTcpTransportQt::WaitRespond(size_t expected_size)
+bool IpcQt_TransporTcp::WaitRespond(size_t expected_size)
 {
 	if( !m_connection )// was disconnected during wait
 		return false;
@@ -61,20 +61,20 @@ bool IpcTcpTransportQt::WaitRespond(size_t expected_size)
 // 	QCoreApplication::exec();
 }
 
-size_t	IpcTcpTransportQt::ReadBytesAvailable()
+size_t	IpcQt_TransporTcp::ReadBytesAvailable()
 {
 	if( !m_connection.data() )
 		return 0;
 	return m_connection->bytesAvailable();
 }
 
-void	IpcTcpTransportQt::Read(uint8_t* data, size_t size)
+void	IpcQt_TransporTcp::Read(uint8_t* data, size_t size)
 {
 	mass_return_if_equal(m_connection.data(), nullptr);
 	m_connection->read(reinterpret_cast<char*>(data), size);
 }
 
-void	IpcTcpTransportQt::Write(const uint8_t* data, size_t size)
+void	IpcQt_TransporTcp::Write(const uint8_t* data, size_t size)
 {
 	mass_return_if_equal(m_connection.data(), nullptr);
 	mass_return_if_not_equal(m_connection->state(), QAbstractSocket::ConnectedState);
@@ -84,12 +84,12 @@ void	IpcTcpTransportQt::Write(const uint8_t* data, size_t size)
 	mass_return_if_not_equal(br, true);
 }
 
-void IpcTcpTransportQt::OnConnected()
+void IpcQt_TransporTcp::OnConnected()
 {
 	HandlerOnConnected();
 }
 
-void IpcTcpTransportQt::OnDisconnected()
+void IpcQt_TransporTcp::OnDisconnected()
 {
 	if( m_connection )
 	{
@@ -99,30 +99,30 @@ void IpcTcpTransportQt::OnDisconnected()
 	}
 }
 
-void IpcTcpTransportQt::OnReadyRead()
+void IpcQt_TransporTcp::OnReadyRead()
 {
 	HandlerProcessTransport();
 }
 
-void IpcTcpTransportQt::OnError(QAbstractSocket::SocketError er)
+void IpcQt_TransporTcp::OnError(QAbstractSocket::SocketError er)
 {
 	if(er!=QAbstractSocket::SocketTimeoutError)
 		OnDisconnected();
 }
 
-void IpcTcpTransportQt::OnConnectionTimeout()
+void IpcQt_TransporTcp::OnConnectionTimeout()
 {
 	if(m_connection)
 		if( m_connection->state()!=QAbstractSocket::ConnectedState )
 			OnDisconnected();
 }
 
-// void	IpcTcpTransportQt::StopWaitRespound()
+// void	IpcQt_TransporTcp::StopWaitRespound()
 // {
 // // 	QCoreApplication::exit();
 // }
 
-// bool IpcTcpTransportQt::IsWaitRespound()
+// bool IpcQt_TransporTcp::IsWaitRespound()
 // {
 // 	return (m_wait_respound!=0);
 // }

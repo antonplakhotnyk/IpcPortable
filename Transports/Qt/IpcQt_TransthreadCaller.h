@@ -5,20 +5,20 @@
 #include <memory>
 #include <QtCore/QMutex>
 #include <QtCore/QWaitCondition>
-#include "MAssIpcThreadTransportTarget.h"
+#include "MAssIpc_TransthreadTarget.h"
 #include <set>
 
-class ThreadCallerQt: public QObject
+class IpcQt_TransthreadCaller: public QObject
 {
 public:
-	ThreadCallerQt();
-	~ThreadCallerQt();
+	IpcQt_TransthreadCaller();
+	~IpcQt_TransthreadCaller();
 
-	static MAssIpcThreadTransportTarget::Id	AddTargetThread(QThread* sender_or_receiver);
+	static MAssIpc_TransthreadTarget::Id	AddTargetThread(QThread* sender_or_receiver);
 
-	static MAssIpcThreadTransportTarget::Id	GetCurrentThreadId();
-	static MAssIpcThreadTransportTarget::Id	GetId(QThread* thread);
-	static void CancelDisableWaitingCall(MAssIpcThreadTransportTarget::Id thread_waiting_call);
+	static MAssIpc_TransthreadTarget::Id	GetCurrentThreadId();
+	static MAssIpc_TransthreadTarget::Id	GetId(QThread* thread);
+	static void CancelDisableWaitingCall(MAssIpc_TransthreadTarget::Id thread_waiting_call);
 
 public:
 
@@ -124,7 +124,7 @@ private:
 
 public:
 
-	void CallFromThread(MAssIpcThreadTransportTarget::Id receiver_thread_id, std::unique_ptr<CallEvent> call,
+	void CallFromThread(MAssIpc_TransthreadTarget::Id receiver_thread_id, std::unique_ptr<CallEvent> call,
 						std::unique_ptr<CancelHolder>* call_waiter);
 protected:
 	void CallNoThread(std::unique_ptr<CallEvent> call);
@@ -136,7 +136,7 @@ private:
 	struct Internals
 	{
 		std::mutex	lock_threads;
-		std::map<MAssIpcThreadTransportTarget::Id, std::unique_ptr<ThreadCallReceiver> > threads;
+		std::map<MAssIpc_TransthreadTarget::Id, std::unique_ptr<ThreadCallReceiver> > threads;
 	};
 
 	std::shared_ptr<Internals> m_int;

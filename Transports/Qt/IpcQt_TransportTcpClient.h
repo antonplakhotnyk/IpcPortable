@@ -3,15 +3,15 @@
 #include "MAssIpcCall.h"
 #include <QtCore/QDataStream>
 #include <QtNetwork/QHostAddress>
-#include "IpcTcpTransportQt.h"
+#include "IpcQt_TransporTcp.h"
 
 
-class IpcClientTcpTransport: public IpcTcpTransportQt
+class IpcQt_TransportTcpClient: public IpcQt_TransporTcp
 {
 public:
 
-	IpcClientTcpTransport(void);
-	~IpcClientTcpTransport();
+	IpcQt_TransportTcpClient(void);
+	~IpcQt_TransportTcpClient();
 
 	struct Addr
 	{

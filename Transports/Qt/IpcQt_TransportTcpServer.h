@@ -1,13 +1,13 @@
 #pragma once
 
 #include <QtNetwork/QTcpServer>
-#include "IpcTcpTransportQt.h"
+#include "IpcQt_TransporTcp.h"
 
-class IpcServerTcpTransport: public IpcTcpTransportQt
+class IpcQt_TransportTcpServer: public IpcQt_TransporTcp
 {
 public:
-	IpcServerTcpTransport(uint16_t listen_port);
-	~IpcServerTcpTransport();
+	IpcQt_TransportTcpServer(uint16_t listen_port);
+	~IpcQt_TransportTcpServer();
 
 	QTcpServer* Server();
 

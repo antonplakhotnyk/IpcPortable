@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 #include <string>
-#include "MAssIpcCallTransport.h"
+#include "MAssIpc_Transport.h"
 #include <vector>
 
 template<class TType>
@@ -26,7 +26,7 @@ template<>															  	\
 struct MAssIpcType<type>												\
 {																		\
 	static constexpr const char name_value[sizeof(#type)] = #type;		\
-	static constexpr MAssIpcData::TPacketSize NameLength()								\
+	static constexpr MAssIpc_Data::TPacketSize NameLength()								\
 	{																	\
 		return std::extent<decltype(name_value)>::value-1;				\
 	}																	\
@@ -38,57 +38,57 @@ struct MAssIpcType<type>												\
 
 //-------------------------------------------------------
 
-class MAssIpcCallDataStream
+class MAssIpc_DataStream
 {
 public:
 
-	MAssIpcCallDataStream(MAssIpcCallDataStream&&) = default;
-	MAssIpcCallDataStream(std::unique_ptr<const MAssIpcData> data_read);
-	MAssIpcCallDataStream(std::unique_ptr<MAssIpcData> data_write);
-	MAssIpcCallDataStream() = default;
-	MAssIpcCallDataStream& operator= (MAssIpcCallDataStream&&) = default;
-	~MAssIpcCallDataStream();
+	MAssIpc_DataStream(MAssIpc_DataStream&&) = default;
+	MAssIpc_DataStream(std::unique_ptr<const MAssIpc_Data> data_read);
+	MAssIpc_DataStream(std::unique_ptr<MAssIpc_Data> data_write);
+	MAssIpc_DataStream() = default;
+	MAssIpc_DataStream& operator= (MAssIpc_DataStream&&) = default;
+	~MAssIpc_DataStream();
 
-	MAssIpcCallDataStream &operator>>(int8_t &i);
-	MAssIpcCallDataStream &operator>>(uint8_t &i);
-	MAssIpcCallDataStream &operator>>(int16_t &i);
-	MAssIpcCallDataStream &operator>>(uint16_t &i);
-	MAssIpcCallDataStream &operator>>(int32_t &i);
-	MAssIpcCallDataStream &operator>>(uint32_t &i);
-	MAssIpcCallDataStream &operator>>(int64_t &i);
-	MAssIpcCallDataStream &operator>>(uint64_t &i);
+	MAssIpc_DataStream &operator>>(int8_t &i);
+	MAssIpc_DataStream &operator>>(uint8_t &i);
+	MAssIpc_DataStream &operator>>(int16_t &i);
+	MAssIpc_DataStream &operator>>(uint16_t &i);
+	MAssIpc_DataStream &operator>>(int32_t &i);
+	MAssIpc_DataStream &operator>>(uint32_t &i);
+	MAssIpc_DataStream &operator>>(int64_t &i);
+	MAssIpc_DataStream &operator>>(uint64_t &i);
 
-	MAssIpcCallDataStream &operator>>(bool &i);
-	MAssIpcCallDataStream &operator>>(float &f);
-	MAssIpcCallDataStream &operator>>(double &f);
+	MAssIpc_DataStream &operator>>(bool &i);
+	MAssIpc_DataStream &operator>>(float &f);
+	MAssIpc_DataStream &operator>>(double &f);
 
-	MAssIpcCallDataStream &operator<<(int8_t i);
-	MAssIpcCallDataStream &operator<<(uint8_t i);
-	MAssIpcCallDataStream &operator<<(int16_t i);
-	MAssIpcCallDataStream &operator<<(uint16_t i);
-	MAssIpcCallDataStream &operator<<(int32_t i);
-	MAssIpcCallDataStream &operator<<(uint32_t i);
-	MAssIpcCallDataStream &operator<<(int64_t i);
-	MAssIpcCallDataStream &operator<<(uint64_t i);
-	MAssIpcCallDataStream &operator<<(bool i);
-	MAssIpcCallDataStream &operator<<(float f);
-	MAssIpcCallDataStream &operator<<(double f);
+	MAssIpc_DataStream &operator<<(int8_t i);
+	MAssIpc_DataStream &operator<<(uint8_t i);
+	MAssIpc_DataStream &operator<<(int16_t i);
+	MAssIpc_DataStream &operator<<(uint16_t i);
+	MAssIpc_DataStream &operator<<(int32_t i);
+	MAssIpc_DataStream &operator<<(uint32_t i);
+	MAssIpc_DataStream &operator<<(int64_t i);
+	MAssIpc_DataStream &operator<<(uint64_t i);
+	MAssIpc_DataStream &operator<<(bool i);
+	MAssIpc_DataStream &operator<<(float f);
+	MAssIpc_DataStream &operator<<(double f);
 
- 	MAssIpcCallDataStream& operator<<(void* p)=delete;// protect for implicit conversion of pointer to bool
+ 	MAssIpc_DataStream& operator<<(void* p)=delete;// protect for implicit conversion of pointer to bool
 
-	void ReadRawData(uint8_t* data, MAssIpcData::TPacketSize len);
-	void ReadRawData(char* data, MAssIpcData::TPacketSize len);
-	const uint8_t* ReadRawData(MAssIpcData::TPacketSize len);
-	const char* ReadRawDataChar(MAssIpcData::TPacketSize len);
-	void WriteRawData(const uint8_t* data, MAssIpcData::TPacketSize len);
-	void WriteRawData(const char* data, MAssIpcData::TPacketSize len);
-	uint8_t* WriteRawData(MAssIpcData::TPacketSize len);
+	void ReadRawData(uint8_t* data, MAssIpc_Data::TPacketSize len);
+	void ReadRawData(char* data, MAssIpc_Data::TPacketSize len);
+	const uint8_t* ReadRawData(MAssIpc_Data::TPacketSize len);
+	const char* ReadRawDataChar(MAssIpc_Data::TPacketSize len);
+	void WriteRawData(const uint8_t* data, MAssIpc_Data::TPacketSize len);
+	void WriteRawData(const char* data, MAssIpc_Data::TPacketSize len);
+	uint8_t* WriteRawData(MAssIpc_Data::TPacketSize len);
 
-	std::unique_ptr<const MAssIpcData> DetachRead();
-	std::unique_ptr<MAssIpcData> DetachWrite();
-	const MAssIpcData* GetDataRead() const;
-	MAssIpcData* GetDataWrite() const;
-	MAssIpcData::TPacketSize GetWritePos();
+	std::unique_ptr<const MAssIpc_Data> DetachRead();
+	std::unique_ptr<MAssIpc_Data> DetachWrite();
+	const MAssIpc_Data* GetDataRead() const;
+	MAssIpc_Data* GetDataWrite() const;
+	MAssIpc_Data::TPacketSize GetWritePos();
 	bool IsReadBufferPresent();
 
 private:
@@ -97,15 +97,15 @@ private:
 
 public:
 
-	bool IsReadAvailable(MAssIpcData::TPacketSize size);
+	bool IsReadAvailable(MAssIpc_Data::TPacketSize size);
 
 	template<class T>
 	void WriteBytes(T t)
 	{
 		if( m_write )
 		{
-			MAssIpcData::TPacketSize size = m_write->Size();
-			if( CheckAssert((m_write_pos<(std::numeric_limits<MAssIpcData::TPacketSize>::max()-sizeof(t)))&&(size < m_write_pos+sizeof(t))) )
+			MAssIpc_Data::TPacketSize size = m_write->Size();
+			if( CheckAssert((m_write_pos<(std::numeric_limits<MAssIpc_Data::TPacketSize>::max()-sizeof(t)))&&(size < m_write_pos+sizeof(t))) )
 				return;
 
 			uint8_t* bytes = m_write->Data()+m_write_pos;
@@ -133,7 +133,7 @@ public:
 			bytes[0] = uint8_t(t);
 		else
 		{
-			for( MAssIpcData::TPacketSize i = 0; i<sizeof(T); i++ )
+			for( MAssIpc_Data::TPacketSize i = 0; i<sizeof(T); i++ )
 			{
 				bytes[i] = (0xFF & t);
 				t >>= 8;
@@ -149,7 +149,7 @@ public:
 		else
 		{
 			T t = 0;
-			for( MAssIpcData::TPacketSize i = 0; i<sizeof(T); i++ )
+			for( MAssIpc_Data::TPacketSize i = 0; i<sizeof(T); i++ )
 			{
 				t <<= 8;
 				t |= bytes[sizeof(T)-1-i];
@@ -161,11 +161,11 @@ public:
 
 private:
 
-	std::unique_ptr<const MAssIpcData> m_read;
-	std::unique_ptr<MAssIpcData> m_write;
+	std::unique_ptr<const MAssIpc_Data> m_read;
+	std::unique_ptr<MAssIpc_Data> m_write;
 
-	MAssIpcData::TPacketSize	m_read_pos = 0;
-	MAssIpcData::TPacketSize	m_write_pos = 0;
+	MAssIpc_Data::TPacketSize	m_read_pos = 0;
+	MAssIpc_Data::TPacketSize	m_write_pos = 0;
 };
 
 //-------------------------------------------------------
@@ -180,20 +180,20 @@ struct MAssIpcCall_ProcDescription
 
 typedef std::vector<MAssIpcCall_ProcDescription> MAssIpcCall_EnumerateData;
 
-MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const MAssIpcCall_EnumerateData& v);
-MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, MAssIpcCall_EnumerateData& v);
+MAssIpc_DataStream& operator<<(MAssIpc_DataStream& stream, const MAssIpcCall_EnumerateData& v);
+MAssIpc_DataStream& operator>>(MAssIpc_DataStream& stream, MAssIpcCall_EnumerateData& v);
 MASS_IPC_TYPE_SIGNATURE(MAssIpcCall_EnumerateData);
 
 //-------------------------------------------------------
 
 
-// MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const int& v);
-// MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, int& v);
+// MAssIpc_DataStream& operator<<(MAssIpc_DataStream& stream, const int& v);
+// MAssIpc_DataStream& operator>>(MAssIpc_DataStream& stream, int& v);
 
 //-------------------------------------------------------
 
-MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const std::string& v);
-MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, std::string& v);
+MAssIpc_DataStream& operator<<(MAssIpc_DataStream& stream, const std::string& v);
+MAssIpc_DataStream& operator>>(MAssIpc_DataStream& stream, std::string& v);
 
 MASS_IPC_TYPE_SIGNATURE(std::string);
 
@@ -204,7 +204,7 @@ MASS_IPC_TYPE_SIGNATURE(std::string);
 //-------------------------------------------------------
 
 template<typename Integer, std::enable_if_t<std::is_integral<Integer>::value, bool> = true>
-MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const std::vector<Integer>& v)
+MAssIpc_DataStream& operator<<(MAssIpc_DataStream& stream, const std::vector<Integer>& v)
 {
 	stream<<(uint32_t)(v.size()*sizeof(Integer));
 	for( const Integer& item : v )
@@ -213,7 +213,7 @@ MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const std::vect
 }
 
 template<typename Integer, std::enable_if_t<std::is_integral<Integer>::value, bool> = true>
-MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, std::vector<Integer>& v)
+MAssIpc_DataStream& operator>>(MAssIpc_DataStream& stream, std::vector<Integer>& v)
 {
 	uint32_t length = 0;
 	stream>>length;

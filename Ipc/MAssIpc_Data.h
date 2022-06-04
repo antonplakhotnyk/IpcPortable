@@ -2,13 +2,13 @@
 
 #include <stdint.h>
 
-class MAssIpcData
+class MAssIpc_Data
 {
 public:
 
 	typedef uint32_t TPacketSize;
 
-	virtual ~MAssIpcData() = default;
+	virtual ~MAssIpc_Data() = default;
 
 	virtual TPacketSize Size() const = 0;
 	virtual uint8_t* Data() = 0;

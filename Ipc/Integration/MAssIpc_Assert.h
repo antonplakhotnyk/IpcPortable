@@ -3,7 +3,7 @@
 #define MASS_ASSERT_STR(msg_a) msg_a
 // #define MASS_ASSERT_STR(msg_a) L ## msg_a
 
-class MAssIpcAssert
+class MAssIpc_Assert
 {
 public:
 

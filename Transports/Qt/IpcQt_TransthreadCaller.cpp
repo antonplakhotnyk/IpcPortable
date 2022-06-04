@@ -1,12 +1,12 @@
-#include "ThreadCallerQt.h"
+#include "IpcQt_TransthreadCaller.h"
 #include <QtCore/QCoreApplication>
 #include <QtCore/QMutexLocker>
-#include "MAssMacros.h"
+#include "MAssIpc_Macros.h"
 
-std::weak_ptr<ThreadCallerQt::Internals> ThreadCallerQt::s_int_inter_thread;
-std::mutex	ThreadCallerQt::s_lock_int_inter_thread;
+std::weak_ptr<IpcQt_TransthreadCaller::Internals> IpcQt_TransthreadCaller::s_int_inter_thread;
+std::mutex	IpcQt_TransthreadCaller::s_lock_int_inter_thread;
 
-ThreadCallerQt::ThreadCallerQt()
+IpcQt_TransthreadCaller::IpcQt_TransthreadCaller()
 {
 	std::shared_ptr<Internals> new_int = std::shared_ptr<Internals>(new Internals);
 
@@ -21,21 +21,21 @@ ThreadCallerQt::ThreadCallerQt()
 	}
 }
 
-ThreadCallerQt::~ThreadCallerQt()
+IpcQt_TransthreadCaller::~IpcQt_TransthreadCaller()
 {
 }
 
-MAssIpcThreadTransportTarget::Id ThreadCallerQt::GetCurrentThreadId()
+MAssIpc_TransthreadTarget::Id IpcQt_TransthreadCaller::GetCurrentThreadId()
 {
 	return QThread::currentThread();
 }
 
-MAssIpcThreadTransportTarget::Id	ThreadCallerQt::GetId(QThread* thread)
+MAssIpc_TransthreadTarget::Id	IpcQt_TransthreadCaller::GetId(QThread* thread)
 {
 	return thread;
 }
 
-void ThreadCallerQt::CancelDisableWaitingCall(MAssIpcThreadTransportTarget::Id thread_waiting_call)
+void IpcQt_TransthreadCaller::CancelDisableWaitingCall(MAssIpc_TransthreadTarget::Id thread_waiting_call)
 {
 	std::shared_ptr<Internals> int_inter_thread;
 	{
@@ -58,17 +58,17 @@ void ThreadCallerQt::CancelDisableWaitingCall(MAssIpcThreadTransportTarget::Id t
 }
 
 
-MAssIpcThreadTransportTarget::Id ThreadCallerQt::AddTargetThread(QThread* sender_or_receiver)
+MAssIpc_TransthreadTarget::Id IpcQt_TransthreadCaller::AddTargetThread(QThread* sender_or_receiver)
 {
 	std::shared_ptr<Internals> int_inter_thread;
 	{
 		std::unique_lock<std::mutex> lock(s_lock_int_inter_thread);
 		int_inter_thread = s_int_inter_thread.lock();
 	}
-	// instance of ThreadCallerQt - does not exist
-	mass_return_x_if_equal(bool(int_inter_thread),false, MAssIpcThreadTransportTarget::Id());
+	// instance of IpcQt_TransthreadCaller - does not exist
+	mass_return_x_if_equal(bool(int_inter_thread),false, MAssIpc_TransthreadTarget::Id());
 
-	MAssIpcThreadTransportTarget::Id receiver_id = ThreadCallerQt::GetId(sender_or_receiver);
+	MAssIpc_TransthreadTarget::Id receiver_id = IpcQt_TransthreadCaller::GetId(sender_or_receiver);
 	bool is_receiver_absent;
 	{
 		std::unique_lock<std::mutex> lock(int_inter_thread->lock_threads);
@@ -90,11 +90,11 @@ MAssIpcThreadTransportTarget::Id ThreadCallerQt::AddTargetThread(QThread* sender
 	return receiver_id;
 }
 
-void ThreadCallerQt::CallFromThread(MAssIpcThreadTransportTarget::Id receiver_thread_id, std::unique_ptr<CallEvent> call,
+void IpcQt_TransthreadCaller::CallFromThread(MAssIpc_TransthreadTarget::Id receiver_thread_id, std::unique_ptr<CallEvent> call,
 									std::unique_ptr<CancelHolder>* call_waiter)
 {
-	MAssIpcThreadTransportTarget::Id sender_thread_id = ThreadCallerQt::GetCurrentThreadId();
-	if( receiver_thread_id == MAssIpcThreadTransportTarget::Id() )
+	MAssIpc_TransthreadTarget::Id sender_thread_id = IpcQt_TransthreadCaller::GetCurrentThreadId();
+	if( receiver_thread_id == MAssIpc_TransthreadTarget::Id() )
 		receiver_thread_id = sender_thread_id;
 
 	std::shared_ptr<WaitSync> wait_return_processing_calls;
@@ -123,9 +123,9 @@ void ThreadCallerQt::CallFromThread(MAssIpcThreadTransportTarget::Id receiver_th
 		wait_return_processing_calls->condition.notify_all();
 }
 
-void ThreadCallerQt::ProcessCalls()
+void IpcQt_TransthreadCaller::ProcessCalls()
 {
-	MAssIpcThreadTransportTarget::Id thread_id = ThreadCallerQt::GetCurrentThreadId();
+	MAssIpc_TransthreadTarget::Id thread_id = IpcQt_TransthreadCaller::GetCurrentThreadId();
 	std::shared_ptr<Internals> int_inter_thread;
 
 	{
@@ -146,14 +146,14 @@ void ThreadCallerQt::ProcessCalls()
 	QCoreApplication::sendPostedEvents(thread_receiver);
 }
 
-void ThreadCallerQt::CallNoThread(std::unique_ptr<CallEvent> call)
+void IpcQt_TransthreadCaller::CallNoThread(std::unique_ptr<CallEvent> call)
 {
 	QCoreApplication::postEvent(&m_receiver_no_thread, call.release());
 }
 
 //-------------------------------------------------------
 
-void ThreadCallerQt::CallReceiver::customEvent(QEvent* event)
+void IpcQt_TransthreadCaller::CallReceiver::customEvent(QEvent* event)
 {
 	CallEvent* ev = static_cast<CallEvent*>(event);
 	ev->ProcessCallFromTargetThread();
@@ -161,14 +161,14 @@ void ThreadCallerQt::CallReceiver::customEvent(QEvent* event)
 
 //-------------------------------------------------------
 
-void ThreadCallerQt::CallEvent::ProcessCallFromTargetThread()
+void IpcQt_TransthreadCaller::CallEvent::ProcessCallFromTargetThread()
 {
 	CallFromTargetThread();
 	if( m_call_waiter )
 		m_call_waiter->CallDone();
 }
 
-void ThreadCallerQt::CallEvent::SetCallWaiter(std::shared_ptr<CallWaiter> call_waiter)
+void IpcQt_TransthreadCaller::CallEvent::SetCallWaiter(std::shared_ptr<CallWaiter> call_waiter)
 {
 	if( !m_call_waiter )
 		m_call_waiter = call_waiter;
@@ -176,9 +176,9 @@ void ThreadCallerQt::CallEvent::SetCallWaiter(std::shared_ptr<CallWaiter> call_w
 
 //-------------------------------------------------------
 
-void ThreadCallerQt::ThreadCallReceiver::OnFinished_ReceiverThread()
+void IpcQt_TransthreadCaller::ThreadCallReceiver::OnFinished_ReceiverThread()
 {
-	auto current_thread_id = ThreadCallerQt::GetCurrentThreadId();
+	auto current_thread_id = IpcQt_TransthreadCaller::GetCurrentThreadId();
 
 	std::unique_ptr<ThreadCallReceiver> safe_delete_lifetime;
 
@@ -203,13 +203,13 @@ void ThreadCallerQt::ThreadCallReceiver::OnFinished_ReceiverThread()
 	}
 }
 
-std::shared_ptr<ThreadCallerQt::WaitSync> ThreadCallerQt::ThreadCallReceiver::GetWaitCallSync() const
+std::shared_ptr<IpcQt_TransthreadCaller::WaitSync> IpcQt_TransthreadCaller::ThreadCallReceiver::GetWaitCallSync() const
 {
 	return m_sender_wait_return_receiver_processing_calls;
 }
 
 //-------------------------------------------------------
-void ThreadCallerQt::CallWaiter::WaitProcessing()
+void IpcQt_TransthreadCaller::CallWaiter::WaitProcessing()
 {
 	while(true)
 	{
@@ -223,25 +223,25 @@ void ThreadCallerQt::CallWaiter::WaitProcessing()
 				break;
 		}
 
-		ThreadCallerQt::ProcessCalls();
+		IpcQt_TransthreadCaller::ProcessCalls();
 	}
 }
 
-void ThreadCallerQt::CallWaiter::CallDone()
+void IpcQt_TransthreadCaller::CallWaiter::CallDone()
 {
 	std::unique_lock<std::mutex> lock(m_wait_return_processing_calls->mutex_sync);
 	m_call_state = cs_done;
 	m_wait_return_processing_calls->condition.notify_all();
 }
 
-void ThreadCallerQt::CallWaiter::CallCancel()
+void IpcQt_TransthreadCaller::CallWaiter::CallCancel()
 {
 	std::unique_lock<std::mutex> lock(m_wait_return_processing_calls->mutex_sync);
 	m_call_state = cs_canceled;
 	m_wait_return_processing_calls->condition.notify_all();
 }
 
-void ThreadCallerQt::WaitSync::SetReceiverThreadFinished()
+void IpcQt_TransthreadCaller::WaitSync::SetReceiverThreadFinished()
 {
 	std::unique_lock<std::mutex> lock(this->mutex_sync);
 	this->receiver_thread_finished = true;

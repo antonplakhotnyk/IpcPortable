@@ -2,30 +2,30 @@
 
 #include <stdint.h>
 #include <memory>
-#include "MAssIpcData.h"
+#include "MAssIpc_Data.h"
 
 
 //-------------------------------------------------------
 
  
-class MAssIpcPacketTransport
+class MAssIpc_TransportShare
 {
 public:
 
-	virtual ~MAssIpcPacketTransport() = default;
+	virtual ~MAssIpc_TransportShare() = default;
 
-	virtual std::unique_ptr<MAssIpcData> Create(MAssIpcData::TPacketSize size) = 0;
-	virtual void Write(std::unique_ptr<const MAssIpcData> packet) = 0;
-	// return meaning same as MAssIpcCallTransport::WaitRespond
-	virtual bool Read(bool wait_incoming_packet, std::unique_ptr<const MAssIpcData>* packet) = 0;
+	virtual std::unique_ptr<MAssIpc_Data> Create(MAssIpc_Data::TPacketSize size) = 0;
+	virtual void Write(std::unique_ptr<const MAssIpc_Data> packet) = 0;
+	// return meaning same as MAssIpc_TransportCopy::WaitRespond
+	virtual bool Read(bool wait_incoming_packet, std::unique_ptr<const MAssIpc_Data>* packet) = 0;
 };
 
 //-------------------------------------------------------
 
-class MAssIpcCallTransport
+class MAssIpc_TransportCopy
 {
 protected:
-	~MAssIpcCallTransport() = default;
+	~MAssIpc_TransportCopy() = default;
 public:
 
 	// return false - cancel wait respond
