@@ -40,6 +40,7 @@ private:
 	void OnDisconnected();
 	void OnReadyRead();
 	void OnError(QAbstractSocket::SocketError er);
+	void OnConnectionTimeout();
 
 private:
 

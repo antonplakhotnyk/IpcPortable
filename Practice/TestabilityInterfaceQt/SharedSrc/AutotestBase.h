@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MAssIpcCall.h"
+#include "AutotestQtUtils.h"
 
 class AutotestBase
 {

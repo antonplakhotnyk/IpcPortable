@@ -9,7 +9,7 @@
 
 #include "ApplicationUnderTest.h"
 #include "ApplicationSut.h"
-
+#include "IpcQt_Global.h"
 
 
 
@@ -17,7 +17,7 @@ int main(int argc, char* argv[])
 {
 	ApplicationWithEvents app(argc, argv);
 
-	ApplicationSut::Init({"localhost", 2233});
+	Ipc::InitClient("localhost", 2233);
 	
 	ApplicationUnderTest application;
 	QMainWindow main_window;

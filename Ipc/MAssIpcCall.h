@@ -58,6 +58,19 @@ public:
 		respond_no_matching_call_return_type,
 	};
 
+	static constexpr const char* ErrorTypeToStr(ErrorType error)
+	{
+		switch( error )
+		{
+			default:
+			case ErrorType::unknown_error: return "unknown_error";
+			case ErrorType::no_matching_call_name_parameters: return "no_matching_call_name_parameters";
+			case ErrorType::no_matching_call_return_type: return "no_matching_call_return_type";
+			case ErrorType::respond_no_matching_call_name_parameters: return "respond_no_matching_call_name_parameters";
+			case ErrorType::respond_no_matching_call_return_type: return "respond_no_matching_call_return_type";
+		};
+	};
+
 
 	using TErrorHandler = std::function<void(ErrorType et, std::string message)>;
 	

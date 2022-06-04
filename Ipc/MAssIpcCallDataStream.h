@@ -91,15 +91,40 @@ public:
 	MAssIpcData::TPacketSize GetWritePos();
 	bool IsReadBufferPresent();
 
+private:
+
+	static bool CheckAssert(bool assert);
+
 public:
 
 	bool IsReadAvailable(MAssIpcData::TPacketSize size);
 
 	template<class T>
-	void WriteBytes(T t);
+	void WriteBytes(T t)
+	{
+		if( m_write )
+		{
+			MAssIpcData::TPacketSize size = m_write->Size();
+			if( CheckAssert((m_write_pos<(std::numeric_limits<MAssIpcData::TPacketSize>::max()-sizeof(t)))&&(size < m_write_pos+sizeof(t))) )
+				return;
+
+			uint8_t* bytes = m_write->Data()+m_write_pos;
+			WriteUnsafe(bytes, t);
+		}
+
+		m_write_pos += sizeof(t);
+	}
 
 	template<class T>
-	void ReadBytes(T* t);
+	void ReadBytes(T* t)
+	{
+		if( CheckAssert(!IsReadAvailable(sizeof(*t))) )
+			return;
+		const uint8_t* bytes = m_read->Data()+m_read_pos;
+
+		*t = ReadUnsafe<T>(bytes);
+		m_read_pos += sizeof(T);
+	}
 
 	template<class T>
 	static void WriteUnsafe(uint8_t* bytes, T t)
@@ -145,16 +170,6 @@ private:
 
 //-------------------------------------------------------
 
-// MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const int& v);
-// MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, int& v);
-
-//-------------------------------------------------------
-
-MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const std::string& v);
-MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, std::string& v);
-
-MASS_IPC_TYPE_SIGNATURE(std::string);
- 
 struct MAssIpcCall_ProcDescription
 {
 	std::string name;
@@ -169,9 +184,53 @@ MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const MAssIpcCa
 MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, MAssIpcCall_EnumerateData& v);
 MASS_IPC_TYPE_SIGNATURE(MAssIpcCall_EnumerateData);
 
+//-------------------------------------------------------
+
+
+// MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const int& v);
+// MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, int& v);
+
+//-------------------------------------------------------
+
+MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const std::string& v);
+MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, std::string& v);
+
+MASS_IPC_TYPE_SIGNATURE(std::string);
+
 // template<class TType> 
 // struct MAssIpcType; 
 // template<> struct MAssIpcType<std::string> { static const char* Name() { return "std::string"; }; };;
+
+//-------------------------------------------------------
+
+template<typename Integer, std::enable_if_t<std::is_integral<Integer>::value, bool> = true>
+MAssIpcCallDataStream& operator<<(MAssIpcCallDataStream& stream, const std::vector<Integer>& v)
+{
+	stream<<(uint32_t)(v.size()*sizeof(Integer));
+	for( const Integer& item : v )
+		stream.WriteBytes(item);
+	return stream;
+}
+
+template<typename Integer, std::enable_if_t<std::is_integral<Integer>::value, bool> = true>
+MAssIpcCallDataStream& operator>>(MAssIpcCallDataStream& stream, std::vector<Integer>& v)
+{
+	uint32_t length = 0;
+	stream>>length;
+	v.resize(length/sizeof(Integer));
+	for( Integer& item : v )
+		stream.ReadBytes(&item);
+	return stream;
+}
+
+MASS_IPC_TYPE_SIGNATURE(std::vector<uint8_t>);
+MASS_IPC_TYPE_SIGNATURE(std::vector<uint16_t>);
+MASS_IPC_TYPE_SIGNATURE(std::vector<uint32_t>);
+MASS_IPC_TYPE_SIGNATURE(std::vector<uint64_t>);
+MASS_IPC_TYPE_SIGNATURE(std::vector<int8_t>);
+MASS_IPC_TYPE_SIGNATURE(std::vector<int16_t>);
+MASS_IPC_TYPE_SIGNATURE(std::vector<int32_t>);
+MASS_IPC_TYPE_SIGNATURE(std::vector<int64_t>);
 
 //-------------------------------------------------------
 

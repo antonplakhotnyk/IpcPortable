@@ -40,7 +40,7 @@ private:
 
 	private:
 
-		MAssIpcCall					m_ipc_connection;
+		MAssIpcCall&				m_ipc_connection;
 		IpcClientTcpTransport::Addr m_connect_to_address;
 		TestabilityClientQt* m_parent;
 	};

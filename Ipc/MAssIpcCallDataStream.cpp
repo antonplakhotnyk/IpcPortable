@@ -43,19 +43,10 @@ MAssIpcData* MAssIpcCallDataStream::GetDataWrite() const
 	return m_write.get();
 }
 
-template<class T>
-void MAssIpcCallDataStream::WriteBytes(T t)
+bool MAssIpcCallDataStream::CheckAssert(bool assert)
 {
-	if( m_write )
-	{
-		MAssIpcData::TPacketSize size = m_write->Size();
-		mass_return_if_equal((m_write_pos<(std::numeric_limits<MAssIpcData::TPacketSize>::max()-sizeof(t)))&&(size < m_write_pos+sizeof(t)), true);
-
-		uint8_t* bytes = m_write->Data()+m_write_pos;
-		WriteUnsafe(bytes, t);
-	}
-
-	m_write_pos += sizeof(t);
+	mass_return_x_if_equal(assert, true, assert);
+	return assert;
 }
 
 void MAssIpcCallDataStream::WriteRawData(const uint8_t* data, MAssIpcData::TPacketSize len)
@@ -79,17 +70,6 @@ uint8_t* MAssIpcCallDataStream::WriteRawData(MAssIpcData::TPacketSize len)
 	m_write_pos += len;// calc necessary size even without storage
 
 	return bytes;
-}
-
-
-template<class T>
-void MAssIpcCallDataStream::ReadBytes(T* t)
-{
-	mass_return_if_equal(IsReadAvailable(sizeof(*t)), false);
-	const uint8_t* bytes = m_read->Data()+m_read_pos;
-
-	*t = ReadUnsafe<T>(bytes);
-	m_read_pos += sizeof(T);
 }
 
 const uint8_t* MAssIpcCallDataStream::ReadRawData(MAssIpcData::TPacketSize len)

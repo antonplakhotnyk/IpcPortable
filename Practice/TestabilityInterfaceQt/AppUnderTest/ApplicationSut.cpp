@@ -6,11 +6,11 @@
 std::shared_ptr<ApplicationSut> ApplicationSut::m_int;
 
 ApplicationSut::ApplicationSut(const IpcClientTcpTransport::Addr& connect_to_address)
-	:m_testability(IpcClient(), connect_to_address)
+	:m_testability(Ipc::Inst(), connect_to_address)
 {
 
 	{
-		IpcClient().AddHandler("AutotestServerReady", std::function<void()>([this]()
+		Ipc::Inst().AddHandler("AutotestServerReady", std::function<void()>([this]()
 		{
 			m_server_ready_request_pending = true;
 			AutotestServerReady();
@@ -25,19 +25,13 @@ void ApplicationSut::AutotestServerReady()
 	if( m_server_ready_request_pending )
 	{
 		m_server_ready_request_pending = false;
-		IpcClient().AsyncInvoke("SutReady");
+		Ipc::Inst().AsyncInvoke("SutReady");
 	}
 }
 
 ApplicationSut::~ApplicationSut()
 {
 	Unregister(m_score_component);
-}
-
-void ApplicationSut::Init(const IpcClientTcpTransport::Addr& connect_to_address)
-{
-	if( !m_int )
-		m_int.reset(new ApplicationSut(connect_to_address));
 }
 
 void ApplicationSut::ApplicationUnderTest_Register(ApplicationUnderTest* score_component)
@@ -53,7 +47,7 @@ void ApplicationSut::Register(ApplicationUnderTest* score_component)
 
 	QObject::connect(score_component, &QObject::destroyed, m_int.get(), &ApplicationSut::Unregister);
 
-	MAssIpcCall& ipc = IpcClient();
+	MAssIpcCall& ipc = Ipc::Inst();
 
 	ipc.AddHandler("OpenFile", std::function<bool(QByteArray)>(std::bind(&ApplicationSut::OpenFile, this, std::placeholders::_1)), {}, ThreadCallerQt::GetCurrentThreadId(), score_component);
 	ipc.AddHandler("TransfetString", std::function<QString(QString)>(std::bind(&ApplicationSut::TransfetString, this, std::placeholders::_1)), {}, ThreadCallerQt::GetCurrentThreadId(), score_component);
@@ -65,7 +59,7 @@ void ApplicationSut::Unregister(QObject* obj)
 {
 	if( bool(m_score_component) && (m_score_component == obj) )
 	{
-		IpcClient().ClearHandlersWithTag(obj);
+		Ipc::Inst().ClearHandlersWithTag(obj);
 		m_score_component.clear();
 	}
 }
@@ -74,7 +68,7 @@ bool ApplicationSut::OpenFile(const QByteArray& file_data)
 {
 	mass_return_x_if_equal(bool(m_score_component), false, false);
 
-	IpcClient().AsyncInvoke("Checkpoint");
+	Ipc::Inst().AsyncInvoke("Checkpoint");
 
 	return m_score_component->OpenFile(file_data);
 }
@@ -82,4 +76,18 @@ bool ApplicationSut::OpenFile(const QByteArray& file_data)
 QString ApplicationSut::TransfetString(const QString& str)
 {
 	return "return"+str;
+}
+
+//-------------------------------------------------------
+void Ipc::InitClient(const QString host_name, uint16_t target_port)
+{
+	if( !ApplicationSut::m_int )
+		ApplicationSut::m_int.reset(new ApplicationSut({host_name, target_port}));
+}
+
+void Ipc::SutRegister(QObject* sut_object)
+{
+	return_if_equal(bool(ApplicationSut::m_int), false);
+	if( ApplicationUnderTest* score_component = dynamic_cast<ApplicationUnderTest*>(sut_object) )
+		ApplicationSut::m_int->Register(score_component);
 }

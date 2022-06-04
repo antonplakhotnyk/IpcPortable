@@ -1,5 +1,6 @@
 #include "IpcTcpTransportQt.h"
 #include "MAssMacros.h"
+#include <QtCore/QTimer>
 
 IpcTcpTransportQt::IpcTcpTransportQt()
 {
@@ -12,6 +13,8 @@ IpcTcpTransportQt::~IpcTcpTransportQt()
 
 void IpcTcpTransportQt::AssignConnection(QTcpSocket* connection)
 {
+	if( m_connection )
+		m_connection->deleteLater();
 	m_connection = connection;
 
 	//void error(QAbstractSocket::SocketError);
@@ -22,7 +25,10 @@ void IpcTcpTransportQt::AssignConnection(QTcpSocket* connection)
 	if( QAbstractSocket::ConnectedState == m_connection->state() )
 		OnConnected();
 	else
+	{
+		QTimer::singleShot(std::chrono::milliseconds(10000), this, &IpcTcpTransportQt::OnConnectionTimeout);
 		QObject::connect(m_connection.data(), &QAbstractSocket::connected, this, &IpcTcpTransportQt::OnConnected);
+	}
 }
 
 QTcpSocket* IpcTcpTransportQt::GetConnection()
@@ -71,6 +77,7 @@ void	IpcTcpTransportQt::Read(uint8_t* data, size_t size)
 void	IpcTcpTransportQt::Write(const uint8_t* data, size_t size)
 {
 	mass_return_if_equal(m_connection.data(), nullptr);
+	mass_return_if_not_equal(m_connection->state(), QAbstractSocket::ConnectedState);
 	auto ir = m_connection->write(reinterpret_cast<const char*>(data), size);
 	mass_return_if_not_equal(ir, size);
 	bool br = m_connection->waitForBytesWritten();
@@ -86,6 +93,7 @@ void IpcTcpTransportQt::OnDisconnected()
 {
 	if( m_connection )
 	{
+		m_connection->deleteLater();
 		m_connection.clear();
 		HandlerOnDisconnected();
 	}
@@ -100,6 +108,13 @@ void IpcTcpTransportQt::OnError(QAbstractSocket::SocketError er)
 {
 	if(er!=QAbstractSocket::SocketTimeoutError)
 		OnDisconnected();
+}
+
+void IpcTcpTransportQt::OnConnectionTimeout()
+{
+	if(m_connection)
+		if( m_connection->state()!=QAbstractSocket::ConnectedState )
+			OnDisconnected();
 }
 
 // void	IpcTcpTransportQt::StopWaitRespound()

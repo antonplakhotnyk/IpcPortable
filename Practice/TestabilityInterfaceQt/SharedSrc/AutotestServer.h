@@ -21,6 +21,7 @@ private:
 
 	void OnConnected();
 	void OnDisconnected();
+	static void IpcError(MAssIpcCall::ErrorType et, std::string message);
 
 private:
 
