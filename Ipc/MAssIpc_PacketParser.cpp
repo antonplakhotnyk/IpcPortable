@@ -1,6 +1,6 @@
 #include "MAssIpc_PacketParser.h"
 #include "MAssIpc_Macros.h"
-#include "MAssIpc_Internals.h "
+#include "MAssIpc_Internals.h"
 #include <cstring>
 
 namespace MAssIpcCallInternal

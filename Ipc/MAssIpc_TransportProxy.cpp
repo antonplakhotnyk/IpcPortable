@@ -1,6 +1,6 @@
 #include "MAssIpc_TransportProxy.h"
 #include "MAssIpc_Macros.h"
-#include "MAssIpc_Internals.h "
+#include "MAssIpc_Internals.h"
 
 namespace MAssIpcCallInternal
 {

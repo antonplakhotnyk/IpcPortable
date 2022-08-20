@@ -4,7 +4,7 @@
 #include <functional>
 #include <memory>
 #include "MAssIpc_Transthread.h"
-#include "MAssIpc_Internals.h "
+#include "MAssIpc_Internals.h"
 #include "MAssIpc_ThreadSafe.h"
 #include "MAssIpc_RawString.h"
 #include <list>

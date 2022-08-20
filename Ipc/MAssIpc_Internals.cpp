@@ -1,4 +1,4 @@
-#include "MAssIpc_Internals.h "
+#include "MAssIpc_Internals.h"
 #include "MAssIpc_Macros.h"
 
 
