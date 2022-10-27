@@ -183,7 +183,7 @@ private:
 
 	struct PendingResponces
 	{
-		// all membersaccess only during unique_lock(m_lock)
+		// all members access only during unique_lock(m_lock)
 		MAssIpc_ThreadSafe::mutex m_lock;
 
 		LockCurrentThreadId m_thread_waiting_transport;
@@ -299,7 +299,7 @@ template<class TDelegateW>
 std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TDelegateW& del, const std::string& comment,
 							 MAssIpc_TransthreadTarget::Id thread_id)
 {
-	return AddHandler(proc_name, del, std::string(), thread_id, nullptr);
+	return AddHandler(proc_name, del, comment, thread_id, nullptr);
 }
 
 template<class TDelegateW>
