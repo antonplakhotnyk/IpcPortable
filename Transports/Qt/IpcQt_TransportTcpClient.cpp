@@ -9,7 +9,7 @@ IpcQt_TransportTcpClient::~IpcQt_TransportTcpClient()
 {
 }
 
-void IpcQt_TransportTcpClient::StartConnection(const Addr& addr)
+void IpcQt_TransportTcpClient::StartConnection(const Ipc::Addr& addr)
 {
 	QTcpSocket* connection = new QTcpSocket();
 	AssignConnection(connection);

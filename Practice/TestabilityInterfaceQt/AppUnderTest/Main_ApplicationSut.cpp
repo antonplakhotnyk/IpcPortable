@@ -17,7 +17,7 @@ int main(int argc, char* argv[])
 {
 	ApplicationStatic app(argc, argv);
 
-	Ipc::InitClient("localhost", 2233);
+	Ipc::InitSpecificClient(QStringList{Ipc::c_arg_autotest_server, "localhost"});
 	
 	ApplicationUnderTest application;
 	QMainWindow main_window;

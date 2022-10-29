@@ -49,33 +49,17 @@ public:
 
 	friend class MAssIpcCall_AutoTest;
 
-	enum struct ErrorType: uint8_t
-	{
-		unknown_error,
-		no_matching_call_name_parameters,
-		no_matching_call_return_type,
-		respond_no_matching_call_name_parameters,
-		respond_no_matching_call_return_type,
-	};
+	using ErrorType = MAssIpcCallInternal::ErrorType;
 
 	static constexpr const char* ErrorTypeToStr(ErrorType error)
 	{
-		switch( error )
-		{
-			default:
-			case ErrorType::unknown_error: return "unknown_error";
-			case ErrorType::no_matching_call_name_parameters: return "no_matching_call_name_parameters";
-			case ErrorType::no_matching_call_return_type: return "no_matching_call_return_type";
-			case ErrorType::respond_no_matching_call_name_parameters: return "respond_no_matching_call_name_parameters";
-			case ErrorType::respond_no_matching_call_return_type: return "respond_no_matching_call_return_type";
-		};
+		return MAssIpcCallInternal::ErrorTypeToStr(error);
 	};
 
 
-	using TErrorHandler = std::function<void(ErrorType et, std::string message)>;
-	
 	using CallInfo = MAssIpcCallInternal::CallInfo;
 	using TCallCountChanged = MAssIpcCallInternal::TCallCountChanged;
+	using TErrorHandler = MAssIpcCallInternal::TErrorHandler;
 
 
 	MAssIpcCall(const MAssIpcCall&)=default;
@@ -117,7 +101,7 @@ public:
 					MAssIpc_TransthreadTarget::Id thread_id, const void* tag);
 
 	void SetErrorHandler(TErrorHandler OnInvalidRemoteCall);
-	TCallCountChanged SetCallCountChanged(const TCallCountChanged& OnCallCountChanged);
+	std::shared_ptr<const TCallCountChanged> SetCallCountChanged(const TCallCountChanged& OnCallCountChanged);
 
 	void ProcessTransport();
 
@@ -203,19 +187,8 @@ private:
 		MAssIpcCallInternal::ProcMap			m_proc_map;
 		std::shared_ptr<MAssIpc_TransportShare>	m_transport_default;
 		std::weak_ptr<MAssIpc_TransportShare>	m_transport;
-		std::weak_ptr<MAssIpc_Transthread>	m_inter_thread_nullable;
-		TErrorHandler							m_OnInvalidRemoteCall;
-		std::shared_ptr<TCallCountChanged>		m_OnCallCountChanged = std::make_shared<TCallCountChanged>();
-		
+		std::weak_ptr<MAssIpc_Transthread>		m_inter_thread_nullable;
 		PendingResponces						m_pending_responses;
-
-		TCallCountChanged SetCallCountChanged(const TCallCountChanged& OnCallCountChanged)
-		{
-			TCallCountChanged& new_handler = *m_OnCallCountChanged.get();
-			TCallCountChanged old_handler = new_handler;
-			new_handler = OnCallCountChanged;
-			return old_handler;
-		}
 
 	private:
 
@@ -225,6 +198,7 @@ private:
 		{
 			std::shared_ptr<MAssIpcCallInternal::CallInfoImpl> call_info;
 			bool send_return = false;
+			std::shared_ptr<const TCallCountChanged>	on_call_count_changed;
 			ErrorType error = ErrorType::unknown_error;
 			std::string message;
 		};
@@ -232,7 +206,8 @@ private:
 		AnalizeInvokeDataRes AnalizeInvokeData(const std::shared_ptr<MAssIpc_TransportShare>& transport, 
 									   MAssIpc_DataStream& call_info_data, 
 									   MAssIpcCallInternal::MAssIpc_PacketParser::TCallId id) const;
-		AnalizeInvokeDataRes ReportError_FindCallInfo(const DeserializedFindCallInfo& find_call_info, ErrorType error) const;
+		AnalizeInvokeDataRes ReportError_FindCallInfo(const DeserializedFindCallInfo& find_call_info, ErrorType error, 
+													  const std::shared_ptr<const  TErrorHandler>& on_invalid_remote_call) const;
 		static void StoreReturnFailCall(MAssIpc_DataStream* result_str, const AnalizeInvokeDataRes& call_job,
 										MAssIpcCallInternal::MAssIpc_PacketParser::TCallId id);
 	};
@@ -248,19 +223,19 @@ public:
 	public:
 		SetCallCountChangedGuard(MAssIpcCall& ipc, const TCallCountChanged& handler)
 			:m_ipc_int(ipc.m_int)
-			, m_old_handler(ipc.m_int->SetCallCountChanged(handler))
+			, m_old_handler(ipc.m_int->m_proc_map.SetCallCountChanged(std::make_shared<const TCallCountChanged>(handler)))
 		{
 		}
 
 		~SetCallCountChangedGuard()
 		{
-			m_ipc_int->SetCallCountChanged(m_old_handler);
+			m_ipc_int->m_proc_map.SetCallCountChanged(m_old_handler);
 		}
 
 	private:
 
-		std::shared_ptr<Internals>		m_ipc_int;
-		TCallCountChanged		m_old_handler;
+		std::shared_ptr<Internals>					m_ipc_int;
+		std::shared_ptr<const TCallCountChanged>	m_old_handler;
 	};
 	
 

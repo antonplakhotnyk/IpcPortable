@@ -5,7 +5,7 @@
 
 std::shared_ptr<ApplicationSut> ApplicationSut::m_int;
 
-ApplicationSut::ApplicationSut(const IpcQt_TransportTcpClient::Addr& connect_to_address)
+ApplicationSut::ApplicationSut(const Ipc::Addr& connect_to_address)
 	:m_testability(Ipc::Inst(), connect_to_address)
 {
 
@@ -79,10 +79,9 @@ QString ApplicationSut::TransfetString(const QString& str)
 }
 
 //-------------------------------------------------------
-void Ipc::InitClient(const QString host_name, uint16_t target_port)
+void Ipc::InitSpecificClient(const QStringList& args)
 {
-	if( !ApplicationSut::m_int )
-		ApplicationSut::m_int.reset(new ApplicationSut({host_name, target_port}));
+	InitClient<ApplicationSut>(args);
 }
 
 void Ipc::SutRegister(QObject* sut_object)

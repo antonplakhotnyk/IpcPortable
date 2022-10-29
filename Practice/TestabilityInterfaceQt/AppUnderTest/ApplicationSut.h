@@ -7,7 +7,7 @@
 class ApplicationSut: public QObject
 {
 public:
-	ApplicationSut(const IpcQt_TransportTcpClient::Addr& connect_to_address);
+	ApplicationSut(const Ipc::Addr& connect_to_address);
 	~ApplicationSut();
 
 	static void ApplicationUnderTest_Register(ApplicationUnderTest* score_component);
@@ -30,6 +30,7 @@ private:
 	TestabilityClientQt		m_testability;
 
 	friend class Ipc;
+	using Internals = ApplicationSut;
 
 	static std::shared_ptr<ApplicationSut> m_int;
 };

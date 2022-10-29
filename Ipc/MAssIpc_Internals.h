@@ -46,7 +46,31 @@ public:
 	virtual const std::string& GetName() const = 0;
 };
 
-typedef std::function<void(std::shared_ptr<const CallInfo> call_info)> TCallCountChanged;
+enum struct ErrorType: uint8_t
+{
+	unknown_error,
+	no_matching_call_name_parameters,
+	no_matching_call_return_type,
+	respond_no_matching_call_name_parameters,
+	respond_no_matching_call_return_type,
+};
+
+static inline constexpr const char* ErrorTypeToStr(ErrorType error)
+{
+	switch( error )
+	{
+		default:
+		case ErrorType::unknown_error: return "unknown_error";
+		case ErrorType::no_matching_call_name_parameters: return "no_matching_call_name_parameters";
+		case ErrorType::no_matching_call_return_type: return "no_matching_call_return_type";
+		case ErrorType::respond_no_matching_call_name_parameters: return "respond_no_matching_call_name_parameters";
+		case ErrorType::respond_no_matching_call_return_type: return "respond_no_matching_call_return_type";
+	};
+};
+
+
+using TErrorHandler = std::function<void(ErrorType et, std::string message)>;
+using TCallCountChanged = std::function<void(std::shared_ptr<const CallInfo> call_info)>;
 
 class CallInfoImpl: public CallInfo
 {
@@ -157,15 +181,6 @@ class ProcMap
 {
 public:
 
-	std::shared_ptr<CallInfoImpl> FindCallInfo(const MAssIpc_RawString& name, const MAssIpc_RawString& params_type) const;
-	MAssIpcCall_EnumerateData EnumerateHandlers() const;
-	std::shared_ptr<const CallInfo> AddProcSignature(const std::shared_ptr<MAssIpcCallInternal::CallInfoImpl>& call_info, const std::string& comment, const void* tag);
-	void AddAllProcs(const ProcMap& other);
-	void ClearAllProcs();
-	void ClearProcsWithTag(const void* tag);
-
-public:
-
 	struct CallData
 	{
 		std::shared_ptr<CallInfoImpl> call_info;
@@ -173,11 +188,42 @@ public:
 		const void* const	tag = nullptr;
 	};
 
+	struct FindCallInfoRes
+	{
+		std::shared_ptr<CallInfoImpl>				call_info;
+		std::shared_ptr<const TCallCountChanged>	on_call_count_changed;
+		std::shared_ptr<const TErrorHandler>		on_invalid_remote_call;
+	};
+
+	FindCallInfoRes FindCallInfo(const MAssIpc_RawString& name, const MAssIpc_RawString& params_type) const;
+	MAssIpcCall_EnumerateData EnumerateHandlers() const;
+	std::shared_ptr<const CallInfo> AddProcSignature(const std::shared_ptr<MAssIpcCallInternal::CallInfoImpl>& call_info, const std::string& comment, const void* tag);
+	void AddAllProcs(const ProcMap& other);
+	void ClearAllProcs();
+	void ClearProcsWithTag(const void* tag);
+
+	std::shared_ptr<const TCallCountChanged> SetCallCountChanged(std::shared_ptr<const TCallCountChanged> new_val);
+	std::shared_ptr<const TErrorHandler> SetErrorHandler(std::shared_ptr<const TErrorHandler> new_val);
+	std::shared_ptr<const TErrorHandler> GetErrorHandler() const;
+
+private:
+
+	template<class TCallback>
+	std::shared_ptr<const TCallback> SetCallback(std::shared_ptr<const TCallback>* member, std::shared_ptr<const TCallback> new_old)
+	{
+		MAssIpc_ThreadSafe::unique_lock<MAssIpc_ThreadSafe::mutex> lock(m_lock);
+		member->swap(new_old);
+		return new_old;
+	}
+
 private:
 
 
 	mutable MAssIpc_ThreadSafe::mutex	m_lock;
 	std::map<MAssIpcCallInternal::CallInfoImpl::SignatureKey, CallData>	m_name_procs;
+
+	std::shared_ptr<const TCallCountChanged>		m_OnCallCountChanged = std::make_shared<const TCallCountChanged>();
+	std::shared_ptr<const TErrorHandler>			m_OnInvalidRemoteCall = std::make_shared<const TErrorHandler>();
 };
 
 

@@ -135,16 +135,16 @@ void CallJob::Invoke(const std::weak_ptr<MAssIpc_TransportShare>& transport, con
 
 //-------------------------------------------------------
 
-std::shared_ptr<CallInfoImpl> ProcMap::FindCallInfo(const MAssIpc_RawString& name, const MAssIpc_RawString& params_type) const
+ProcMap::FindCallInfoRes ProcMap::FindCallInfo(const MAssIpc_RawString& name, const MAssIpc_RawString& params_type) const
 {
 	MAssIpc_ThreadSafe::unique_lock<MAssIpc_ThreadSafe::mutex> lock(m_lock);
 
 	const CallInfoImpl::SignatureKey key{name,params_type};
 	auto it_procs_signature = m_name_procs.find(key);
 	if( it_procs_signature==m_name_procs.end() )
-		return {};
+		return {{},{},m_OnInvalidRemoteCall};
 
-	return it_procs_signature->second.call_info;
+	return {it_procs_signature->second.call_info, m_OnCallCountChanged};
 }
 
 MAssIpcCall_EnumerateData ProcMap::EnumerateHandlers() const
@@ -198,7 +198,21 @@ void ProcMap::ClearProcsWithTag(const void* tag)
 			it++;
 }
 
+std::shared_ptr<const TCallCountChanged> ProcMap::SetCallCountChanged(std::shared_ptr<const TCallCountChanged> new_val)
+{
+	return SetCallback(&m_OnCallCountChanged, new_val);
+}
 
+std::shared_ptr<const TErrorHandler> ProcMap::SetErrorHandler(std::shared_ptr<const TErrorHandler> new_val)
+{
+	return SetCallback(&m_OnInvalidRemoteCall, new_val);
+}
+
+std::shared_ptr<const TErrorHandler> ProcMap::GetErrorHandler() const
+{
+	MAssIpc_ThreadSafe::unique_lock<MAssIpc_ThreadSafe::mutex> lock(m_lock);
+	return m_OnInvalidRemoteCall;
+}
 
 }// namespace MAssIpcCallInternal;
 

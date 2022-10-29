@@ -62,7 +62,8 @@ MAssIpcCall::DeserializedFindCallInfo MAssIpcCall::DeserializeNameSignature(MAss
 	return {name, send_return, return_type, params_type};
 }
 
-MAssIpcCall::Internals::AnalizeInvokeDataRes MAssIpcCall::Internals::ReportError_FindCallInfo(const DeserializedFindCallInfo& find_call_info, ErrorType error) const
+MAssIpcCall::Internals::AnalizeInvokeDataRes MAssIpcCall::Internals::ReportError_FindCallInfo(const DeserializedFindCallInfo& find_call_info, ErrorType error,
+																							  const std::shared_ptr<const TErrorHandler>& on_invalid_remote_call) const
 {
 	AnalizeInvokeDataRes res = {};
 	res.send_return = find_call_info.send_return;
@@ -79,8 +80,8 @@ MAssIpcCall::Internals::AnalizeInvokeDataRes MAssIpcCall::Internals::ReportError
 	res.message += message_formaters[2];
 
 	res.error = error;
-	if( m_OnInvalidRemoteCall )
-		m_OnInvalidRemoteCall(res.error, res.message);
+	if( bool(on_invalid_remote_call) && bool(*on_invalid_remote_call.get()) )
+		(*on_invalid_remote_call.get())(res.error, res.message);
 	return res;
 }
 
@@ -90,18 +91,18 @@ MAssIpcCall::Internals::AnalizeInvokeDataRes MAssIpcCall::Internals::AnalizeInvo
 {
 	DeserializedFindCallInfo find_call_info = DeserializeNameSignature(call_info_data);
 
-	std::shared_ptr<MAssIpcCallInternal::CallInfoImpl> call_info = m_proc_map.FindCallInfo(find_call_info.name, find_call_info.params_type);
-	if( !bool(call_info) )
-		return ReportError_FindCallInfo(find_call_info, ErrorType::no_matching_call_name_parameters);
+	ProcMap::FindCallInfoRes find_res = m_proc_map.FindCallInfo(find_call_info.name, find_call_info.params_type);
+	if( !bool(find_res.call_info) )
+		return ReportError_FindCallInfo(find_call_info, ErrorType::no_matching_call_name_parameters, find_res.on_invalid_remote_call);
 
 	if( find_call_info.return_type.Length()!=0 )
 	{
-		const MAssIpc_RawString return_type_call(call_info->GetSignature_RetType());
+		const MAssIpc_RawString return_type_call(find_res.call_info->GetSignature_RetType());
 		if( find_call_info.return_type != return_type_call )
-			return ReportError_FindCallInfo(find_call_info, ErrorType::no_matching_call_return_type);
+			return ReportError_FindCallInfo(find_call_info, ErrorType::no_matching_call_return_type, find_res.on_invalid_remote_call);
 	}
 
-	return {call_info, find_call_info.send_return};
+	return {find_res.call_info, find_call_info.send_return, find_res.on_call_count_changed};
 }
 
 void MAssIpcCall::Internals::StoreReturnFailCall(MAssIpc_DataStream* result_str, const AnalizeInvokeDataRes& call_job, 
@@ -127,11 +128,11 @@ void MAssIpcCall::Internals::InvokeLocal(MAssIpc_DataStream& call_info_data, MAs
 		{
 			auto thread_id = invoke.call_info->m_thread_id;
 
-			std::unique_ptr<CallJob> call_job(std::make_unique<CallJob>(transport, m_inter_thread_nullable, m_OnCallCountChanged, call_info_data, respond_id, invoke.call_info));
+			std::unique_ptr<CallJob> call_job(std::make_unique<CallJob>(transport, m_inter_thread_nullable, invoke.on_call_count_changed, call_info_data, respond_id, invoke.call_info));
 			inter_thread_nullable->CallFromThread(thread_id, std::move(call_job));
 		}
 		else
-			CallJob::Invoke(transport, m_inter_thread_nullable, m_OnCallCountChanged, call_info_data, invoke.call_info, respond_id);
+			CallJob::Invoke(transport, m_inter_thread_nullable, invoke.on_call_count_changed, call_info_data, invoke.call_info, respond_id);
 	}
 	else
 	{// fail to call
@@ -340,8 +341,9 @@ MAssIpc_DataStream MAssIpcCall::Internals::ProcessBuffer(CallDataBuffer buffer) 
 			else
 				error = ErrorType::unknown_error;
 
-			if( bool(m_OnInvalidRemoteCall) )
-				m_OnInvalidRemoteCall(error, message);
+			std::shared_ptr<const TErrorHandler> on_invalid_remote_call = m_proc_map.GetErrorHandler();
+			if( bool(on_invalid_remote_call) && bool(*on_invalid_remote_call.get()) )
+				(*on_invalid_remote_call.get())(error, message);
 		}
 		break;
 		case MAssIpc_PacketParser::PacketType::pt_return_enumerate:
@@ -394,12 +396,12 @@ MAssIpcCall_EnumerateData MAssIpcCall::EnumerateLocal() const
 
 void MAssIpcCall::SetErrorHandler(TErrorHandler OnInvalidRemoteCall)
 {
-	m_int->m_OnInvalidRemoteCall = OnInvalidRemoteCall;
+	m_int->m_proc_map.SetErrorHandler(std::make_shared<const TErrorHandler>(OnInvalidRemoteCall));
 }
 
-TCallCountChanged MAssIpcCall::SetCallCountChanged(const TCallCountChanged& OnCallCountChanged)
+std::shared_ptr<const TCallCountChanged> MAssIpcCall::SetCallCountChanged(const TCallCountChanged& OnCallCountChanged)
 {
-	return m_int->SetCallCountChanged(OnCallCountChanged);
+	return m_int->m_proc_map.SetCallCountChanged(std::make_shared<const TCallCountChanged>(OnCallCountChanged));
 }
 
 MAssIpcCallInternal::MAssIpc_PacketParser::TCallId MAssIpcCall::NewCallId() const
