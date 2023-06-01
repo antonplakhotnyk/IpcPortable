@@ -552,6 +552,26 @@ void CallCountChanged(std::shared_ptr<const MAssIpcCall::CallInfo> call_info)
 	s_calls.push_back(call_data);
 }
 
+static std::string Static_String_StringU32Double(std::string s, uint32_t a, double b)
+{
+	return s + std::to_string(int(a*b));
+}
+
+class SigCheck
+{
+public:
+	std::string Static_String_StringU32Double(std::string s, uint32_t a, double b)
+	{
+	}
+
+};
+
+constexpr const MAssIpcCall::SigName<std::string(std::string, uint32_t, double)> sig_Static_String_StringU32Double = {"Float_StringDouble"};
+constexpr const MAssIpcCall::Make_SigName<decltype(&Static_String_StringU32Double)>::type sig2_Static_String_StringU32Double = {"Float_StringDouble"};
+constexpr const MAssIpcCall::Make_SigName<decltype(&SigCheck::Static_String_StringU32Double)>::type sig3_Static_String_StringU32Double = {"Float_StringDouble"};
+static_assert(std::is_same<decltype(sig_Static_String_StringU32Double), decltype(sig2_Static_String_StringU32Double)>::value, "must be same type");
+static_assert(std::is_same<decltype(sig_Static_String_StringU32Double), decltype(sig3_Static_String_StringU32Double)>::value, "must be same type");
+
 void Main_IpcService(std::shared_ptr<IpcPackerTransportMemory> transport_buffer)
 {
 	std::shared_ptr<MAssCallThreadTransport_Stub> thread_transport(new MAssCallThreadTransport_Stub);
@@ -561,6 +581,8 @@ void Main_IpcService(std::shared_ptr<IpcPackerTransportMemory> transport_buffer)
 	call.SetErrorHandler(MAssIpcCall::TErrorHandler(&OnInvalidRemoteCall));
 
 	std::shared_ptr<const MAssIpcCall::CallInfo> call_info;
+
+	call.AddHandler(sig_Static_String_StringU32Double, std::function<decltype(Static_String_StringU32Double)>(&Static_String_StringU32Double), {}, {}, {});
 
 	// 	call.AddHandler("Ipc_Proc1", DelegateW<std::string(uint8_t, std::string, uint32_t)>().BindS(&Ipc_Proc1));
 	call.AddHandler("IsLinkUp_Sta", std::function<bool()>(&IsLinkUp), CreateCustomId(3));
@@ -672,6 +694,10 @@ void Main_IpcClient()
 	mass_return_if_not_equal(res2, "Ipc_Proc1 result 123456789012345");
 	mass_return_if_not_equal(s_state_error_et, MAssIpcCall::ErrorType::unknown_error);
 	mass_return_if_not_equal(s_calls.empty(), false);
+
+	std::string str = call.WaitInvokeSig(sig_Static_String_StringU32Double, "str:", uint8_t(2), double(123.5));
+	mass_return_if_not_equal(str, "str:247");
+
 
 	c = 654321;
 	const char* string_pointer_Ipc_Proc1 = "Ipc_Proc1";

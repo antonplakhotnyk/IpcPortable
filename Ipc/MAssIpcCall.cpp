@@ -70,7 +70,7 @@ MAssIpcCall::Internals::AnalizeInvokeDataRes MAssIpcCall::Internals::ReportError
 
 	// message format "return_type proc_name(params_type)"
 	constexpr char message_formaters[] = " ()";
-	res.message.reserve(find_call_info.return_type.Length()+find_call_info.name.Length()+find_call_info.params_type.Length()+sizeof(message_formaters));
+	res.message.reserve(sizeof(message_formaters)+find_call_info.return_type.Length()+find_call_info.name.Length()+find_call_info.params_type.Length());
 
 	res.message.append(find_call_info.return_type.C_String(), find_call_info.return_type.Length());
 	res.message+=(message_formaters[0]);

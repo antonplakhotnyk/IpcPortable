@@ -203,7 +203,7 @@ MASS_IPC_TYPE_SIGNATURE(std::string);
 
 //-------------------------------------------------------
 
-template<typename Integer, std::enable_if_t<std::is_integral<Integer>::value, bool> = true>
+template<typename Integer, typename std::enable_if<std::is_integral<Integer>::value, bool>::type = true>
 MAssIpc_DataStream& operator<<(MAssIpc_DataStream& stream, const std::vector<Integer>& v)
 {
 	stream<<(uint32_t)(v.size()*sizeof(Integer));
@@ -212,7 +212,7 @@ MAssIpc_DataStream& operator<<(MAssIpc_DataStream& stream, const std::vector<Int
 	return stream;
 }
 
-template<typename Integer, std::enable_if_t<std::is_integral<Integer>::value, bool> = true>
+template<typename Integer, typename std::enable_if<std::is_integral<Integer>::value, bool>::type = true>
 MAssIpc_DataStream& operator>>(MAssIpc_DataStream& stream, std::vector<Integer>& v)
 {
 	uint32_t length = 0;

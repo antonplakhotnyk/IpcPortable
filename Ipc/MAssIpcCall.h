@@ -23,7 +23,7 @@ private:
 			static_assert(N>=1, "unexpected string size");
 		}
 
-		template<class T, typename = typename std::enable_if<!std::is_array<T>::value>::type>
+		template<class T, typename std::enable_if<!std::is_array<T>::value, bool>::type = true>
 		InvokeSetting(const T str)
 			: proc_name{str}
 		{
@@ -44,6 +44,100 @@ private:
 		std::unique_ptr<MAssIpc_Data> inplace_send_buffer;
 	};
 
+    template<class TSig>
+	struct TInvokeSetting: public InvokeSetting
+    {
+        constexpr TInvokeSetting(InvokeSetting&& base):InvokeSetting(std::move(base)){}
+
+        using t_sig = TSig;
+    };
+
+    template<class... Args>
+    struct Compare{};
+
+    template<class... Args>
+    static constexpr bool Check_is_signame_and_handler_describe_same_call_signatures(Compare<Args...> a1, Compare<Args...> a2){return true;};
+
+    template<class TSig>
+    struct ExtractCallTypes
+    {
+        static_assert(sizeof(TSig)<0, "no specialization");
+    };
+
+    template<class Ret, class TCls, class... Args>
+    struct ExtractCallTypes<Ret (TCls::*)(Args...)>
+    {
+        using TCompare = Compare<Ret, Args...>;
+    };
+
+    template<class Ret, class TCls, class... Args>
+    struct ExtractCallTypes<Ret (TCls::*)(Args...) const>
+    {
+        using TCompare = Compare<Ret, Args...>;
+    };
+
+    template<class Ret, class... Args>
+    struct ExtractCallTypes<Ret (*)(Args...)>
+    {
+        using TCompare = Compare<Ret, Args...>;
+    };
+
+    template<class L>
+    static auto ExtractCompare(const L&)->typename ExtractCallTypes<decltype(&L::operator())>::TCompare;
+
+
+    template<class TSig> 
+    struct IsSigProc: public std::false_type{};
+
+    template<class Ret, class... Args>
+    struct IsSigProc<Ret(Args...)>: public std::true_type{};
+
+public:
+
+    template<class SigProc>
+    struct SigName
+    {
+    public:
+
+        static_assert(IsSigProc<SigProc>::value, "SigProc must be function type like TRet(TArgs...)");
+        using TSigProc = SigProc;
+
+        constexpr TInvokeSetting<SigName<SigProc>> operator()(std::unique_ptr<MAssIpc_Data>&& inplace_send_buffer) const
+        {
+            return {InvokeSetting{proc_name, std::move(inplace_send_buffer)}};
+        }
+
+		constexpr TInvokeSetting<SigName<SigProc>> operator()() const
+        {
+            return {InvokeSetting{proc_name, {}}};
+        }
+
+        const MAssIpcCallInternal::MAssIpc_RawString proc_name;
+    };
+
+    template<class SigProcPtr>
+    struct Make_SigName
+    {
+        static_assert(sizeof(SigProcPtr)<0, "specialization not found, SigProcPtr must be (member or) function pointer like decltype(&Cls::Proc)");
+    };
+
+    template<class THandler, class TRet, class... Args>
+    struct Make_SigName<TRet (THandler::*)(Args...)>
+    {
+        using type = SigName<TRet(Args...)>;
+    };
+
+    template<class THandler, class TRet, class... Args>
+    struct Make_SigName<TRet (THandler::*)(Args...) const>
+    {
+        using type = SigName<TRet(Args...)>;
+    };
+
+    template<class TRet, class... Args>
+    struct Make_SigName<TRet (*)(Args...)>
+    {
+        using type = SigName<TRet(Args...)>;
+    };
 
 public:
 
@@ -86,6 +180,18 @@ public:
 	template<class... TArgs>
 	void AsyncInvoke(InvokeSetting settings, const TArgs&... args) const;
 
+    template<class Ret_Check, class... Args_Check, class... Args_Local>
+    Ret_Check WaitInvokeSig(TInvokeSetting<SigName<Ret_Check(Args_Check...)>> settings, Args_Local... args) const
+    {
+        return ConvertArgs<Ret_Check(Args_Check...)>::InvokeUnified(this, settings, false, args...);
+    }
+
+	template<class Ret_Check, class... Args_Check, class... Args_Local>
+	Ret_Check WaitInvokeSig(SigName<Ret_Check(Args_Check...)> signame, Args_Local&&... args) const
+    {
+        return WaitInvokeSig(signame(), std::forward<Args_Local>(args)...);
+    }
+
 
 	template<class TRet, class... TArgs>
 	static MAssIpc_Data::TPacketSize CalcCallSize(bool send_return, const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TArgs&... args);
@@ -99,6 +205,16 @@ public:
 	template<class TDelegateW>
 	std::shared_ptr<const CallInfo> AddHandler(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TDelegateW& del, const std::string& comment,
 					MAssIpc_TransthreadTarget::Id thread_id, const void* tag);
+
+	template<class SigProc_Ret, class TDelegateW, class... SigProc_Args>
+	std::shared_ptr<const CallInfo> AddHandler(const SigName<SigProc_Ret(SigProc_Args...)>& signame, const TDelegateW& handler, const std::string& comment,
+					MAssIpc_TransthreadTarget::Id thread_id, const void* tag)
+    {
+        static_assert(Check_is_signame_and_handler_describe_same_call_signatures(Compare<SigProc_Ret, SigProc_Args...>(), decltype(ExtractCompare(handler))()), "must be same types");
+        // static_assert(std::is_same<Compare<SigProc_Ret, SigProc_Args...>(), decltype(ExtractCompare(handler))()>::value, "must be same types");
+        return AddHandler<TDelegateW>(signame.proc_name, handler, comment, thread_id, tag);
+    }
+
 
 	void SetErrorHandler(TErrorHandler OnInvalidRemoteCall);
 	std::shared_ptr<const TCallCountChanged> SetCallCountChanged(const TCallCountChanged& OnCallCountChanged);
@@ -127,6 +243,39 @@ private:
 	void InvokeRemote(MAssIpc_DataStream& call_info_data, MAssIpc_DataStream* result_buf_wait_return,
 					  MAssIpcCallInternal::MAssIpc_PacketParser::TCallId wait_response_id,
 					  bool process_incoming_calls) const;
+
+    template<class TProc>
+    struct ConvertArgs
+    {
+        static_assert(sizeof(TProc)==0, "TProc must be void or function type");
+    };
+
+    template<class TProc>
+    friend struct ConvertArgs;
+
+    template<class TRet_Check, class... Args_Check>
+    struct ConvertArgs<TRet_Check(Args_Check...)>
+    {
+        template<class... Args_Local>
+        static TRet_Check InvokeUnified(const MAssIpcCall* self, InvokeSetting& settings, bool process_incoming_calls,
+                                        Args_Local... args_local)
+        {
+            return self->WaitInvokeRetUnified<TRet_Check, Args_Check...>(settings, process_incoming_calls, std::forward<Args_Local>(args_local)...);    
+        }
+    };
+
+    template<class... Args_Check>
+    struct ConvertArgs<void(Args_Check...)>
+    {
+        template<class... Args_Local>
+        static void InvokeUnified(const MAssIpcCall* self, InvokeSetting& settings, bool process_incoming_calls, 
+                                    Args_Local... args_local)
+        {
+            MAssIpc_DataStream result_buf_wait_return;
+            self->InvokeUnified<void,Args_Check...>(settings, result_buf_wait_return, process_incoming_calls, args_local...);
+        }
+    };
+
 
 	struct DeserializedFindCallInfo
 	{
@@ -364,14 +513,12 @@ TRet MAssIpcCall::WaitInvokeRetUnified(InvokeSetting& settings, bool process_inc
 template<class TRet, class... TArgs>
 TRet MAssIpcCall::WaitInvokeRet(InvokeSetting settings, const TArgs&... args) const
 {
-	std::unique_ptr<MAssIpc_Data> inplace;
 	return WaitInvokeRetUnified<TRet>(settings, false, args...);
 }
 
 template<class... TArgs>
 void MAssIpcCall::WaitInvoke(InvokeSetting settings, const TArgs&... args) const
 {
-	std::unique_ptr<MAssIpc_Data> inplace;
 	MAssIpc_DataStream result_buf;
 	InvokeUnified<void>(settings, &result_buf, false, args...);
 }
@@ -379,14 +526,12 @@ void MAssIpcCall::WaitInvoke(InvokeSetting settings, const TArgs&... args) const
 template<class... TArgs>
 void MAssIpcCall::AsyncInvoke(InvokeSetting settings, const TArgs&... args) const
 {
-	std::unique_ptr<MAssIpc_Data> inplace;
 	InvokeUnified<void>(settings, nullptr, false, args...);
 }
 
 template<class... TArgs>
 void MAssIpcCall::WaitInvokeAlertable(InvokeSetting settings, const TArgs&... args) const
 {
-	std::unique_ptr<MAssIpc_Data> inplace;
 	MAssIpc_DataStream result_buf;
 	InvokeUnified<void>(settings, &result_buf, true, args...);
 }
@@ -394,7 +539,6 @@ void MAssIpcCall::WaitInvokeAlertable(InvokeSetting settings, const TArgs&... ar
 template<class TRet, class... TArgs>
 TRet MAssIpcCall::WaitInvokeRetAlertable(InvokeSetting settings, const TArgs&... args) const
 {
-	std::unique_ptr<MAssIpc_Data> inplace;
 	return WaitInvokeRetUnified<TRet>(settings, true, args...);
 }
 

@@ -55,17 +55,19 @@ enum struct ErrorType: uint8_t
 	respond_no_matching_call_return_type,
 };
 
+static constexpr const char* ErrorType_string_map[] =
+{
+	"unknown_error",
+	"no_matching_call_name_parameters",
+	"no_matching_call_return_type",
+	"respond_no_matching_call_name_parameters",
+	"respond_no_matching_call_return_type",
+};
+
 static inline constexpr const char* ErrorTypeToStr(ErrorType error)
 {
-	switch( error )
-	{
-		default:
-		case ErrorType::unknown_error: return "unknown_error";
-		case ErrorType::no_matching_call_name_parameters: return "no_matching_call_name_parameters";
-		case ErrorType::no_matching_call_return_type: return "no_matching_call_return_type";
-		case ErrorType::respond_no_matching_call_name_parameters: return "respond_no_matching_call_name_parameters";
-		case ErrorType::respond_no_matching_call_return_type: return "respond_no_matching_call_return_type";
-	};
+	static_assert(size_t(ErrorType::unknown_error) == 0, "unexpected value");
+	return (size_t(error) < std::extent<decltype(ErrorType_string_map)>::value) ? ErrorType_string_map[size_t(error)] : ErrorType_string_map[0];
 };
 
 
@@ -127,7 +129,7 @@ public:
 
 protected:
 
-	MAssIpc_ThreadSafe::atomic_uint32_t	m_call_count = 0;
+	MAssIpc_ThreadSafe::atomic_uint32_t	m_call_count = {0};
 	const std::string		m_name;
 	const std::string		m_params_type;
 };
@@ -292,7 +294,7 @@ static inline std::tuple<TArgs...> DeserializeArgs(MAssIpc_DataStream& call_info
 {
 	std::tuple<TArgs...> tup;
 	int unpack[]{0,((call_info>>std::get<Indexes>(tup)),0)...};
-	unpack;
+	static_assert(sizeof(unpack)>0, "disable warning local variable is initialized but not referenced");
 	return tup;
 }
 
@@ -301,7 +303,7 @@ template<class... TArgs>
 static inline void SerializeArgs(MAssIpc_DataStream& call_info, const TArgs&... args)
 {
 	int unpack[]{0,((call_info<<args),0)...};
-	unpack;
+	static_assert(sizeof(unpack) > 0, "disable warning local variable is initialized but not referenced");
 }
 
 }
@@ -405,7 +407,7 @@ struct ProcSignature<TRet(*)(TArgs... args)>
 						 , CheckSeparatorInName<MAssIpcType<TArgs>::name_value>()
 #endif
 						 ),0)...};
-		unpack;
+		static_assert(sizeof(unpack) > 0, "disable warning local variable is initialized but not referenced");
 	};
 };
 
@@ -571,7 +573,7 @@ class MAssIpcData_Vector: public MAssIpc_Data
 public:
 
 	MAssIpcData_Vector(MAssIpc_Data::TPacketSize size)
-		: m_storage(std::make_unique<uint8_t[]>(size))
+		: m_storage(new uint8_t[size])
 		, m_storage_size(size)
 	{
 	}
