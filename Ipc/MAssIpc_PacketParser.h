@@ -52,7 +52,15 @@ private:
 private:
 
 	std::unique_ptr<MAssIpc_Data> m_incoming_packet_header_data;
-	MAssIpc_Data::TPacketSize m_incoming_packet_size = c_invalid_packet_size;
+	struct ReadState
+	{
+		MAssIpc_Data::TPacketSize data_size = c_invalid_packet_size;
+		MAssIpc_Data::TPacketSize need_size = c_net_call_packet_header_size;
+
+		uint8_t raw_header_buffer[c_net_call_packet_header_size] = {};
+	};
+
+	ReadState m_incoming_packet;
 };
 
 }

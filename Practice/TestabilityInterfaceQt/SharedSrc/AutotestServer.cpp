@@ -23,11 +23,31 @@ void AutotestServer::IpcError(MAssIpcCall::ErrorType et, std::string message)
 void AutotestServer::OnConnected()
 {
 	m_sut_handler = std::make_unique<SutHandlerThread>(m_ipc_connection, m_autotest_container);
+
+	{
+		auto clients{m_clients};
+		for( std::weak_ptr<ClientPrivate> client_weak : clients )
+			if( std::shared_ptr<ClientPrivate> client = client_weak.lock() )
+				client->GetHandlers().OnConnectedSut();
+	}
 }
 
 void AutotestServer::OnDisconnected()
 {
 	m_sut_handler.reset();
 	m_transport_server->ListenRestart();
+
+	{
+		auto clients{m_clients};
+		for( std::weak_ptr<ClientPrivate> client_weak : clients )
+			if( std::shared_ptr<ClientPrivate> client = client_weak.lock() )
+				client->GetHandlers().OnDisconnectedSut();
+	}
 }
 
+std::shared_ptr<AutotestServer::Client> AutotestServer::CreateClient(const Client::Handlers& handlers)
+{
+	std::shared_ptr<AutotestServer::ClientPrivate> new_client{new AutotestServer::ClientPrivate(handlers, m_ipc_connection)};
+	m_clients.push_back(new_client);
+	return new_client;
+}
