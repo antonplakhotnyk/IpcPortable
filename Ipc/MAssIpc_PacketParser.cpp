@@ -48,12 +48,12 @@ size_t MAssIpc_PacketParser::ReadNeededDataSize(const std::shared_ptr<MAssIpc_Tr
 				in_data->Read(m_incoming_packet_header_data->Data()+c_net_call_packet_header_size+read_offset, read_size);
 				m_incoming_packet.need_size -= read_size;
 			}
+		}
 
-			if( m_incoming_packet.need_size==0 )
-			{
-				*packet_data = std::move(m_incoming_packet_header_data);
-				m_incoming_packet = ReadState{};
-			}
+		if( m_incoming_packet.need_size==0 )
+		{
+			*packet_data = std::move(m_incoming_packet_header_data);
+			m_incoming_packet = ReadState{};
 		}
 	}
 
