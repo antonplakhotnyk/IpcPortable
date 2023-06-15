@@ -409,6 +409,7 @@ MAssIpcCallInternal::MAssIpc_PacketParser::TCallId MAssIpcCall::NewCallId() cons
 	MAssIpc_ThreadSafe::unique_lock<MAssIpc_ThreadSafe::mutex> lock(m_int->m_pending_responses.m_lock);
 	MAssIpcCallInternal::MAssIpc_PacketParser::TCallId new_id;
 
+	do
 	{
 		if( m_int->m_pending_responses.m_incremental_id==MAssIpcCallInternal::MAssIpc_PacketParser::c_invalid_id )
 			m_int->m_pending_responses.m_incremental_id++;
