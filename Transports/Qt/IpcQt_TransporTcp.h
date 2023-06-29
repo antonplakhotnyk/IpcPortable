@@ -13,16 +13,15 @@ public:
 	~IpcQt_TransporTcp();
 
 	QTcpSocket* GetConnection();
+	void	AssignConnection(std::weak_ptr<IpcQt_TransporTcp> transport, QTcpSocket* connection);
 
 signals:
 
-	void HandlerOnDisconnected();
-	void HandlerOnConnected();
+	void HandlerOnDisconnected(std::weak_ptr<IpcQt_TransporTcp> transport);
+	void HandlerOnConnected(std::weak_ptr<IpcQt_TransporTcp> transport);
 	void HandlerProcessTransport();
 
 protected:
-
-	void	AssignConnection(QTcpSocket* connection);
 
 // 	void StopWaitRespound();
 // 	bool IsWaitRespound();
@@ -44,6 +43,7 @@ private:
 
 private:
 
+	std::weak_ptr<IpcQt_TransporTcp> m_self_transport;
 	QPointer<QTcpSocket>	m_connection;
 
 private:
@@ -53,3 +53,5 @@ private:
 	bool m_disconnect_called;
 };
 
+
+Q_DECLARE_METATYPE(std::weak_ptr<IpcQt_TransporTcp>)

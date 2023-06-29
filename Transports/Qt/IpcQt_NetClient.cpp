@@ -4,9 +4,9 @@
 
 IpcQt_NetClient::IpcQt_NetClient(MAssIpcCall& ipc_connection)
 	:m_transport_client(std::make_shared<IpcQt_TransportTcpClient>())
-	, m_ipc_net(ipc_connection, m_transport_client)
+	, m_ipc_net(ipc_connection, m_transport_client->GetTransport())
 {
-
+	ipc_connection = m_ipc_net.ipc_call;
 // 	mass_assert_if_not_equal(s_instance,nullptr);
 // 	s_instance = this;
 }
@@ -33,8 +33,8 @@ void IpcQt_NetClient::WaitConnection()
 // 	return s_instance->Ipc();
 // }
 
-IpcQt_TransportTcpClient& IpcQt_NetClient::GetIpcClientTcpTransport()
+std::shared_ptr<IpcQt_TransportTcpClient> IpcQt_NetClient::GetIpcClientTcpTransport()
 {
-	return *m_transport_client.get();
+	return m_transport_client;
 }
 

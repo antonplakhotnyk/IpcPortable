@@ -23,6 +23,5 @@ private:
 	std::shared_ptr<IpcQt_TransportTcpServer> m_transport;
 	
 	MAssIpcCall		m_ipc_connection;
-	IpcQt_Net			m_ipc_net;
 };
 

@@ -2,40 +2,45 @@
 #include "MAssIpc_Macros.h"
 
 AutotestServer::AutotestServer(const Params& params)
-	:m_transport_server(std::make_shared<IpcQt_TransportTcpServer>(params.server_port))
-	, m_ipc_connection({})
-	, m_ipc_net(m_ipc_connection, m_transport_server)
+	:IpcQt_TransportTcpServer(params.server_port)
 	, m_autotest_container(params.autotest_container)
 {
-	m_ipc_connection.SetErrorHandler(&AutotestServer::IpcError);
-
-	QObject::connect(m_transport_server.get(), &IpcQt_TransporTcp::HandlerOnConnected, this, &AutotestServer::OnConnected, Qt::QueuedConnection);
-	QObject::connect(m_transport_server.get(), &IpcQt_TransporTcp::HandlerOnDisconnected, this, &AutotestServer::OnDisconnected, Qt::QueuedConnection);
-	
-	m_transport_server->ListenRestart();
+	this->ListenRestart();
 }
 
-void AutotestServer::IpcError(MAssIpcCall::ErrorType et, std::string message)
+void AutotestServer::SutConnection::IpcError(MAssIpcCall::ErrorType et, std::string message)
 {
 	mass_assert_msg(std::string(std::string(MAssIpcCall::ErrorTypeToStr(et)) + " " + message).c_str());
 }
 
-void AutotestServer::OnConnected()
+void AutotestServer::OnConnected(std::weak_ptr<IpcQt_TransporTcp> transport_weak)
 {
-	m_sut_handler = std::make_unique<SutHandlerThread>(m_ipc_connection, m_autotest_container);
+	auto transport = transport_weak.lock();
+
+	MAssIpcCall ipc_call_initial({});
+	std::shared_ptr<SutConnection> connection{std::make_shared<SutConnection>(ipc_call_initial, transport)};
+
+	m_sut_handler = std::make_unique<SutHandlerThread>(connection->ipc_net.ipc_call, m_autotest_container);
 
 	{
 		auto clients{m_clients};
 		for( std::weak_ptr<ClientPrivate> client_weak : clients )
 			if( std::shared_ptr<ClientPrivate> client = client_weak.lock() )
-				client->GetHandlers().OnConnectedSut();
+			{
+				client->SetConnection(Client::SutIndexId::on_connected_sut, connection);
+				Client::SutIndexId sut_index_id = client->GetHandlers().OnConnectedSut();
+				client->SetConnection(Client::SutIndexId::on_connected_sut, {});
+
+				if( sut_index_id<Client::SutIndexId::on_connected_sut )
+					client->SetConnection(sut_index_id, connection);
+			}
 	}
 }
 
-void AutotestServer::OnDisconnected()
+void AutotestServer::OnDisconnected(std::weak_ptr<IpcQt_TransporTcp> transport)
 {
 	m_sut_handler.reset();
-	m_transport_server->ListenRestart();
+	this->ListenRestart();
 
 	{
 		auto clients{m_clients};
@@ -47,7 +52,7 @@ void AutotestServer::OnDisconnected()
 
 std::shared_ptr<AutotestServer::Client> AutotestServer::CreateClient(const Client::Handlers& handlers)
 {
-	std::shared_ptr<AutotestServer::ClientPrivate> new_client{new AutotestServer::ClientPrivate(handlers, m_ipc_connection)};
+	std::shared_ptr<AutotestServer::ClientPrivate> new_client{new AutotestServer::ClientPrivate(handlers)};
 	m_clients.push_back(new_client);
 	return new_client;
 }

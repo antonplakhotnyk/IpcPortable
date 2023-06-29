@@ -3,10 +3,11 @@
 #include "IpcQt_Global.h"
 
 
-std::shared_ptr<ApplicationSut> ApplicationSut::m_int;
+std::shared_ptr<ApplicationSut> ApplicationSut::s_sut_inst;
 
-ApplicationSut::ApplicationSut(const Ipc::Addr& connect_to_address)
+ApplicationSut::ApplicationSut(const Ipc::Addr& connect_to_address, std::weak_ptr<EventHandlerMap>* sut_event_map)
 	:m_testability(Ipc::Inst(), connect_to_address)
+	, m_sut_event_map((*sut_event_map = std::make_shared<EventHandlerMap>()).lock())
 {
 
 	{
@@ -36,8 +37,8 @@ ApplicationSut::~ApplicationSut()
 
 void ApplicationSut::ApplicationUnderTest_Register(ApplicationUnderTest* score_component)
 {
-	mass_return_if_equal(bool(m_int), false);
-	m_int->Register(score_component);
+	mass_return_if_equal(bool(s_sut_inst), false);
+	s_sut_inst->Register(score_component);
 }
 
 void ApplicationSut::Register(ApplicationUnderTest* score_component)
@@ -45,7 +46,7 @@ void ApplicationSut::Register(ApplicationUnderTest* score_component)
 	Unregister(m_score_component);
 	m_score_component = score_component;
 
-	QObject::connect(score_component, &QObject::destroyed, m_int.get(), &ApplicationSut::Unregister);
+	QObject::connect(score_component, &QObject::destroyed, s_sut_inst.get(), &ApplicationSut::Unregister);
 
 	MAssIpcCall& ipc = Ipc::Inst();
 
@@ -82,11 +83,4 @@ QString ApplicationSut::TransfetString(const QString& str)
 void Ipc::InitSpecificClient(const QStringList& args)
 {
 	InitClient<ApplicationSut>(args);
-}
-
-void Ipc::SutRegister(QObject* sut_object)
-{
-	mass_return_if_equal(bool(ApplicationSut::m_int), false);
-	if( ApplicationUnderTest* score_component = dynamic_cast<ApplicationUnderTest*>(sut_object) )
-		ApplicationSut::m_int->Register(score_component);
 }

@@ -4,8 +4,9 @@
 
 #include "MAssIpc_TransthreadTarget.h"
 #include "IpcQt_Serializers.h"
+#include "Sut.h"
 
-class Ipc
+class Ipc: public Sut
 {
 public:
 
@@ -26,7 +27,6 @@ public:
 
 	static Addr GetArgServerAddr(const QStringList& args);
 	static void InitSpecificClient(const QStringList& args);
-	static void SutRegister(QObject* sut_object);
 
 	static MAssIpc_TransthreadTarget::Id CurrentThread();
 	static const void* HandlersTag();
@@ -37,11 +37,10 @@ public:
 	template<class TSpecificSut>
 	static void InitClient(const QStringList& args)
 	{
-		if( !TSpecificSut::m_int )
+		if( !TSpecificSut::s_sut_inst )
 			if( Ipc::Addr addr = Ipc::GetArgServerAddr(args) )
-				TSpecificSut::m_int.reset(new typename TSpecificSut::Internals(addr));
+				TSpecificSut::s_sut_inst.reset(new typename TSpecificSut::Internals(addr, Sut::GetEventHandlerMap()));
 	}
-
 
 private:
 

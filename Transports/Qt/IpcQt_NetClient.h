@@ -17,7 +17,7 @@ public:
 // 	static bool IsExist();
 // 	static MAssIpcCall& Get();
 
-	IpcQt_TransportTcpClient& GetIpcClientTcpTransport();
+	std::shared_ptr<IpcQt_TransportTcpClient> GetIpcClientTcpTransport();
 
 private:
 

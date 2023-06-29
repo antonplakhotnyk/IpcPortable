@@ -7,7 +7,7 @@
 #include "IpcQt_Global.h"
 
 
-class IpcQt_TransportTcpClient: public IpcQt_TransporTcp
+class IpcQt_TransportTcpClient: public QObject
 {
 public:
 
@@ -17,7 +17,11 @@ public:
 	void StartConnection(const Ipc::Addr& addr);
 	bool WaitConnection();
 
+	std::shared_ptr<IpcQt_TransporTcp> GetTransport();
+
 private:
+
+	std::shared_ptr<IpcQt_TransporTcp> m_connection_transport;
 };
 
 

@@ -174,6 +174,9 @@ std::shared_ptr<const CallInfo> ProcMap::AddProcSignature(const std::shared_ptr<
 
 void ProcMap::AddAllProcs(const ProcMap& other)
 {
+	if( this == &other )
+		return;
+
 	MAssIpc_ThreadSafe::unique_lock<MAssIpc_ThreadSafe::mutex> lock(m_lock);
 	MAssIpc_ThreadSafe::unique_lock<MAssIpc_ThreadSafe::mutex> lock_other(other.m_lock);
 

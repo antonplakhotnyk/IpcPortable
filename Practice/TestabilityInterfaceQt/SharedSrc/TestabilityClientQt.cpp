@@ -53,7 +53,7 @@ TestabilityClientQt::Internals::Internals(MAssIpcCall& ipc_connection, const Ipc
 	:m_connect_to_address(connect_to_address)
 	, m_ipc_net(ipc_connection)
 {
-	QObject::connect(&m_ipc_net.GetIpcClientTcpTransport(), &IpcQt_TransporTcp::HandlerOnDisconnected, this, &Internals::OnDisconnected, Qt::QueuedConnection);
+	QObject::connect(m_ipc_net.GetIpcClientTcpTransport()->GetTransport().get(), &IpcQt_TransporTcp::HandlerOnDisconnected, this, &Internals::OnDisconnected, Qt::QueuedConnection);
 }
 
 TestabilityClientQt::Internals::~Internals()
@@ -62,10 +62,10 @@ TestabilityClientQt::Internals::~Internals()
 
 void TestabilityClientQt::Internals::StartConnection()
 {
-	m_ipc_net.GetIpcClientTcpTransport().StartConnection(m_connect_to_address);
+	m_ipc_net.GetIpcClientTcpTransport()->StartConnection(m_connect_to_address);
 }
 
-void TestabilityClientQt::Internals::OnDisconnected()
+void TestabilityClientQt::Internals::OnDisconnected(std::weak_ptr<IpcQt_TransporTcp> transport)
 {
 	StartConnection();
 }

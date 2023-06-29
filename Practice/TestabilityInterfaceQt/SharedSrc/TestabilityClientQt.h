@@ -57,7 +57,7 @@ private:
 
 	private:
 
-		void OnDisconnected();
+		void OnDisconnected(std::weak_ptr<IpcQt_TransporTcp> transport);
 
 	private:
 

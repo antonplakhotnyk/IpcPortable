@@ -1,4 +1,6 @@
 #include "IpcQt_Global.h"
+#include <QtCore/QStringList>
+
 
 static MAssIpcCall g_ipc_global({});
 
@@ -9,7 +11,11 @@ MAssIpcCall& Ipc::Inst()
 
 QString Ipc::GetArgParam_String(const QStringList& args, const char* arg)
 {
-	const int index = args.indexOf(arg)+1;
+    const int index_of_arg = args.indexOf(arg);
+    if (index_of_arg < 0)
+        return {};
+    
+	const int index = index_of_arg+1;
 	if( index >= args.size() )
 		return {};
 	return args.at(index);

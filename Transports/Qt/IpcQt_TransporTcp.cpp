@@ -4,15 +4,18 @@
 
 IpcQt_TransporTcp::IpcQt_TransporTcp()
 {
+	qRegisterMetaType<std::weak_ptr<IpcQt_TransporTcp>>();
 }
-
 
 IpcQt_TransporTcp::~IpcQt_TransporTcp()
 {
 }
 
-void IpcQt_TransporTcp::AssignConnection(QTcpSocket* connection)
+void IpcQt_TransporTcp::AssignConnection(std::weak_ptr<IpcQt_TransporTcp> transport, QTcpSocket* connection)
 {
+	mass_return_if_not_equal(transport.lock().get(), this);
+	m_self_transport = transport;
+
 	if( m_connection )
 		m_connection->deleteLater();
 	m_connection = connection;
@@ -86,7 +89,7 @@ void	IpcQt_TransporTcp::Write(const uint8_t* data, size_t size)
 
 void IpcQt_TransporTcp::OnConnected()
 {
-	HandlerOnConnected();
+	HandlerOnConnected(m_self_transport);
 }
 
 void IpcQt_TransporTcp::OnDisconnected()
@@ -95,7 +98,7 @@ void IpcQt_TransporTcp::OnDisconnected()
 	{
 		m_connection->deleteLater();
 		m_connection.clear();
-		HandlerOnDisconnected();
+		HandlerOnDisconnected(m_self_transport);
 	}
 }
 

@@ -14,6 +14,10 @@ public:
 
 private:
 
+	MAssIpc_TransthreadTarget::Id					m_ipc_transport_thread;
 	std::shared_ptr<IpcQt_Transthread>		m_thread_transport;
 	std::shared_ptr<IpcQt_TransthreadTransportCopy>	m_transport_from_thread;
+public:
+
+	MAssIpcCall ipc_call;
 };

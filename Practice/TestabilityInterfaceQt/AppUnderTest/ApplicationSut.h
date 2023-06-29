@@ -7,7 +7,8 @@
 class ApplicationSut: public QObject
 {
 public:
-	ApplicationSut(const Ipc::Addr& connect_to_address);
+
+	ApplicationSut(const Ipc::Addr& connect_to_address, std::weak_ptr<EventHandlerMap>* sut_event_map);
 	~ApplicationSut();
 
 	static void ApplicationUnderTest_Register(ApplicationUnderTest* score_component);
@@ -28,10 +29,12 @@ private:
 
 	QPointer<ApplicationUnderTest> m_score_component;
 	TestabilityClientQt		m_testability;
+	std::shared_ptr<EventHandlerMap> m_sut_event_map;
 
 	friend class Ipc;
 	using Internals = ApplicationSut;
 
-	static std::shared_ptr<ApplicationSut> m_int;
+public:
+	static std::shared_ptr<ApplicationSut> s_sut_inst;
 };
 
