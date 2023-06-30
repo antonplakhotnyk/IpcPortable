@@ -289,12 +289,80 @@ Ret ExpandTupleCall(const TFunc& pf, std::tuple<Args...>& tup)
 
 //-------------------------------------------------------
 
+template<class...>
+using void_t = void;
+
+
+template <typename TCheckedType, typename = void>
+struct IsReadStreamCreating: std::false_type
+{
+};
+
+template <typename TCheckedType>
+struct IsReadStreamCreating<TCheckedType, void_t<decltype(operator>>(std::declval<MAssIpc_DataStream&>(), std::declval<const MAssIpc_DataStream_Create<TCheckedType>&>()))>>: std::true_type
+{
+};
+
+//-------------------------------------------------------
+
+struct Deserialize_Creating
+{
+	template<class T>
+	static inline T Do(MAssIpc_DataStream& call_info)
+	{
+		return call_info>>MAssIpc_DataStream_Create<T>();
+	}
+};
+
+struct Deserialize_DefConstruct
+{
+	template<class T>
+	static inline T Do(MAssIpc_DataStream& call_info)
+	{
+		T t{};
+		call_info>>t;
+		return t;
+	}
+};
+
+template<class T>
+static inline T ReadFromStream(MAssIpc_DataStream& call_info)
+{
+	return std::conditional<IsReadStreamCreating<T>::value, Deserialize_Creating, Deserialize_DefConstruct>::type::template Do<T>(call_info);
+}
+
+//-------------------------------------------------------
+
+struct Default_Constructor
+{
+	template<class T>
+	static inline T Do(){return {};}
+};
+
+struct Default_FromStream
+{
+	template<class T>
+	static inline T Do()
+	{
+		static_assert(IsReadStreamCreating<T>::value, "type hase no default constructor and no create from stream operator");
+		MAssIpc_DataStream empty_stream;
+		return Deserialize_Creating::Do<T>(empty_stream);
+	}
+};
+
+template<class T>
+static inline T MakeDefault()
+{
+	return std::conditional<std::is_default_constructible<T>::value, Default_Constructor, Default_FromStream>::type::template Do<T>();
+}
+
+//-------------------------------------------------------
+
 template<class... TArgs, size_t... Indexes>
 static inline std::tuple<TArgs...> DeserializeArgs(MAssIpc_DataStream& call_info, index_tuple< Indexes... >)
 {
-	std::tuple<TArgs...> tup;
-	int unpack[]{0,((call_info>>std::get<Indexes>(tup)),0)...};
-	static_assert(sizeof(unpack)>0, "disable warning local variable is initialized but not referenced");
+	std::tuple<TArgs...> tup{(ReadFromStream<typename std::tuple_element<Indexes, std::tuple<TArgs...>>::type>(call_info))...};
+	static_assert(sizeof(tup)>0, "disable warning local variable is initialized but not referenced");
 	return tup;
 }
 

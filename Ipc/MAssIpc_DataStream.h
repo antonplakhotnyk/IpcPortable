@@ -169,6 +169,12 @@ private:
 };
 
 //-------------------------------------------------------
+template<class T>
+struct MAssIpc_DataStream_Create
+{
+};
+
+//-------------------------------------------------------
 
 struct MAssIpcCall_ProcDescription
 {
@@ -231,6 +237,19 @@ MASS_IPC_TYPE_SIGNATURE(std::vector<int8_t>);
 MASS_IPC_TYPE_SIGNATURE(std::vector<int16_t>);
 MASS_IPC_TYPE_SIGNATURE(std::vector<int32_t>);
 MASS_IPC_TYPE_SIGNATURE(std::vector<int64_t>);
+
+// Deserialization of class without default constructor
+// 
+// MAssIpc_DataStream& operator<<(MAssIpc_DataStream& stream, const NoDefConstruct& v);
+// NoDefConstruct operator>>(MAssIpc_DataStream& stream, const MAssIpc_DataStream_Create<NoDefConstruct>& v);
+// MASS_IPC_TYPE_SIGNATURE(NoDefConstruct);
+
+// usage of std::unique_ptr
+// 
+// MAssIpc_DataStream& operator<<(MAssIpc_DataStream& stream, const std::unique_ptr<NoDefConstruct>& v);
+// std::unique_ptr<NoDefConstruct> operator>>(MAssIpc_DataStream& stream, const MAssIpc_DataStream_Create<std::unique_ptr<NoDefConstruct>>& v);
+// MASS_IPC_TYPE_SIGNATURE(std::unique_ptr<NoDefConstruct>);
+
 
 //-------------------------------------------------------
 

@@ -2,12 +2,17 @@
 #include <thread>
 #include <condition_variable>
 #include <mutex>
-#include "../Ipc/MAssIpcCall.h"
-#include <functional>
-#include "../Ipc/MAssIpc_Macros.h"
 #include <sstream>
 #include <mutex>
 #include <condition_variable>
+#include <functional>
+#include <list>
+#include <map>
+
+//static constexpr const char* main_start_mark = {};
+
+#include "../Ipc/MAssIpcCall.h"
+#include "../Ipc/MAssIpc_Macros.h"
 
 // struct TestStruct
 // {
@@ -31,6 +36,62 @@
 // {
 // 	//...
 // }
+
+
+class NoDefConstruct
+{
+public:
+	NoDefConstruct() = delete;
+	NoDefConstruct(const NoDefConstruct&) = default;
+	NoDefConstruct(uint32_t a)
+		:m_a(a)
+	{
+	}
+
+	~NoDefConstruct()
+	{
+		volatile int a = 0;
+	}
+
+	uint32_t m_a;
+};
+
+
+MAssIpc_DataStream& operator<<(MAssIpc_DataStream& stream, const NoDefConstruct& v)
+{
+	stream<<v.m_a;
+	return stream;
+}
+
+NoDefConstruct operator>>(MAssIpc_DataStream& stream, const MAssIpc_DataStream_Create<NoDefConstruct>& v)
+{
+	uint32_t a{};
+	stream>>a;
+	return NoDefConstruct(a);
+}
+
+MASS_IPC_TYPE_SIGNATURE(NoDefConstruct);
+
+
+MAssIpc_DataStream& operator<<(MAssIpc_DataStream& stream, const std::unique_ptr<NoDefConstruct>& v)
+{
+	stream<<v->m_a;
+	return stream;
+}
+
+std::unique_ptr<NoDefConstruct> operator>>(MAssIpc_DataStream& stream, const MAssIpc_DataStream_Create<std::unique_ptr<NoDefConstruct>>& v)
+{
+	uint32_t a{};
+	stream>>a;
+	return std::unique_ptr<NoDefConstruct>{new NoDefConstruct(a)};
+}
+MASS_IPC_TYPE_SIGNATURE(std::unique_ptr<NoDefConstruct>);
+
+
+// static_assert(IsReadStreamCreating<NoDefConstruct>::value, "NoDefConstruct should have a stream operator");
+// static_assert(!IsReadStreamCreating<int>::value, "int should not have a stream operator");
+
+
 
 static MAssIpc_TransthreadTarget::Id CreateCustomId(size_t value)
 {
@@ -436,6 +497,16 @@ void TestThreads_MainThread()
 //-------------------------------------------------------
 //-------------------------------------------------------
 
+static NoDefConstruct Proc_NoDefConstruct(NoDefConstruct ndc)
+{
+	return NoDefConstruct(ndc.m_a*2);
+}
+
+static std::unique_ptr<NoDefConstruct> Proc_NoDefConstruct_unique_ptr(std::unique_ptr<NoDefConstruct> ndc)
+{
+	ndc->m_a *= 4;
+	return std::move(ndc);
+}
 
 static std::string Ipc_Proc1(uint8_t a, std::string b, uint32_t c)
 {
@@ -562,8 +633,8 @@ class SigCheck
 public:
 	std::string Static_String_StringU32Double(std::string s, uint32_t a, double b)
 	{
+		return s + std::to_string(int(a*b));
 	}
-
 };
 
 constexpr const MAssIpcCall::SigName<std::string(std::string, uint32_t, double)> sig_Static_String_StringU32Double = {"Float_StringDouble"};
@@ -581,6 +652,10 @@ void Main_IpcService(std::shared_ptr<IpcPackerTransportMemory> transport_buffer)
 	call.SetErrorHandler(MAssIpcCall::TErrorHandler(&OnInvalidRemoteCall));
 
 	std::shared_ptr<const MAssIpcCall::CallInfo> call_info;
+
+	call.AddHandler("Proc_NoDefConstruct", std::function<NoDefConstruct(NoDefConstruct)>(&Proc_NoDefConstruct));
+	call.AddHandler("Proc_NoDefConstruct_unique_ptr", std::function<std::unique_ptr<NoDefConstruct>(std::unique_ptr<NoDefConstruct>)>(&Proc_NoDefConstruct_unique_ptr));
+	
 
 	call.AddHandler(sig_Static_String_StringU32Double, std::function<decltype(Static_String_StringU32Double)>(&Static_String_StringU32Double), {}, {}, {});
 
@@ -681,6 +756,17 @@ void Main_IpcClient()
  		call.AsyncInvoke({"NotExistProc", std::move(ipc_buffer)}, 0);
 // 		call.InvokeWait("NotExistProc", std::move(ipc_buffer)).RetArgs<int>();
 //  	call[{std::move(ipc_buffer), "NotExistProc"}];
+	}
+
+
+	{
+		NoDefConstruct s(123);
+		NoDefConstruct r{call.WaitInvokeRet<NoDefConstruct>("Proc_NoDefConstruct", s)};
+		mass_return_if_not_equal(r.m_a, s.m_a*2);
+
+		std::unique_ptr<NoDefConstruct> us(new NoDefConstruct(123));
+		std::unique_ptr<NoDefConstruct> ur{call.WaitInvokeRet<std::unique_ptr<NoDefConstruct>>("Proc_NoDefConstruct_unique_ptr", us)};
+		mass_return_if_not_equal(ur->m_a, us->m_a*4);
 	}
 
 

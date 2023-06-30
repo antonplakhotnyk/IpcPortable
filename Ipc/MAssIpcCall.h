@@ -501,10 +501,9 @@ TRet MAssIpcCall::WaitInvokeRetUnified(InvokeSetting& settings, bool process_inc
 	MAssIpc_DataStream result;
 	InvokeUnified<TRet>(settings, &result, process_incoming_calls, args...);
 	{
-		TRet res = {};
 		if( result.IsReadBufferPresent() )
-			result>>res;
-		return res;
+			return MAssIpcCallInternal::ReadFromStream<TRet>(result);
+		return MAssIpcCallInternal::MakeDefault<TRet>();
 	}
 }
 
