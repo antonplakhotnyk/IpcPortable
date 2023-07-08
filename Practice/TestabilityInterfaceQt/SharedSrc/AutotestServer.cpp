@@ -56,3 +56,10 @@ std::shared_ptr<AutotestServer::Client> AutotestServer::CreateClient(const Clien
 	m_clients.push_back(new_client);
 	return new_client;
 }
+
+//-------------------------------------------------------
+void AutotestServer::ClientPrivate::SetConnection(SutIndexId sut_id, std::shared_ptr<SutConnection> connection)
+{
+	mass_return_if_equal(sut_id<SutIndexId::max_count, false);
+	m_client_connections[size_t(sut_id)] = connection;
+}

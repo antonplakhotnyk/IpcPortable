@@ -89,11 +89,7 @@ private:
 		ClientPrivate(Args&&... args):Client(args...){};
 
 		const Handlers& GetHandlers() const {return m_handlers;}
-		void SetConnection(SutIndexId sut_id, std::shared_ptr<SutConnection> connection)
-		{
-			mass_return_if_equal(sut_id<SutIndexId::max_count, false);
-			m_client_connections[size_t(sut_id)] = connection;
-		}
+		void SetConnection(SutIndexId sut_id, std::shared_ptr<SutConnection> connection);
 	};
 
 
