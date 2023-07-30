@@ -1,6 +1,5 @@
 #include "IpcQt_TransthreadCaller.h"
 #include <QtCore/QCoreApplication>
-#include <QtCore/QMutexLocker>
 #include "MAssIpc_Macros.h"
 
 std::weak_ptr<IpcQt_TransthreadCaller::Internals> IpcQt_TransthreadCaller::s_int_inter_thread;

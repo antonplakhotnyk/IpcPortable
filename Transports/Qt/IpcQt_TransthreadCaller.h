@@ -2,10 +2,10 @@
 
 #include <QtCore/QThread>
 #include <QtCore/QEvent>
-#include <memory>
-#include <QtCore/QMutex>
-#include <QtCore/QWaitCondition>
 #include "MAssIpc_TransthreadTarget.h"
+#include <memory>
+#include <mutex>
+#include <condition_variable>
 #include <set>
 
 class IpcQt_TransthreadCaller: public QObject
@@ -20,7 +20,7 @@ public:
 	static MAssIpc_TransthreadTarget::Id	GetId(QThread* thread);
 	static void CancelDisableWaitingCall(MAssIpc_TransthreadTarget::Id thread_waiting_call);
 
-public:
+private:
 
 	struct WaitSync
 	{
@@ -55,7 +55,7 @@ public:
 		std::shared_ptr<WaitSync> m_wait_return_processing_calls;
 	};
 
-
+public:
 
 	class CallEvent: public QEvent
 	{
