@@ -20,39 +20,80 @@ public:
 	static MAssIpc_TransthreadTarget::Id	GetId(QThread* thread);
 	static void CancelDisableWaitingCall(MAssIpc_TransthreadTarget::Id thread_waiting_call);
 
-private:
-
-	struct WaitSync
-	{
-		bool receiver_thread_finished = false;
-		std::condition_variable	condition;
-		std::mutex mutex_sync;
-
-		void SetReceiverThreadFinished();
-	};
-
 	class CallWaiter
 	{
 	public:
 
-		CallWaiter(std::shared_ptr<WaitSync> wait_return_processing_calls)
-			:m_wait_return_processing_calls(wait_return_processing_calls)
-		{
-		}
+		virtual ~CallWaiter() = default;
 
-		void WaitProcessing();
-		void CallDone();
-		void CallCancel();
-
-	private:
 		enum CallState: uint8_t
 		{
+			cs_no_call,
 			cs_inprogress,
 			cs_canceled,
 			cs_done,
+			cs_receiver_thread_finished
 		};
+
+		virtual CallState WaitProcessing()
+		{
+			return cs_no_call;
+		}
+	};
+
+	class CallEvent;
+
+	std::shared_ptr<CallWaiter> CallFromThread(MAssIpc_TransthreadTarget::Id receiver_thread_id, std::unique_ptr<CallEvent> call);
+
+protected:
+
+	static void ProcessCalls();
+
+private:
+
+	struct WaitSync
+	{
+		std::condition_variable	condition;
+		std::mutex mutex_sync;
+	};
+
+	class CallWaiterPrivate: public CallWaiter
+	{
+	public:
+
+		CallWaiterPrivate(std::shared_ptr<std::set<CallWaiterPrivate*> > sender_calls,
+						  std::shared_ptr<std::set<CallWaiterPrivate*> > receiver_calls,
+						  std::shared_ptr<WaitSync> wait_return_processing_calls)
+			:m_wait_return_processing_calls(wait_return_processing_calls)
+			, m_sender_calls(sender_calls)
+			, m_receiver_calls(receiver_calls)
+		{
+			if( m_sender_calls )
+				m_sender_calls->insert(this);
+			if( m_receiver_calls )
+				m_receiver_calls->insert(this);
+		}
+
+		~CallWaiterPrivate()
+		{
+			if( m_sender_calls )
+				m_sender_calls->erase(this);
+			if( m_receiver_calls )
+				m_receiver_calls->erase(this);
+		}
+
+		CallState WaitProcessing() override;
+
+		void CallDone();
+		void CallCancel();
+		void SetReceiverThreadFinished();
+
+	private:
 		CallState m_call_state = cs_inprogress;
 		std::shared_ptr<WaitSync> m_wait_return_processing_calls;
+
+		const std::shared_ptr<std::set<CallWaiterPrivate*> > m_sender_calls;
+		const std::shared_ptr<std::set<CallWaiterPrivate*> > m_receiver_calls;
 	};
 
 public:
@@ -65,37 +106,14 @@ public:
 
 		void ProcessCallFromTargetThread();
 
-		void SetCallWaiter(std::shared_ptr<CallWaiter> call_waiter);
+		void SetCallWaiter(std::shared_ptr<CallWaiterPrivate> call_waiter);
 
 	protected:
 		virtual void CallFromTargetThread() = 0;
 
 	protected:
 
-		std::shared_ptr<CallWaiter> m_call_waiter;
-	};
-
-	struct CancelHolder
-	{
-		CancelHolder(std::shared_ptr<std::set<CancelHolder*> > sender_waiting_calls, const std::shared_ptr<CallWaiter>& call_waiter)
-			: m_call_waiter_cancel(call_waiter)
-			, m_sender_waiting_calls(sender_waiting_calls)
-		{
-			if( m_sender_waiting_calls )
-				m_sender_waiting_calls->insert(this);
-		}
-
-		~CancelHolder()
-		{
-			if( m_sender_waiting_calls )
-				m_sender_waiting_calls->erase(this);
-		}
-
-		std::shared_ptr<CallWaiter> m_call_waiter_cancel;
-
-	private:
-
-		std::shared_ptr<std::set<CancelHolder*> > m_sender_waiting_calls;
+		std::shared_ptr<CallWaiterPrivate> m_call_waiter;
 	};
 
 
@@ -116,20 +134,13 @@ private:
 
 		std::shared_ptr<WaitSync> GetWaitCallSync() const;
 
-		std::shared_ptr<std::set<CancelHolder*> > m_sender_waiting_calls = std::make_shared<std::set<CancelHolder*>>();
+		std::shared_ptr<std::set<CallWaiterPrivate*> > m_call_waiters_sender = std::make_shared<std::set<CallWaiterPrivate*>>();
+		std::shared_ptr<std::set<CallWaiterPrivate*> > m_call_waiters_receiver = std::make_shared<std::set<CallWaiterPrivate*>>();
 
 	private:
 		const std::shared_ptr<WaitSync> m_sender_wait_return_receiver_processing_calls = std::make_shared<WaitSync>();
 	};
 
-public:
-
-	void CallFromThread(MAssIpc_TransthreadTarget::Id receiver_thread_id, std::unique_ptr<CallEvent> call,
-						std::unique_ptr<CancelHolder>* call_waiter);
-protected:
-	void CallNoThread(std::unique_ptr<CallEvent> call);
-	
-	static void ProcessCalls();
 
 private:
 

@@ -16,11 +16,10 @@ void IpcQt_TransthreadTransportCopy::CallFromThread(std::function<void()> invoke
 		invoke_proc();
 	else
 	{
-		std::unique_ptr<IpcQt_TransthreadCaller::CancelHolder> call_waiter;
 		std::unique_ptr<Call> call(std::make_unique<Call>(m_transport, invoke_proc));
-		m_inter_thread->CallFromThread(m_transport_thread_id, std::move(call), &call_waiter);
+		std::shared_ptr<IpcQt_TransthreadCaller::CallWaiter> call_waiter = m_inter_thread->CallFromThread(m_transport_thread_id, std::move(call));
 
-		call_waiter->m_call_waiter_cancel->WaitProcessing();
+		call_waiter->WaitProcessing();
 	}
 }
 

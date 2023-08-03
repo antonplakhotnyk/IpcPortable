@@ -15,7 +15,7 @@ IpcQt_Transthread::~IpcQt_Transthread()
 void IpcQt_Transthread::CallFromThread(MAssIpc_TransthreadTarget::Id thread_id, std::unique_ptr<Job> job)
 {
 	std::unique_ptr<JobEvent> call(std::make_unique<JobEvent>(std::move(job)));
-	IpcQt_TransthreadCaller::CallFromThread(thread_id, std::move(call), nullptr);
+	IpcQt_TransthreadCaller::CallFromThread(thread_id, std::move(call));
 }
 
 MAssIpc_TransthreadTarget::Id	IpcQt_Transthread::GetResultSendThreadId()

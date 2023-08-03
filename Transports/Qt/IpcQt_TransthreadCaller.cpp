@@ -49,10 +49,13 @@ void IpcQt_TransthreadCaller::CancelDisableWaitingCall(MAssIpc_TransthreadTarget
 		auto it_thread_waiting_call = int_inter_thread->threads.find(thread_waiting_call);
 		mass_return_if_equal(it_thread_waiting_call, int_inter_thread->threads.end());
 
-		for( CancelHolder* holder : *it_thread_waiting_call->second->m_sender_waiting_calls.get() )
-			holder->m_call_waiter_cancel->CallCancel();
+		if( bool(it_thread_waiting_call->second->m_call_waiters_sender) )
+		{
+			for( CallWaiterPrivate* call_waiter_cancel : *it_thread_waiting_call->second->m_call_waiters_sender.get() )
+				call_waiter_cancel->CallCancel();
 
-		it_thread_waiting_call->second->m_sender_waiting_calls.reset();
+			it_thread_waiting_call->second->m_call_waiters_sender.reset();
+		}
 	}
 }
 
@@ -89,37 +92,38 @@ MAssIpc_TransthreadTarget::Id IpcQt_TransthreadCaller::AddTargetThread(QThread* 
 	return receiver_id;
 }
 
-void IpcQt_TransthreadCaller::CallFromThread(MAssIpc_TransthreadTarget::Id receiver_thread_id, std::unique_ptr<CallEvent> call,
-									std::unique_ptr<CancelHolder>* call_waiter)
+std::shared_ptr<IpcQt_TransthreadCaller::CallWaiter> IpcQt_TransthreadCaller::CallFromThread(MAssIpc_TransthreadTarget::Id receiver_thread_id, std::unique_ptr<CallEvent> call)
 {
 	MAssIpc_TransthreadTarget::Id sender_thread_id = IpcQt_TransthreadCaller::GetCurrentThreadId();
 	if( receiver_thread_id == MAssIpc_TransthreadTarget::Id() )
 		receiver_thread_id = sender_thread_id;
 
-	std::shared_ptr<WaitSync> wait_return_processing_calls;
+	std::shared_ptr<CallWaiterPrivate> call_waiter_new;
+	std::shared_ptr<WaitSync> receiver_wait_return_processing_calls;
 	{
 		std::unique_lock<std::mutex> lock(m_int->lock_threads);
 
 		auto it_receiver = m_int->threads.find(receiver_thread_id);
-		mass_return_if_equal(it_receiver, m_int->threads.end());
-		wait_return_processing_calls = it_receiver->second->GetWaitCallSync();
+		mass_return_x_if_equal(it_receiver, m_int->threads.end(), std::make_shared<CallWaiter>());
 
-		if( call_waiter )
-		{
-			auto it_sender = m_int->threads.find(sender_thread_id);
-			mass_return_if_equal(it_sender, m_int->threads.end());
+		receiver_wait_return_processing_calls = it_receiver->second->GetWaitCallSync();
 
-			std::shared_ptr<CallWaiter> call_waiter_new = std::make_shared<CallWaiter>(wait_return_processing_calls);
-			call->SetCallWaiter(call_waiter_new);
-			if( !bool(it_sender->second->m_sender_waiting_calls) )
-				call_waiter_new->CallCancel();
+		auto it_sender = m_int->threads.find(sender_thread_id);
+		mass_return_x_if_equal(it_sender, m_int->threads.end(), std::make_shared<CallWaiter>());
 
-			*call_waiter = std::make_unique<CancelHolder>(it_sender->second->m_sender_waiting_calls, call_waiter_new);
-		}
+		call_waiter_new = std::make_shared<CallWaiterPrivate>(it_sender->second->m_call_waiters_sender, 
+															  it_receiver->second->m_call_waiters_receiver, 
+															  it_sender->second->GetWaitCallSync());
+		call->SetCallWaiter(call_waiter_new);
+		if( !bool(it_sender->second->m_call_waiters_sender) )
+			call_waiter_new->CallCancel();
+
 		QCoreApplication::postEvent(it_receiver->second.get(), call.release());
 	}
-	if( wait_return_processing_calls )
-		wait_return_processing_calls->condition.notify_all();
+	if( receiver_wait_return_processing_calls )
+		receiver_wait_return_processing_calls->condition.notify_all();
+
+	return call_waiter_new;
 }
 
 void IpcQt_TransthreadCaller::ProcessCalls()
@@ -145,11 +149,6 @@ void IpcQt_TransthreadCaller::ProcessCalls()
 	QCoreApplication::sendPostedEvents(thread_receiver);
 }
 
-void IpcQt_TransthreadCaller::CallNoThread(std::unique_ptr<CallEvent> call)
-{
-	QCoreApplication::postEvent(&m_receiver_no_thread, call.release());
-}
-
 //-------------------------------------------------------
 
 void IpcQt_TransthreadCaller::CallReceiver::customEvent(QEvent* event)
@@ -167,7 +166,7 @@ void IpcQt_TransthreadCaller::CallEvent::ProcessCallFromTargetThread()
 		m_call_waiter->CallDone();
 }
 
-void IpcQt_TransthreadCaller::CallEvent::SetCallWaiter(std::shared_ptr<CallWaiter> call_waiter)
+void IpcQt_TransthreadCaller::CallEvent::SetCallWaiter(std::shared_ptr<CallWaiterPrivate> call_waiter)
 {
 	if( !m_call_waiter )
 		m_call_waiter = call_waiter;
@@ -195,8 +194,9 @@ void IpcQt_TransthreadCaller::ThreadCallReceiver::OnFinished_ReceiverThread()
 				safe_delete_lifetime = std::move(it->second);
 				int_inter_thread->threads.erase(it);
 
-				std::shared_ptr<WaitSync> wait_return_processing_calls = safe_delete_lifetime->GetWaitCallSync();
-				wait_return_processing_calls->SetReceiverThreadFinished();
+				if( bool(safe_delete_lifetime->m_call_waiters_receiver) )
+					for( CallWaiterPrivate* call_waiter_cancel : *safe_delete_lifetime->m_call_waiters_receiver.get() )
+						call_waiter_cancel->SetReceiverThreadFinished();
 			}
 		}
 	}
@@ -208,41 +208,43 @@ std::shared_ptr<IpcQt_TransthreadCaller::WaitSync> IpcQt_TransthreadCaller::Thre
 }
 
 //-------------------------------------------------------
-void IpcQt_TransthreadCaller::CallWaiter::WaitProcessing()
+IpcQt_TransthreadCaller::CallWaiterPrivate::CallState IpcQt_TransthreadCaller::CallWaiterPrivate::WaitProcessing()
 {
 	while(true)
 	{
+		IpcQt_TransthreadCaller::ProcessCalls();
+
 		{
 			std::unique_lock<std::mutex> lock(m_wait_return_processing_calls->mutex_sync);
-			if( (m_call_state!=cs_inprogress) || m_wait_return_processing_calls->receiver_thread_finished )
+			if( m_call_state!=cs_inprogress )
 				break;
 
 			m_wait_return_processing_calls->condition.wait(lock);
-			if( (m_call_state!=cs_inprogress) || m_wait_return_processing_calls->receiver_thread_finished )
+			if( m_call_state!=cs_inprogress )
 				break;
 		}
-
-		IpcQt_TransthreadCaller::ProcessCalls();
 	}
+
+	return m_call_state;
 }
 
-void IpcQt_TransthreadCaller::CallWaiter::CallDone()
+void IpcQt_TransthreadCaller::CallWaiterPrivate::CallDone()
 {
 	std::unique_lock<std::mutex> lock(m_wait_return_processing_calls->mutex_sync);
 	m_call_state = cs_done;
 	m_wait_return_processing_calls->condition.notify_all();
 }
 
-void IpcQt_TransthreadCaller::CallWaiter::CallCancel()
+void IpcQt_TransthreadCaller::CallWaiterPrivate::CallCancel()
 {
 	std::unique_lock<std::mutex> lock(m_wait_return_processing_calls->mutex_sync);
 	m_call_state = cs_canceled;
 	m_wait_return_processing_calls->condition.notify_all();
 }
 
-void IpcQt_TransthreadCaller::WaitSync::SetReceiverThreadFinished()
+void IpcQt_TransthreadCaller::CallWaiterPrivate::SetReceiverThreadFinished()
 {
-	std::unique_lock<std::mutex> lock(this->mutex_sync);
-	this->receiver_thread_finished = true;
-	this->condition.notify_all();
+	std::unique_lock<std::mutex> lock(m_wait_return_processing_calls->mutex_sync);
+	m_call_state = cs_receiver_thread_finished;
+	m_wait_return_processing_calls->condition.notify_all();
 }
