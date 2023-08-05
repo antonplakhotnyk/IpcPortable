@@ -1,7 +1,6 @@
 #pragma once
 
 #include "MAssIpc_DataStream.h"
-#include <functional>
 #include <memory>
 #include "MAssIpc_Transthread.h"
 #include "MAssIpc_Internals.h"
