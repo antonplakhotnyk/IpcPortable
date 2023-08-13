@@ -49,8 +49,6 @@ private:
 private:
 
 // 	int						m_wait_respound;
-
-	bool m_disconnect_called;
 };
 
 

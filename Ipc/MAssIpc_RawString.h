@@ -18,7 +18,7 @@ public:
 		static_assert(N>=1, "unexpected string size");
 	}
 
-	template<typename T, typename std::enable_if<!std::is_array<T>::value, bool>::type = true>
+	template<typename T, typename std::enable_if<!std::is_array<T>::value && std::is_convertible<T, const char*>::value, bool>::type = true>
 	MAssIpc_RawString(const T str)
 		:MAssIpc_RawString(str, ConvertCheckStrLen(strlen(str)))
 	{

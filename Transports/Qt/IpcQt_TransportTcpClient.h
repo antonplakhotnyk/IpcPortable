@@ -4,7 +4,7 @@
 #include <QtCore/QDataStream>
 #include <QtNetwork/QHostAddress>
 #include "IpcQt_TransporTcp.h"
-#include "IpcQt_Global.h"
+#include "TestabilityGlobalQt.h"
 
 
 class IpcQt_TransportTcpClient: public QObject
@@ -14,7 +14,7 @@ public:
 	IpcQt_TransportTcpClient(void);
 	~IpcQt_TransportTcpClient();
 
-	void StartConnection(const Ipc::Addr& addr);
+	void StartConnection(const TestabilityGlobalQt::Addr& addr);
 	bool WaitConnection();
 
 	std::shared_ptr<IpcQt_TransporTcp> GetTransport();

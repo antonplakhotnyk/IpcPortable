@@ -12,4 +12,10 @@ class MAssIpc_TransthreadTarget
 public:
 
 	using Id = QThread*;
+
+	static Id CurrentThread()
+	{
+		return QThread::currentThread();
+	}
+
 };

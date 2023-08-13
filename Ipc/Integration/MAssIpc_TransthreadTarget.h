@@ -18,11 +18,28 @@ public:
 		constexpr Id() = default;
 
 	private:
-
-		size_t m_id = -1;
+		size_t m_id = -1;// no thread
 	};
 
+	static Id CurrentThread()
+	{
+		return Id();
+	}
+
 	// possible implementations:
-	//using Id = MAssIpc_ThreadSafe::Id;
-	//using Id = std::thread::id
+	// 
+	// Same as MAssIpc_ThreadSafe
+	// using Id = MAssIpc_ThreadSafe::Id;
+	// static Id CurrentThread()
+	// {
+	// 	return MAssIpc_ThreadSafe::get_id();
+	// }
+	//
+	// based on std::thread
+	// using Id = std::thread::id
+	// static inline id get_id()
+	// {
+	// 	return std::this_thread::get_id();
+	// }
+
 };

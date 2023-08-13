@@ -1,5 +1,8 @@
 #pragma once
 
+#include <QtCore/QObject>
+#include <QtCore/QByteArray>
+
 class ApplicationUnderTest: public QObject
 {
 public:

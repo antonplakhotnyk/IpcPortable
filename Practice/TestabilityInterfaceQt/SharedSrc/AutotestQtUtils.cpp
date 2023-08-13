@@ -11,7 +11,7 @@ bool AutotestQtUtils::WaitProcessingSutReady(MAssIpcCall& sut_ipc, QEventLoop& e
 	{
 		wait_success = true;
 		event_loop.exit();
-	}), {}, IpcQt_TransthreadCaller::GetCurrentThreadId(), handler_tag);
+	}), handler_tag);
 
 	sut_ipc.AsyncInvoke("AutotestServerReady");
 	event_loop.exec();
@@ -28,7 +28,7 @@ bool AutotestQtUtils::WaitIncomingCall(const char* proc_name, MAssIpcCall& sut_i
 	{
 		wait_success = true;
 		event_loop.exit();
-	}), {}, IpcQt_TransthreadCaller::GetCurrentThreadId(), handler_tag);
+	}), handler_tag);
 
 	event_loop.exec();
 	return wait_success;

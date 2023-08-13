@@ -3,13 +3,13 @@
 #include <QtWidgets/QWidget>
 #include <QtWidgets/QMainWindow>
 #include <QtCore/QDebug>
-#include "ApplicationStatic.h"
 
 #include <iostream>
 
 #include "ApplicationUnderTest.h"
-#include "ApplicationSut.h"
-#include "IpcQt_Global.h"
+#include "Application_Sut.h"
+#include "TestabilityGlobalQt.h"
+#include "ApplicationStatic.h"
 
 
 
@@ -17,7 +17,7 @@ int main(int argc, char* argv[])
 {
 	ApplicationStatic app(argc, argv);
 
-	Ipc::InitSpecificClient(QStringList{Ipc::c_arg_autotest_server, "localhost"});
+	TestabilityGlobalQt::InitClient<Application_Sut>(QStringList{TestabilityGlobalQt::c_arg_autotest_server, "localhost"});
 	
 	ApplicationUnderTest application;
 	QMainWindow main_window;

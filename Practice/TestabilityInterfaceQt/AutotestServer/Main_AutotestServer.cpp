@@ -38,10 +38,15 @@ public:
 
 		bool br;
 
+		br = AutotestQtUtils::WaitProcessingSutReady(m_sut_ipc, event_loop);
+
 		br = m_sut_ipc.WaitInvokeRet<bool>("OpenFile", QByteArray{"Test-data"});
+		return_if_not_equal(br, true);
 		br = m_sut_ipc.WaitInvokeRet<bool>("OpenFile", QByteArray{"return false"});
+		return_if_not_equal(br, false);
 
 		QString str = m_sut_ipc.WaitInvokeRet<QString>("TransfetString", QString{" string data"});
+		return_if_not_equal(str, "return string data");
 
 		event_loop.exec();
 	}
@@ -60,7 +65,7 @@ public:
 		switch( create_index )
 		{
 			case 0: return std::unique_ptr<AutotestBase>{new Autotest1(sut_ipc)};
-			default: return {};
+			default: m_index = 0; return {};
 		}
 	}
 

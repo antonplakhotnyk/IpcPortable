@@ -1,15 +1,15 @@
-#include "IpcQt_Global.h"
+#include "TestabilityGlobalQt.h"
 #include <QtCore/QStringList>
 
 
 static MAssIpcCall g_ipc_global({});
 
-MAssIpcCall& Ipc::Inst()
+MAssIpcCall& TestabilityGlobalQt::Ipc()
 {
 	return g_ipc_global;
 }
 
-QString Ipc::GetArgParam_String(const QStringList& args, const char* arg)
+QString TestabilityGlobalQt::GetArgParam_String(const QStringList& args, const char* arg)
 {
     const int index_of_arg = args.indexOf(arg);
     if (index_of_arg < 0)
@@ -21,7 +21,7 @@ QString Ipc::GetArgParam_String(const QStringList& args, const char* arg)
 	return args.at(index);
 }
 
-Ipc::Addr Ipc::GetArgServerAddr(const QStringList& args)
+TestabilityGlobalQt::Addr TestabilityGlobalQt::GetArgServerAddr(const QStringList& args)
 {
 	const QString& host_name = GetArgParam_String(args, c_arg_autotest_server);
 	if( host_name.isEmpty() )

@@ -12,7 +12,7 @@ IpcQt_TransthreadTransportCopy::IpcQt_TransthreadTransportCopy(MAssIpc_Transthre
 
 void IpcQt_TransthreadTransportCopy::CallFromThread(std::function<void()> invoke_proc)
 {
-	if( IpcQt_TransthreadCaller::GetCurrentThreadId() == m_transport_thread_id )
+	if( MAssIpc_TransthreadTarget::CurrentThread() == m_transport_thread_id )
 		invoke_proc();
 	else
 	{

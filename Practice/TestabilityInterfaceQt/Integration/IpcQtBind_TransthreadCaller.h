@@ -7,11 +7,6 @@ class IpcQtBind_TransthreadCaller
 {
 public:
 
-	static MAssIpc_TransthreadTarget::Id GetCurrentThreadId()
-	{
-		return QThread::currentThread();
-	}
-
 	static MAssIpc_TransthreadTarget::Id GetId(QThread* thread)
 	{
 		return thread;

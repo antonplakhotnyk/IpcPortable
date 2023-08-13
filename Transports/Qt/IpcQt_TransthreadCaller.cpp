@@ -78,7 +78,7 @@ MAssIpc_TransthreadTarget::Id IpcQt_TransthreadCaller::AddTargetThread(QThread* 
 
 std::shared_ptr<IpcQt_TransthreadCaller::CallWaiter> IpcQt_TransthreadCaller::CallFromThread(MAssIpc_TransthreadTarget::Id receiver_thread_id, std::unique_ptr<CallEvent> call)
 {
-	MAssIpc_TransthreadTarget::Id sender_thread_id = IpcQt_TransthreadCaller::GetCurrentThreadId();
+	MAssIpc_TransthreadTarget::Id sender_thread_id = MAssIpc_TransthreadTarget::CurrentThread();
 	if( receiver_thread_id == MAssIpc_TransthreadTarget::Id() )
 		receiver_thread_id = sender_thread_id;
 
@@ -116,7 +116,7 @@ void IpcQt_TransthreadCaller::ProcessCalls()
 	std::shared_ptr<Internals> int_inter_thread = GetInternals();
 	mass_return_if_equal(bool(int_inter_thread), false);
 
-	MAssIpc_TransthreadTarget::Id thread_id = IpcQt_TransthreadCaller::GetCurrentThreadId();
+	MAssIpc_TransthreadTarget::Id thread_id = MAssIpc_TransthreadTarget::CurrentThread();
 
 	ThreadCallReceiver* thread_receiver;
 	{
@@ -157,7 +157,7 @@ void IpcQt_TransthreadCaller::CallEvent::SetCallWaiter(std::shared_ptr<CallWaite
 
 void IpcQt_TransthreadCaller::ThreadCallReceiver::OnFinished_ReceiverThread()
 {
-	auto current_thread_id = IpcQt_TransthreadCaller::GetCurrentThreadId();
+	auto current_thread_id = MAssIpc_TransthreadTarget::CurrentThread();
 
 	std::shared_ptr<Internals> int_inter_thread = GetInternals();
 	if( !bool(int_inter_thread) )

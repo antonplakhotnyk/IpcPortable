@@ -8,14 +8,14 @@ class TestabilityClientQt: public QThread
 {
 public:
 
-	TestabilityClientQt(MAssIpcCall& ipc_connection, const Ipc::Addr& connect_to_address);
+	TestabilityClientQt(MAssIpcCall& ipc_connection, const TestabilityGlobalQt::Addr& connect_to_address);
 	~TestabilityClientQt();
 
 	void Start();
 
 private:
 
-	void Background_Main(MAssIpcCall& ipc_connection, const Ipc::Addr& connect_to_address);
+	void Background_Main(MAssIpcCall& ipc_connection, const TestabilityGlobalQt::Addr& connect_to_address);
 
 private:
 
@@ -26,8 +26,9 @@ private:
 		//	BackgroundThread must be removed and replaced by 
 		//	:m_background_thread(QThread::create(&TestabilityClientQt::Background_Main, this, connect_to_address))
 		//	it can not be done right now because of Qt targeting Android fails compile that string
-		BackgroundThread(TestabilityClientQt* parent, MAssIpcCall& ipc_connection, const Ipc::Addr& connect_to_address)
-			: m_ipc_connection(ipc_connection)
+		BackgroundThread(TestabilityClientQt* parent, MAssIpcCall& ipc_connection, const TestabilityGlobalQt::Addr& connect_to_address)
+			: QThread(parent)
+			, m_ipc_connection(ipc_connection)
 			, m_connect_to_address(connect_to_address)
 			, m_parent(parent)
 		{
@@ -35,20 +36,21 @@ private:
 
 		void run() override
 		{
+			bool br = (this==QThread::currentThread());
 			m_parent->Background_Main(m_ipc_connection, m_connect_to_address);
 		}
 
 	private:
 
 		MAssIpcCall&				m_ipc_connection;
-		Ipc::Addr m_connect_to_address;
+		TestabilityGlobalQt::Addr m_connect_to_address;
 		TestabilityClientQt* m_parent;
 	};
 
 	class Internals: public QObject  
 	{
 	public:
-		Internals(MAssIpcCall& ipc_connection, const Ipc::Addr& connect_to_address);
+		Internals(MAssIpcCall& ipc_connection, const TestabilityGlobalQt::Addr& connect_to_address);
 		~Internals();
 
 		void StartConnection();
@@ -61,7 +63,7 @@ private:
 
 	private:
 
-		Ipc::Addr m_connect_to_address;
+		TestabilityGlobalQt::Addr m_connect_to_address;
 	};
 
 	class WaitReady

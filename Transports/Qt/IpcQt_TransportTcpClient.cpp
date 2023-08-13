@@ -10,7 +10,7 @@ IpcQt_TransportTcpClient::~IpcQt_TransportTcpClient()
 {
 }
 
-void IpcQt_TransportTcpClient::StartConnection(const Ipc::Addr& addr)
+void IpcQt_TransportTcpClient::StartConnection(const TestabilityGlobalQt::Addr& addr)
 {
 	QTcpSocket* connection = new QTcpSocket();
 	m_connection_transport->AssignConnection(m_connection_transport, connection);

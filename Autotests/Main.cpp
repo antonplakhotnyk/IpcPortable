@@ -668,6 +668,21 @@ void Main_IpcService(std::shared_ptr<IpcPackerTransportMemory> transport_buffer)
 	call.AddHandler("Ipc_UniquePtr2", std::function<void(DataStruct2*)>(&Ipc_Ptr2));
 	//	call.AddHandler("IsLinkUp_Sta", std::function<void(uint8_t, std::string, uint32_t)>(&Ipc_Proc3));
 
+	class TagLocal
+	{
+	}; 
+	TagLocal* tag = nullptr;
+	MAssIpc_TransthreadTarget::Id thread_id;
+	const char* proc_name = "test compile 2";
+	const char proc_name_literal[] = {"test compile 3"};
+	call.AddHandler("test compile 1", std::function<void(uint8_t, std::string, uint32_t)>(&Ipc_Proc3), {}, {}, tag);// obsolate
+	call.AddHandler(proc_name, std::function<void(uint8_t, std::string, uint32_t)>(&Ipc_Proc3));
+	call.AddHandler(proc_name_literal, std::function<void(uint8_t, std::string, uint32_t)>(&Ipc_Proc3));
+	call.AddHandler("test compile 4", std::function<void(uint8_t, std::string, uint32_t)>(&Ipc_Proc3));
+	call.AddHandler("test compile 5", std::function<void(uint8_t, std::string, uint32_t)>(&Ipc_Proc3), tag);
+	call.AddHandler("test compile 6", std::function<void(uint8_t, std::string, uint32_t)>(&Ipc_Proc3), tag, thread_id);
+	call.AddHandler("test compile 7", std::function<void(uint8_t, std::string, uint32_t)>(&Ipc_Proc3), tag, thread_id, "comment");
+
 	call.AddHandler("VectorU8", std::function<std::vector<uint8_t>(std::vector<uint8_t>)>(&VectorT<uint8_t>));
 	call.AddHandler("VectorU16", std::function<std::vector<uint16_t>(std::vector<uint16_t>)>(&VectorT<uint16_t>));
 	call.AddHandler("VectorU32", std::function<std::vector<uint32_t>(std::vector<uint32_t>)>(&VectorT<uint32_t>));

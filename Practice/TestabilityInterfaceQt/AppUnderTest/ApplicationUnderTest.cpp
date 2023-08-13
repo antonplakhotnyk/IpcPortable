@@ -1,13 +1,14 @@
 #include "ApplicationUnderTest.h"
-#include "ApplicationSut.h"
+#include "Application_Sut.h"
 
 ApplicationUnderTest::ApplicationUnderTest()
 {
-	ApplicationSut::ApplicationUnderTest_Register(this);
+	Sut::RegisterObject(this);
 }
 
 ApplicationUnderTest::~ApplicationUnderTest()
 {
+	Sut::UnregisterObject(this);
 }
 
 bool ApplicationUnderTest::OpenFile(const QByteArray& file_data)

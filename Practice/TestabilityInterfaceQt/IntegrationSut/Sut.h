@@ -15,6 +15,9 @@ private:
 
 protected:
 
+	template<class Object>
+	using RegisterUnregisterObjectProc = void (*)(Object*);
+
 	static constexpr const char* c_register_proc_name = "RegisterObject@Sut";
 	static constexpr const char* c_unregister_proc_name = "UnregisterObject@Sut";
 
@@ -49,18 +52,42 @@ public:
 			event_call->CallName<void (*)(Args...)>(std::move(name), args...);
 	}
 
+
+
 	template<class Object>
 	static void RegisterObject(Object* object)
 	{
 		if( auto event_call = GetEventHandlerMap()->lock() )
-			event_call->CallName<void (*)(Object*)>(c_register_proc_name, object);
+			event_call->CallName<RegisterUnregisterObjectProc<Object> >(c_register_proc_name, object);
 	}
 
 	template<class Object>
 	static void UnregisterObject(Object* object)
 	{
 		if( auto event_call = GetEventHandlerMap()->lock() )
-			event_call->CallName<void (*)(Object*)>(c_unregister_proc_name, object);
+			event_call->CallName<RegisterUnregisterObjectProc<Object> >(c_unregister_proc_name, object);
+	}
+
+
+
+	template<class Object>
+	static void AddHandler_RegisterObject(const std::function<void(Object* object)>& handler, const void* tag = nullptr)
+	{
+		if( auto event_handler = Sut::GetEventHandlerMap()->lock() )
+			event_handler->AddHandlerName<RegisterUnregisterObjectProc<Object> >(Sut::c_register_proc_name, handler, tag);
+	}
+
+	template<class Object>
+	static void AddHandler_UnregisterObject(const std::function<void(Object* object)>& handler, const void* tag = nullptr)
+	{
+		if( auto event_handler = Sut::GetEventHandlerMap()->lock() )
+			event_handler->AddHandlerName<RegisterUnregisterObjectProc<Object> >(Sut::c_unregister_proc_name, handler, tag);
+	}
+
+	void ClearHandlersWithTag(const void* tag)
+	{
+		if( auto event_handler = Sut::GetEventHandlerMap()->lock() )
+			event_handler->ClearHandlersWithTag(tag);
 	}
 };
 

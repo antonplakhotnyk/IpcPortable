@@ -14,14 +14,14 @@ private:
 		mass_return_if_equal(bool(handler_this), false);
 
 		THandlerClass* clear_handler_tag = handler_this;
-		MAssIpcCall& ipc = Ipc::Inst();
+		MAssIpcCall& ipc = TestabilityGlobalQt::Ipc();
 		ipc.AddHandler(handler_name, std::function<TRet(typename std::remove_reference<typename std::remove_cv<TArgs>::type>::type ...)>([=](TArgs&& ... args)
 		{
 			if( !bool(handler_this) )
 				return TRet();
 			return (handler_this->*handler_proc)(std::forward<TArgs>(args)...);
 		}
-		), {}, IpcQt_TransthreadCaller::GetCurrentThreadId(), clear_handler_tag);
+		), {}, MAssIpc_TransthreadTarget::CurrentThread(), clear_handler_tag);
 	}
 
 protected:
