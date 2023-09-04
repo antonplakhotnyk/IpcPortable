@@ -50,7 +50,7 @@ public:
 
 	~NoDefConstruct()
 	{
-		volatile int a = 0;
+		// volatile int a = 0;
 	}
 
 	uint32_t m_a;
@@ -406,7 +406,7 @@ void TestThreads_Sender(std::shared_ptr<IpcPackerTransportMemory> transport_buff
 			a += 1;
 			c += 10;
 
-			std::string res = call.WaitInvokeRetAlertable<std::string>("TestThreads_HandlerWithCallBack");
+			std::string res = call.WaitInvokeRet<std::string>({"TestThreads_HandlerWithCallBack",MAssIpcCall::InProc::now});
 			mass_return_if_not_equal(res, "TestThreads_SenderCallBack");
 		}
 
@@ -796,7 +796,7 @@ void Main_IpcClient()
 	mass_return_if_not_equal(s_state_error_et, MAssIpcCall::ErrorType::unknown_error);
 	mass_return_if_not_equal(s_calls.empty(), false);
 
-	std::string str = call.WaitInvokeSig(sig_Static_String_StringU32Double, "str:", uint8_t(2), double(123.5));
+	std::string str = call.WaitInvoke(sig_Static_String_StringU32Double, "str:", uint8_t(2), double(123.5));
 	mass_return_if_not_equal(str, "str:247");
 
 

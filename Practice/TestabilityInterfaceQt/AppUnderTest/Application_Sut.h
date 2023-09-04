@@ -23,6 +23,5 @@ private:
 private:
 
 	QPointer<ApplicationUnderTest> m_application;
-	std::shared_ptr<EventHandlerMap> m_sut_event_map;
 };
 

@@ -15,7 +15,8 @@ void AutotestServer::OnConnected(std::weak_ptr<IpcQt_TransporTcp> transport_weak
 	MAssIpcCall ipc_call_initial({});
 	std::shared_ptr<AutotestServer_Client::SutConnection> connection{std::make_shared<AutotestServer_Client::SutConnection>(ipc_call_initial, transport)};
 
-	m_sut_handler = std::make_unique<SutHandlerThread>(connection, m_autotest_container);
+	if( m_autotest_container )
+		m_sut_handler = std::make_unique<SutHandlerThread>(connection, m_autotest_container);
 
 	{
 		auto clients{m_clients};
@@ -56,5 +57,5 @@ std::shared_ptr<AutotestServer_Client> AutotestServer::CreateClient(const Autote
 void AutotestServer::ClientPrivate::SetConnection(SutIndexId sut_id, std::shared_ptr<AutotestServer_Client::SutConnection> connection)
 {
 	mass_return_if_equal(sut_id<SutIndexId::max_count, false);
-	m_client_connections[size_t(sut_id)] = connection;
+	m_int->m_client_connections[size_t(sut_id)] = connection;
 }

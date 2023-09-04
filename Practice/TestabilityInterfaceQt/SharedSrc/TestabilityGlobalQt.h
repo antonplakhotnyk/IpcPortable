@@ -54,16 +54,20 @@ public:
 	static class MAssIpcCall& Ipc();
 
 	template<class TSpecificSut>
-	static void InitClient(const QStringList& args)
+	static void InitClient(const QStringList& args, QObject* sut_deleter_parent = QCoreApplication::instance())
 	{
 		if( !DeclareStaticVariable<TSpecificSut>::s_sut_inst )
 			if( Addr addr = GetArgServerAddr(args) )
 			{
-				DeclareStaticVariable<TSpecificSut>::s_sut_inst = new DeleterStorage<TSpecificSut>(QCoreApplication::instance(), addr, Sut::GetEventHandlerMap());
+				sut_deleter_parent = InitCheckDeleterParent(sut_deleter_parent);
+				if( sut_deleter_parent )
+					DeclareStaticVariable<TSpecificSut>::s_sut_inst = new DeleterStorage<TSpecificSut>(sut_deleter_parent, addr, Sut::GetEventHandlerMap());
 			}
 	}
 
 private:
+
+	static QObject* InitCheckDeleterParent(QObject* sut_deleter_parent);
 
 	static QString GetArgParam_String(const QStringList& args, const char* arg);
 };

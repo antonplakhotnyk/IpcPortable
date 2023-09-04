@@ -421,6 +421,11 @@ MAssIpcCallInternal::MAssIpc_PacketParser::TCallId MAssIpcCall::NewCallId() cons
 	return new_id;
 }
 
+void MAssIpcCall::SetProcessIncomingCalls(bool process_incoming_calls_default)
+{
+	m_int->m_process_incoming_calls_default = process_incoming_calls_default;
+}
+
 //-------------------------------------------------------
 
 MAssIpc_DataStream& operator<<(MAssIpc_DataStream& stream, const MAssIpcCall::ErrorType& v)

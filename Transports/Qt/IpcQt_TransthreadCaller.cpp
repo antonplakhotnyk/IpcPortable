@@ -1,6 +1,7 @@
 #include "IpcQt_TransthreadCaller.h"
 #include <QtCore/QCoreApplication>
 #include "MAssIpc_Macros.h"
+//#include <QtCore/qDebug>
 
 std::weak_ptr<IpcQt_TransthreadCaller::Internals> IpcQt_TransthreadCaller::s_int_inter_thread;
 std::recursive_mutex	IpcQt_TransthreadCaller::s_lock_int_inter_thread;
@@ -78,6 +79,7 @@ MAssIpc_TransthreadTarget::Id IpcQt_TransthreadCaller::AddTargetThread(QThread* 
 
 std::shared_ptr<IpcQt_TransthreadCaller::CallWaiter> IpcQt_TransthreadCaller::CallFromThread(MAssIpc_TransthreadTarget::Id receiver_thread_id, std::unique_ptr<CallEvent> call)
 {
+//	qDebug()<<__func__<<' '<<QThread::currentThreadId()<<" ";
 	MAssIpc_TransthreadTarget::Id sender_thread_id = MAssIpc_TransthreadTarget::CurrentThread();
 	if( receiver_thread_id == MAssIpc_TransthreadTarget::Id() )
 		receiver_thread_id = sender_thread_id;
@@ -115,6 +117,8 @@ void IpcQt_TransthreadCaller::ProcessCalls()
 {
 	std::shared_ptr<Internals> int_inter_thread = GetInternals();
 	mass_return_if_equal(bool(int_inter_thread), false);
+
+//	qDebug()<<__func__<<' '<<QThread::currentThreadId()<<" ";
 
 	MAssIpc_TransthreadTarget::Id thread_id = MAssIpc_TransthreadTarget::CurrentThread();
 
@@ -191,6 +195,8 @@ IpcQt_TransthreadCaller::CallWaiterPrivate::CallState IpcQt_TransthreadCaller::C
 	{
 		{
 			std::unique_lock<std::recursive_mutex> lock(m_wait_return_processing_calls->mutex_sync);
+//			qDebug()<<__func__<<' '<<QThread::currentThreadId()<<" lock";
+
 			if( m_call_state!=cs_inprogress )
 				break;
 
@@ -198,6 +204,7 @@ IpcQt_TransthreadCaller::CallWaiterPrivate::CallState IpcQt_TransthreadCaller::C
 				m_wait_return_processing_calls->process_incoming_call = false;
 			else
 			{
+//				qDebug()<<__func__<<' '<<QThread::currentThreadId()<<" wait";
 				m_wait_return_processing_calls->condition.wait(lock);
 				if( m_call_state!=cs_inprogress )
 					break;
@@ -213,6 +220,7 @@ IpcQt_TransthreadCaller::CallWaiterPrivate::CallState IpcQt_TransthreadCaller::C
 void IpcQt_TransthreadCaller::CallWaiterPrivate::CallDone()
 {
 	std::unique_lock<std::recursive_mutex> lock(m_wait_return_processing_calls->mutex_sync);
+//	qDebug()<<__func__<<' '<<QThread::currentThreadId()<<" lock";
 	m_call_state = cs_done;
 	m_wait_return_processing_calls->condition.notify_all();
 }
@@ -234,6 +242,7 @@ void IpcQt_TransthreadCaller::CallWaiterPrivate::SetReceiverThreadFinished()
 void IpcQt_TransthreadCaller::WaitSync::ProcessIncomingCall()
 {
 	std::unique_lock<std::recursive_mutex> lock(this->mutex_sync);
+//	qDebug()<<__func__<<' '<<QThread::currentThreadId()<<" lock";
 	this->process_incoming_call = true;
 	this->condition.notify_all();
 }

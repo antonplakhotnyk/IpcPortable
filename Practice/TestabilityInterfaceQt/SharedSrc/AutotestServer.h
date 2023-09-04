@@ -28,7 +28,7 @@ private:
 		template<class... Args>
 		ClientPrivate(Args&&... args):AutotestServer_Client(args...){};
 
-		const Handlers& GetHandlers() const {return m_handlers;}
+		const Handlers& GetHandlers() const {return m_int->m_handlers;}
 		void SetConnection(SutIndexId sut_id, std::shared_ptr<AutotestServer_Client::SutConnection> connection);
 	};
 

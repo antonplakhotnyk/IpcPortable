@@ -37,6 +37,46 @@ class IsConvertible: public decltype(DeduceAvailable<TFrom, TTo>(0))
 
 //-------------------------------------------------------
 
+template<class... Args>
+struct Compare
+{
+};
+
+template<class... Args>
+static constexpr bool Check_is_signame_and_handler_describe_same_call_signatures(Compare<Args...> a1, Compare<Args...> a2)
+{
+	return true;
+};
+
+template<class TSig>
+struct ExtractCallTypes
+{
+	static_assert(sizeof(TSig)<0, "no specialization");
+};
+
+template<class Ret, class TCls, class... Args>
+struct ExtractCallTypes<Ret(TCls::*)(Args...)>
+{
+	using TCompare = Compare<Ret, Args...>;
+};
+
+template<class Ret, class TCls, class... Args>
+struct ExtractCallTypes<Ret(TCls::*)(Args...) const>
+{
+	using TCompare = Compare<Ret, Args...>;
+};
+
+template<class Ret, class... Args>
+struct ExtractCallTypes<Ret(*)(Args...)>
+{
+	using TCompare = Compare<Ret, Args...>;
+};
+
+template<class L>
+static auto ExtractCompare(const L&) -> typename ExtractCallTypes<decltype(&L::operator())>::TCompare;
+
+//-------------------------------------------------------
+
 
 class CallInfo
 {
