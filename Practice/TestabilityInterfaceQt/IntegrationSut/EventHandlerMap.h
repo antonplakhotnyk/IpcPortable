@@ -11,6 +11,38 @@ class EventHandlerMap
 {
 private:
 
+	template<typename T>
+	struct GetFunctionSignature;
+
+	// Partial specializations for function, member function and lambda/function objects
+	template<typename Ret, typename... Args>
+	struct GetFunctionSignature<Ret(Args...)>
+	{
+		using TFuncPtr = Ret(*)(Args...);
+	};
+
+	template<typename Ret, typename... Args>
+	struct GetFunctionSignature<Ret(*)(Args...)>: public GetFunctionSignature<Ret(Args...)>
+	{
+	};
+
+	template<typename Class, typename Ret, typename... Args>
+	struct GetFunctionSignature<Ret(Class::*)(Args...)>: public GetFunctionSignature<Ret(Args...)>
+	{
+	};
+
+	template<typename Class, typename Ret, typename... Args>
+	struct GetFunctionSignature<Ret(Class::*)(Args...) const>: public GetFunctionSignature<Ret(Args...)>
+	{
+	};
+
+	template<typename Callable>
+	struct GetFunctionSignature: public GetFunctionSignature<decltype(&Callable::operator())>
+	{
+	};
+
+
+
 	class CallerBase
 	{
 	public:
@@ -44,11 +76,6 @@ private:
 	{
 	}
 
-	template<class TCall, class... Args>
-	class IsSameArgs: public std::is_same<decltype(GetArgsTuple_helper(TCall(nullptr), 0)), std::tuple<Args...> >
-	{
-	};
-
 	template<class TCall>
 	struct TupleArgsFunction
 	{
@@ -59,10 +86,9 @@ private:
 	template<class TypeCheckParams, class... Args>
 	struct TKeyTypeIndex
 	{
-		using TKeyHandler = typename TupleArgsFunction<TypeCheckParams>::type;
+		using TKeyHandler = typename TupleArgsFunction<typename GetFunctionSignature<TypeCheckParams>::TFuncPtr>::type;
 		using TKeyCall = typename std::tuple<Args...>;
-		//		static_assert(IsSameArgs<TypeCheckParams, Args...>::value, "TypeCheckParams must be function pointer with exactly same Args");
-		static_assert(std::is_same<TKeyHandler, TKeyCall>::value, "TypeCheckParams must be function pointer with exactly same Args");
+		static_assert(std::is_same<TKeyHandler, TKeyCall>::value, "TypeCheckParams must be callable or function pointer with exactly same Args");
 
 		static std::type_index HandlerTypeIndex()
 		{
@@ -78,12 +104,14 @@ private:
 		using Caller = TCaller<Args...>;
 	};
 
-	template<class TypeCheckParams, class TRet, class TCls, class... Args>
-	static auto GetAddHandlerInfo(TRet(TCls::* proc)(Args...))->AddHandlerInfo<TypeCheckParams, Args...>;
-
 	template<class TypeCheckParams, class TRet, class... Args>
 	static auto GetAddHandlerInfo(TRet(* proc)(Args...))->AddHandlerInfo<TypeCheckParams, Args...>;
 
+	template<class TypeCheckParams>
+	struct GetTInfo
+	{
+		using type = decltype(GetAddHandlerInfo<TypeCheckParams>(typename GetFunctionSignature<TypeCheckParams>::TFuncPtr(nullptr)));
+	};
 
 	struct Key
 	{
@@ -126,7 +154,7 @@ public:
 	template<class TypeCheckParams, class THandlerProc>
 	void AddHandlerName(std::string name, THandlerProc handler_proc, const void* tag = nullptr)
 	{
-		using TInfo = decltype(GetAddHandlerInfo<TypeCheckParams>(TypeCheckParams(nullptr)));
+		using TInfo = typename GetTInfo<TypeCheckParams>::type;
 		const Key key{std::move(name),TInfo::KeyTypeIndex::HandlerTypeIndex()};
 
 		{
@@ -140,6 +168,12 @@ public:
 		}
 	}
 
+	template<class THandlerProc>
+	void AddName(std::string name, THandlerProc handler_proc, const void* tag = nullptr)
+	{
+ 		AddHandlerName<typename GetFunctionSignature<THandlerProc>::TFuncPtr, THandlerProc>(name, std::forward<THandlerProc>(handler_proc), tag);
+	}
+
 	template<class TypeCheckParams>
 	void ClearHandler()
 	{
@@ -149,7 +183,7 @@ public:
 	template<class TypeCheckParams>
 	void ClearHandlerName(std::string name)
 	{
-		using TInfo = decltype(GetAddHandlerInfo<TypeCheckParams>(TypeCheckParams(nullptr)));
+		using TInfo = typename GetTInfo<TypeCheckParams>::type;
 		const Key key{std::move(name),TInfo::KeyTypeIndex::HandlerTypeIndex()};
 
 		m_name_procs.erase(key);
@@ -175,7 +209,7 @@ public:
 	template<class TypeCheckParams, class... Args>
 	void CallName(std::string name, Args... args)
 	{
-		using TInfo = decltype(GetAddHandlerInfo<TypeCheckParams>(TypeCheckParams(nullptr)));
+		using TInfo = typename GetTInfo<TypeCheckParams>::type;
 		const Key key{std::move(name),TInfo::KeyTypeIndex::HandlerTypeIndex()};
 
 		if(std::shared_ptr<CallerBase> caller_base = FindCaller(key) )

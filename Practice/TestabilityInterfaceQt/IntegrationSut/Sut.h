@@ -70,19 +70,34 @@ public:
 
 
 
-	template<class Object>
-	static void AddHandler_RegisterObject(const std::function<void(Object* object)>& handler, const void* tag = nullptr)
+	template<class Object, class HandlerProc>
+	static void AddHandler_RegisterObject(const HandlerProc& handler, const void* tag = nullptr)
 	{
 		if( auto event_handler = Sut::GetEventHandlerMap()->lock() )
 			event_handler->AddHandlerName<RegisterUnregisterObjectProc<Object> >(Sut::c_register_proc_name, handler, tag);
 	}
 
-	template<class Object>
-	static void AddHandler_UnregisterObject(const std::function<void(Object* object)>& handler, const void* tag = nullptr)
+	template<class Object, class HandlerProc>
+	static void AddHandler_UnregisterObject(const HandlerProc& handler, const void* tag = nullptr)
 	{
 		if( auto event_handler = Sut::GetEventHandlerMap()->lock() )
 			event_handler->AddHandlerName<RegisterUnregisterObjectProc<Object> >(Sut::c_unregister_proc_name, handler, tag);
 	}
+
+	template<class Object>
+	static void ClearHandler_RegisterObject()
+	{
+		if( auto event_call = Sut::GetEventHandlerMap()->lock() )
+			event_call->ClearHandlerName<RegisterUnregisterObjectProc<Object>>(Sut::c_register_proc_name);
+	}
+
+	template<class Object>
+	static void ClearHandler_UnregisterObject()
+	{
+		if( auto event_call = Sut::GetEventHandlerMap()->lock() )
+			event_call->ClearHandlerName<RegisterUnregisterObjectProc<Object>>(Sut::c_unregister_proc_name);
+	}
+
 
 	void ClearHandlersWithTag(const void* tag)
 	{

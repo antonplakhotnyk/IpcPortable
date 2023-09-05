@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Sut.h"
-#include "IpcQt_TransthreadCaller.h"
+#include "TestabilityGlobalQt.h"
 
 class SutUtils: public Sut
 {
@@ -21,7 +21,7 @@ private:
 				return TRet();
 			return (handler_this->*handler_proc)(std::forward<TArgs>(args)...);
 		}
-		), {}, MAssIpc_TransthreadTarget::CurrentThread(), clear_handler_tag);
+		), clear_handler_tag);
 	}
 
 protected:

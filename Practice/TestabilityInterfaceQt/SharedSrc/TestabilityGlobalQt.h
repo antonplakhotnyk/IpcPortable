@@ -10,9 +10,9 @@
 
 class TestabilityGlobalQt: public Sut
 {
-private:
-
+public:
 	struct Addr;
+private:
 
 	template<class TSpecificSut>
 	struct DeleterStorage: public QObject
