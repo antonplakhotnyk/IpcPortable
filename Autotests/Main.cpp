@@ -406,7 +406,7 @@ void TestThreads_Sender(std::shared_ptr<IpcPackerTransportMemory> transport_buff
 			a += 1;
 			c += 10;
 
-			std::string res = call.WaitInvokeRet<std::string>({"TestThreads_HandlerWithCallBack",MAssIpcCall::InProc::now});
+			std::string res = call.WaitInvokeRet<std::string>({"TestThreads_HandlerWithCallBack",MAssIpcCall::ProcIn::now});
 			mass_return_if_not_equal(res, "TestThreads_SenderCallBack");
 		}
 

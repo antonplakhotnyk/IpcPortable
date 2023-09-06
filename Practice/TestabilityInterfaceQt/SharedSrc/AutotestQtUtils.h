@@ -9,6 +9,7 @@ public:
 
 	static bool WaitProcessingSutReady(MAssIpcCall& sut_ipc, QEventLoop& event_loop);
 	static bool WaitIncomingCall(const char* proc_name, MAssIpcCall& sut_ipc, QEventLoop& event_loop);
+	static size_t WaitIncomingCalls(std::vector<const char*> proc_names, MAssIpcCall& sut_ipc, QEventLoop& event_loop);
 
 	class Waiter
 	{

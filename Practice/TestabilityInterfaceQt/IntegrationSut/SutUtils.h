@@ -7,8 +7,8 @@ class SutUtils: public Sut
 {
 private:
 
-	template<class TProcPtr, class THandlerClass, class THandlerThis, class TRet, class... TArgs>
-	static void BindHandlerImpl(const char* handler_name, TProcPtr handler_proc, THandlerThis handler_this)
+	template<class TProcPtr, class THandlerClass, class THandlerThis, class TSigName, class TRet, class... TArgs>
+	static void BindHandlerImpl(const TSigName& handler_name, TProcPtr handler_proc, THandlerThis handler_this)
 	{
 		static_assert(std::is_member_function_pointer<TProcPtr>::value, "member function expected");
 		mass_return_if_equal(bool(handler_this), false);
@@ -26,16 +26,16 @@ private:
 
 protected:
 
-	template<class THandlerClass, class THandlerThis, class TRet, class... TArgs>
-	static void BindHandlerClass(const char* handler_name, TRet(THandlerClass::* handler_proc)(TArgs... args), THandlerThis handler_this)
+	template<class THandlerClass, class THandlerThis, class TSigName, class TRet, class... TArgs>
+	static void BindHandlerClass(const TSigName& handler_name, TRet(THandlerClass::* handler_proc)(TArgs... args), THandlerThis handler_this)
 	{
-		BindHandlerImpl<decltype(handler_proc), THandlerClass, THandlerThis, TRet, TArgs...>(handler_name, handler_proc, handler_this);
+		BindHandlerImpl<decltype(handler_proc), THandlerClass, THandlerThis, TSigName, TRet, TArgs...>(handler_name, handler_proc, handler_this);
 	}
 
-	template<class THandlerClass, class THandlerThis, class TRet, class... TArgs>
-	static void BindHandlerClass(const char* handler_name, TRet(THandlerClass::* handler_proc)(TArgs... args) const, THandlerThis handler_this)
+	template<class THandlerClass, class THandlerThis, class TSigName, class TRet, class... TArgs>
+	static void BindHandlerClass(const TSigName& handler_name, TRet(THandlerClass::* handler_proc)(TArgs... args) const, THandlerThis handler_this)
 	{
-		BindHandlerImpl<decltype(handler_proc), THandlerClass, THandlerThis, TRet, TArgs...>(handler_name, handler_proc, handler_this);
+		BindHandlerImpl<decltype(handler_proc), THandlerClass, THandlerThis, TSigName, TRet, TArgs...>(handler_name, handler_proc, handler_this);
 	}
 
 public:

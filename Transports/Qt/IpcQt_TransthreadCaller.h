@@ -49,8 +49,6 @@ public:
 		}
 	};
 
-	class CallWaiterPrivate;
-
 	class CallEvent: public QEvent
 	{
 	public:

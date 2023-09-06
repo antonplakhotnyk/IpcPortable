@@ -34,3 +34,22 @@ bool AutotestQtUtils::WaitIncomingCall(const char* proc_name, MAssIpcCall& sut_i
 	return wait_success;
 
 }
+
+size_t AutotestQtUtils::WaitIncomingCalls(std::vector<const char*> proc_names, MAssIpcCall& sut_ipc, QEventLoop& event_loop)
+{
+	size_t wait_success = std::numeric_limits<size_t>::max();
+	const void* handler_tag = (void*)(&AutotestQtUtils::WaitIncomingCall);
+	MAssIpcCall::HandlerGuard tag_remove(sut_ipc, handler_tag);
+
+	for(size_t i=0; i<proc_names.size(); i++)
+	{
+		sut_ipc.AddHandler(proc_names[i], [&, i]()
+		{
+			wait_success = i;
+			event_loop.exit();
+		}, handler_tag);
+	}
+
+	event_loop.exec();
+	return wait_success;
+}

@@ -13,7 +13,8 @@ class MAssIpcCall
 {
 public:
 
-	enum struct InProc
+	// During waiting response specify when to execute process incoming calls 
+	enum struct ProcIn
 	{
 		later,
 		now,
@@ -48,14 +49,14 @@ private:
 		{
 		}
 
-		InvokeSetting(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, std::unique_ptr<MAssIpc_Data> inplace_send_buffer, InProc process_incoming_calls)
+		InvokeSetting(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, std::unique_ptr<MAssIpc_Data> inplace_send_buffer, ProcIn process_incoming_calls)
 			:proc_name(proc_name)
 			, inplace_send_buffer(std::move(inplace_send_buffer))
 			, process_incoming_calls(process_incoming_calls)
 		{
 		}
 
-		InvokeSetting(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, InProc process_incoming_calls)
+		InvokeSetting(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, ProcIn process_incoming_calls)
 			:proc_name(proc_name)
 			, process_incoming_calls(process_incoming_calls)
 		{
@@ -63,7 +64,7 @@ private:
 
 		MAssIpcCallInternal::MAssIpc_RawString proc_name;
 		std::unique_ptr<MAssIpc_Data> inplace_send_buffer;
-		InProc process_incoming_calls = InProc::bydefault;
+		ProcIn process_incoming_calls = ProcIn::bydefault;
 	};
 
     template<class TSig>
@@ -91,7 +92,7 @@ public:
         static_assert(IsSigProc<SigProc>::value, "SigProc must be function type like TRet(TArgs...)");
         using TSigProc = SigProc;
 
-		constexpr TInvokeSetting<SigName<SigProc>> operator()(std::unique_ptr<MAssIpc_Data>&& inplace_send_buffer, InProc process_incoming_calls) const
+		constexpr TInvokeSetting<SigName<SigProc>> operator()(std::unique_ptr<MAssIpc_Data>&& inplace_send_buffer, ProcIn process_incoming_calls) const
 		{
 			return {InvokeSetting{proc_name, std::move(inplace_send_buffer), process_incoming_calls}};
 		}
@@ -101,7 +102,7 @@ public:
             return {InvokeSetting{proc_name, std::move(inplace_send_buffer)}};
         }
 
-		constexpr TInvokeSetting<SigName<SigProc>> operator()(InProc process_incoming_calls) const
+		constexpr TInvokeSetting<SigName<SigProc>> operator()(ProcIn process_incoming_calls) const
 		{
 			return {InvokeSetting{proc_name, process_incoming_calls}};
 		}
@@ -325,7 +326,7 @@ private:
 	};
 	static DeserializedFindCallInfo DeserializeNameSignature(MAssIpc_DataStream& call_info);
 
-	inline bool IsProcessIncomingCalls(InProc process_incoming_calls) const;
+	inline bool IsProcessIncomingCalls(ProcIn process_incoming_calls) const;
 	MAssIpcCallInternal::MAssIpc_PacketParser::TCallId NewCallId() const;
 	
 	MAssIpc_DataStream ProcessTransportResponse(MAssIpcCallInternal::MAssIpc_PacketParser::TCallId wait_response_id,
@@ -452,14 +453,14 @@ public:
 };
 
 //-------------------------------------------------------
-inline bool MAssIpcCall::IsProcessIncomingCalls(InProc process_incoming_calls) const
+inline bool MAssIpcCall::IsProcessIncomingCalls(ProcIn process_incoming_calls) const
 {
 	switch( process_incoming_calls )
 	{
-		case InProc::later: return false;
-		case InProc::now: return true;
+		case ProcIn::later: return false;
+		case ProcIn::now: return true;
 		default:
-		case InProc::bydefault: return m_int->m_process_incoming_calls_default;
+		case ProcIn::bydefault: return m_int->m_process_incoming_calls_default;
 	}
 }
 

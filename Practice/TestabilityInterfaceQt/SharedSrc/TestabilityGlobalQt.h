@@ -6,7 +6,8 @@
 #include "IpcQt_Serializers.h"
 #include "Sut.h"
 
-// #include <QtCore/QObject>
+#include <QtCore/QObject>
+#include <QtCore/QCoreApplication>
 
 class TestabilityGlobalQt: public Sut
 {
