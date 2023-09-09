@@ -30,7 +30,11 @@ public:
 
 		bool WaitProcessing(QEventLoop& event_loop)
 		{
-			MAssIpcCall::SetCallCountChangedGuard set_handler_guard(m_sut_ipc, std::bind(&Waiter::OnCallCountChanged, this, std::placeholders::_1, std::ref(event_loop)));
+			auto new_handler = MAssIpcCall::SetCallCountChangedGuard::MakeHandler_CallCountChanged([this, &event_loop](const std::shared_ptr<const MAssIpcCall::CallInfo>& call_info)
+			{
+				OnCallCountChanged(call_info, event_loop);
+			});
+ 			MAssIpcCall::SetCallCountChangedGuard set_handler_guard(m_sut_ipc, new_handler);
 
 			if( IsCheckFinished_Autoreset() )
 				return true;

@@ -41,7 +41,18 @@ private:
 	{
 	};
 
+	template<class Ret, class... Args>
+	static constexpr bool Check_is_signame_and_handler_describe_same_call_signatures(Ret(*a1)(Args...), Ret(*a2)(Args...))
+	{
+		return true;
+	};
 
+	template<class A1, class A2>
+	static constexpr bool Check_is_signame_and_handler_describe_same_call_signatures(A1, A2, ...)
+	{
+		static_assert(std::is_same<A1, A2>::value, "A1 and A2 must be same types");
+		return false;
+	};
 
 	class CallerBase
 	{
@@ -154,6 +165,8 @@ public:
 	template<class TypeCheckParams, class THandlerProc>
 	void AddHandlerName(std::string name, THandlerProc handler_proc, const void* tag = nullptr)
 	{
+		static_assert(Check_is_signame_and_handler_describe_same_call_signatures(typename GetFunctionSignature<TypeCheckParams>::TFuncPtr{}, typename GetFunctionSignature<THandlerProc>::TFuncPtr{}), "TypeCheckParams and THandlerProc signatures not match");
+
 		using TInfo = typename GetTInfo<TypeCheckParams>::type;
 		const Key key{std::move(name),TInfo::KeyTypeIndex::HandlerTypeIndex()};
 

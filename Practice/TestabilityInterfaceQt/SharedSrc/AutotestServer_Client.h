@@ -11,13 +11,13 @@ public:
 		SutConnection(MAssIpcCall& ipc_connection, std::shared_ptr<IpcQt_TransporTcp> transport)
 			: ipc_net(ipc_connection, transport)
 		{
-			this->ipc_net.ipc_call.SetErrorHandler(&SutConnection::IpcError);
+			this->ipc_net.ipc_call.SetHandler_ErrorOccured(&SutConnection::IpcError);
 		}
 
 		IpcQt_Net		ipc_net;
 
 	private:
-		static void IpcError(MAssIpcCall::ErrorType et, std::string message);
+		static void IpcError(MAssIpcCall::ErrorType et, const std::string& message);
 	};
 
 public:

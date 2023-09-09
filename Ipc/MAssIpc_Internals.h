@@ -3,11 +3,36 @@
 #include <map>
 #include "MAssIpc_DataStream.h"
 #include "MAssIpc_Transthread.h"
-#include <functional>
 #include "MAssIpc_PacketParser.h"
 #include "MAssIpc_Transport.h"
 #include "MAssIpc_ThreadSafe.h"
 #include "MAssIpc_RawString.h"
+
+//-------------------------------------------------------
+
+namespace std
+{
+template< class T >
+struct is_bind_expression;
+}
+
+namespace MAssIpcCallInternal
+{
+
+template<class T>
+auto IsAvailable_is_bind_expression(int) -> decltype(std::is_bind_expression<T>{});
+
+template<class>
+auto IsAvailable_is_bind_expression(...) -> std::false_type;
+
+template<class T>
+class Check_is_bind_expression: public decltype(IsAvailable_is_bind_expression<T>(0))
+{
+};
+
+}
+
+//-------------------------------------------------------
 
 namespace MAssIpcCallInternal
 {
@@ -25,55 +50,82 @@ MAssIpc_DataStream CreateDataStreamInplace(std::unique_ptr<MAssIpc_Data> inplace
 //-------------------------------------------------------
 
 template<class TFrom, class TTo>
-auto DeduceAvailable(int) -> decltype(TTo(std::declval<TFrom>()), std::true_type{});
+auto ConversionAvailable(int) -> decltype(TTo(std::declval<TFrom>()), std::true_type{});
 
 template<class, class>
-auto DeduceAvailable(...)->std::false_type;
+auto ConversionAvailable(...)->std::false_type;
 
 template<class TFrom, class TTo>
-class IsConvertible: public decltype(DeduceAvailable<TFrom, TTo>(0))
+class IsConvertible: public decltype(ConversionAvailable<TFrom, TTo>(0))
+{
+};
+
+
+struct IsCallable_Check
+{
+	template<class TDelegate>
+	static inline bool ToBool(TDelegate& del){return bool(del);}
+};
+
+struct IsCallable_True
+{
+	template<class TDelegate>
+	static constexpr bool ToBool(const TDelegate& del){return true;}
+};
+
+template<class TDelegate>
+static inline bool IsBoolConvertible_Callable(TDelegate& del)
+{
+	return std::conditional<IsConvertible<TDelegate, bool>::value, IsCallable_Check, IsCallable_True>::type::ToBool(del);
+}
+
+//-------------------------------------------------------
+
+
+template<typename TSig>
+struct FuncSig;
+
+template<typename Ret, typename... Args>
+struct FuncSig<Ret(Args...)>
+{
+	using FuncPtr = Ret(*)(Args...);
+	using FuncRet = Ret;
+};
+
+template<typename Ret, typename... Args>
+struct FuncSig<Ret(*)(Args...)>: public FuncSig<Ret(Args...)>
+{
+};
+
+template<typename Class, typename Ret, typename... Args>
+struct FuncSig<Ret(Class::*)(Args...)>: public FuncSig<Ret(Args...)>
+{
+};
+
+template<typename Class, typename Ret, typename... Args>
+struct FuncSig<Ret(Class::*)(Args...) const>: public FuncSig<Ret(Args...)>
+{
+};
+
+template<typename Callable>
+struct FuncSig: public FuncSig<decltype( &Callable::operator() )>
 {
 };
 
 //-------------------------------------------------------
 
-template<class... Args>
-struct Compare
-{
-};
-
-template<class... Args>
-static constexpr bool Check_is_signame_and_handler_describe_same_call_signatures(Compare<Args...> a1, Compare<Args...> a2)
+template<class Ret, class... Args>
+static constexpr bool Check_is_signame_and_handler_describe_same_call_signatures(Ret(*a1)(Args...), Ret(*a2)(Args...))
 {
 	return true;
 };
 
-template<class TSig>
-struct ExtractCallTypes
+template<class A1, class A2>
+static constexpr bool Check_is_signame_and_handler_describe_same_call_signatures(A1 ,A2, ...)
 {
-	static_assert(sizeof(TSig)<0, "no specialization");
+	static_assert(std::is_same<A1, A2>::value, "A1 and A2 must be same types");
+	return false;
 };
-
-template<class Ret, class TCls, class... Args>
-struct ExtractCallTypes<Ret(TCls::*)(Args...)>
-{
-	using TCompare = Compare<Ret, Args...>;
-};
-
-template<class Ret, class TCls, class... Args>
-struct ExtractCallTypes<Ret(TCls::*)(Args...) const>
-{
-	using TCompare = Compare<Ret, Args...>;
-};
-
-template<class Ret, class... Args>
-struct ExtractCallTypes<Ret(*)(Args...)>
-{
-	using TCompare = Compare<Ret, Args...>;
-};
-
-template<class L>
-static auto ExtractCompare(const L&) -> typename ExtractCallTypes<decltype(&L::operator())>::TCompare;
 
 //-------------------------------------------------------
 
@@ -111,21 +163,48 @@ static inline constexpr const char* ErrorTypeToStr(ErrorType error)
 };
 
 
-using TErrorHandler = std::function<void(ErrorType et, std::string message)>;
-using TCallCountChanged = std::function<void(std::shared_ptr<const CallInfo> call_info)>;
+class InvokeBase
+{
+public:
+	InvokeBase(MAssIpc_TransthreadTarget::Id thread_id, const void* tag)
+		:m_thread_id(thread_id)
+		, m_tag(tag)
+	{
+	}
+
+	virtual ~InvokeBase() = default;
+	virtual bool IsCallable() const = 0;
+
+public:
+
+	const void* const	m_tag = nullptr;
+	const MAssIpc_TransthreadTarget::Id m_thread_id;
+};
+
+class InvokeRemoteBase: public InvokeBase
+{
+public:
+
+	InvokeRemoteBase(MAssIpc_TransthreadTarget::Id thread_id, const void* tag)
+		:InvokeBase(thread_id, tag)
+	{
+	}
+
+	virtual std::unique_ptr<const MAssIpc_Data> Invoke(const std::weak_ptr<MAssIpc_TransportShare>& transport,
+													   MAssIpc_PacketParser::TCallId respond_id,
+													   MAssIpc_DataStream& params) const = 0;
+	virtual MAssIpc_RawString GetSignature_RetType() const = 0;
+};
 
 class CallInfoImpl: public CallInfo
 {
 public:
+	CallInfoImpl(const MAssIpc_RawString& proc_name, std::string params_type)
+		: m_name(proc_name.Std_String())
+		, m_params_type(std::move(params_type))
+	{
+	};
 
-
-	CallInfoImpl(MAssIpc_TransthreadTarget::Id thread_id, const MAssIpc_RawString& proc_name, std::string params_type);
-
-	virtual std::unique_ptr<const MAssIpc_Data> Invoke(const std::weak_ptr<MAssIpc_TransportShare>& transport, 
-												MAssIpc_PacketParser::TCallId respond_id,
-												MAssIpc_DataStream& params) const = 0;
-	virtual bool IsCallable() const = 0;
-	virtual MAssIpc_RawString GetSignature_RetType() const = 0;
 
 	struct SignatureKey
 	{
@@ -163,11 +242,21 @@ public:
 		return m_name;
 	}
 
-public:
+	void SetInvoke(std::unique_ptr<InvokeRemoteBase> invoke)
+	{
+		m_invoke = std::move(invoke);
+	}
 
-	const MAssIpc_TransthreadTarget::Id m_thread_id;
+	const std::shared_ptr<InvokeRemoteBase> IsInvokable() const
+	{
+		if( m_invoke && m_invoke->IsCallable() )
+			return m_invoke;
+		return {};
+	}
 
 protected:
+
+	std::shared_ptr<InvokeRemoteBase> m_invoke;
 
 	MAssIpc_ThreadSafe::atomic_uint32_t	m_call_count = {0};
 	const std::string		m_name;
@@ -179,9 +268,17 @@ class ResultJob: public MAssIpc_Transthread::Job
 {
 public:
 
-	ResultJob(const std::weak_ptr<MAssIpc_TransportShare>& transport, std::unique_ptr<const MAssIpc_Data>& result);
+	ResultJob(const std::weak_ptr<MAssIpc_TransportShare>& transport, std::unique_ptr<const MAssIpc_Data>& result)
+		: m_transport(transport)
+		, m_result(std::move(result))
+	{
+	}
 
-	void Invoke() override;
+	void Invoke() override
+	{
+		Invoke(m_transport, m_result);
+	}
+
 	static void Invoke(const std::weak_ptr<MAssIpc_TransportShare>& transport, std::unique_ptr<const MAssIpc_Data>& result);
 
 private:
@@ -197,19 +294,24 @@ public:
 
 	CallJob(const std::weak_ptr<MAssIpc_TransportShare>& transport, 
 			const std::weak_ptr<MAssIpc_Transthread>& inter_thread,
-			const std::shared_ptr<const TCallCountChanged>& call_count_changed,
 			MAssIpc_DataStream& call_info_data, MAssIpc_PacketParser::TCallId respond_id,
-			std::shared_ptr<const CallInfoImpl> call_info);
+			std::shared_ptr<const InvokeRemoteBase> invoke_base)
+		: m_call_info_data(std::move(call_info_data))
+		, m_transport(transport)
+		, m_inter_thread(inter_thread)
+		, m_respond_id(respond_id)
+		, m_invoke_base(invoke_base)
+	{
+	}
+
 	void Invoke() override;
 	static void Invoke(const std::weak_ptr<MAssIpc_TransportShare>& transport, const std::weak_ptr<MAssIpc_Transthread>& inter_thread,
-					   const std::shared_ptr<const TCallCountChanged>& call_count_changed,
-					   MAssIpc_DataStream& call_info_data, std::shared_ptr<const CallInfoImpl> call_info, 
+					   MAssIpc_DataStream& call_info_data, std::shared_ptr<const InvokeRemoteBase> invoke_base,
 					   MAssIpc_PacketParser::TCallId respond_id);
 	static MAssIpc_PacketParser::TCallId CalcRespondId(bool send_return, MAssIpc_PacketParser::TCallId respond_id);
 
-	const std::shared_ptr<const TCallCountChanged>	m_call_count_changed;
 	MAssIpc_DataStream					m_call_info_data;
-	const std::shared_ptr<const CallInfoImpl>	m_call_info;
+	const std::shared_ptr<const InvokeRemoteBase>	m_invoke_base;
 	const MAssIpc_PacketParser::TCallId		m_respond_id;
 
 private:
@@ -219,6 +321,149 @@ private:
 };
 
 
+//-------------------------------------------------------
+
+class CallCountChanged: public InvokeBase
+{
+public:
+
+	CallCountChanged(MAssIpc_TransthreadTarget::Id thread_id, const void* tag)
+		:InvokeBase(thread_id, tag)
+	{
+	}
+
+	virtual void Invoke(const std::shared_ptr<const CallInfo>& call_info) const = 0;
+
+};
+
+template<class TDelegate>
+class CallCountChanged_Imp: public CallCountChanged
+{
+public:
+
+	CallCountChanged_Imp(const TDelegate& handler, MAssIpc_TransthreadTarget::Id thread_id, const void* tag)
+		: CallCountChanged(thread_id, tag)
+		, m_handler(handler)
+	{
+	}
+
+	void Invoke(const std::shared_ptr<const CallInfo>& call_info) const override
+	{
+		m_handler(call_info);
+	}
+
+	bool IsCallable() const override
+	{
+		return IsBoolConvertible_Callable(m_handler);
+	}
+
+private:
+
+	const TDelegate m_handler;
+};
+
+class CountJob: public MAssIpc_Transthread::Job
+{
+public:
+
+	CountJob(const std::shared_ptr<const CallCountChanged>& call_count_changed, std::shared_ptr<const CallInfo> call_info)
+		:m_call_count_changed(call_count_changed)
+		, m_call_info(call_info)
+	{
+	}
+
+	void Invoke() override
+	{
+		Invoke(m_call_count_changed, m_call_info);
+	}
+
+	static void Invoke(const std::shared_ptr<const CallCountChanged>& call_count_changed, std::shared_ptr<const CallInfo> call_info)
+	{
+		if( call_count_changed )
+			call_count_changed->Invoke(call_info);
+	}
+
+private:
+
+	const std::shared_ptr<const CallCountChanged>	m_call_count_changed;
+	const std::shared_ptr<const CallInfo>	m_call_info;
+};
+
+//-------------------------------------------------------
+class ErrorOccured: public InvokeBase
+{
+public:
+
+	ErrorOccured(MAssIpc_TransthreadTarget::Id thread_id, const void* tag)
+		:InvokeBase(thread_id, tag)
+	{
+	}
+
+	virtual void Invoke(ErrorType et, const std::string& message) const = 0;
+
+};
+
+template<class TDelegate>
+class ErrorOccured_Imp: public ErrorOccured
+{
+public:
+
+	ErrorOccured_Imp(const TDelegate& handler, MAssIpc_TransthreadTarget::Id thread_id, const void* tag)
+		: ErrorOccured(thread_id, tag)
+		, m_handler(handler)
+	{
+	}
+
+	void Invoke(ErrorType et, const std::string& message) const override
+	{
+		m_handler(et, message);
+	}
+
+	bool IsCallable() const override
+	{
+		return IsBoolConvertible_Callable(m_handler);
+	}
+
+private:
+
+	const TDelegate m_handler;
+};
+
+class ErrorJob: public MAssIpc_Transthread::Job
+{
+public:
+
+	struct Arg
+	{
+		ErrorType error;
+		std::string message;
+	};
+
+	ErrorJob(const std::shared_ptr<const ErrorOccured>& error_occured, const std::shared_ptr<Arg>& arg)
+		:m_error_occured(error_occured)
+		, m_arg(arg)
+	{
+	}
+
+	void Invoke() override
+	{
+		Invoke(m_error_occured, std::move(m_arg));
+	}
+
+	static void Invoke(const std::shared_ptr<const ErrorOccured>& error_occured, std::shared_ptr<Arg> arg)
+	{
+		if( error_occured )
+			error_occured->Invoke(arg->error, arg->message);
+	}
+
+private:
+
+	const std::shared_ptr<const ErrorOccured>	m_error_occured;
+	const std::shared_ptr<Arg> m_arg;
+};
+
+//-------------------------------------------------------
+
 class ProcMap
 {
 public:
@@ -227,26 +472,26 @@ public:
 	{
 		std::shared_ptr<CallInfoImpl> call_info;
 		std::string comment;
-		const void* const	tag = nullptr;
 	};
 
 	struct FindCallInfoRes
 	{
 		std::shared_ptr<CallInfoImpl>				call_info;
-		std::shared_ptr<const TCallCountChanged>	on_call_count_changed;
-		std::shared_ptr<const TErrorHandler>		on_invalid_remote_call;
+		std::shared_ptr<InvokeRemoteBase>			invoke_base;
+		std::shared_ptr<const CallCountChanged>		on_call_count_changed;
+		std::shared_ptr<const ErrorOccured>			on_invalid_remote_call;
 	};
 
-	FindCallInfoRes FindCallInfo(const MAssIpc_RawString& name, const MAssIpc_RawString& params_type) const;
+	FindCallInfoRes FindCallInfo(const MAssIpc_RawString& proc_name, const MAssIpc_RawString& params_type) const;
 	MAssIpcCall_EnumerateData EnumerateHandlers() const;
-	std::shared_ptr<const CallInfo> AddProcSignature(const std::shared_ptr<MAssIpcCallInternal::CallInfoImpl>& call_info, const std::string& comment, const void* tag);
+	std::shared_ptr<const CallInfo> AddProcSignature(const MAssIpc_RawString& proc_name, std::string params_type, std::unique_ptr<InvokeRemoteBase> invoke, const std::string& comment);
 	void AddAllProcs(const ProcMap& other);
 	void ClearAllProcs();
 	void ClearProcsWithTag(const void* tag);
 
-	std::shared_ptr<const TCallCountChanged> SetCallCountChanged(std::shared_ptr<const TCallCountChanged> new_val);
-	std::shared_ptr<const TErrorHandler> SetErrorHandler(std::shared_ptr<const TErrorHandler> new_val);
-	std::shared_ptr<const TErrorHandler> GetErrorHandler() const;
+	std::shared_ptr<const CallCountChanged> SetCallCountChanged(std::shared_ptr<const CallCountChanged> new_val);
+	std::shared_ptr<const ErrorOccured> SetErrorHandler(std::shared_ptr<const ErrorOccured> new_val);
+	std::shared_ptr<const ErrorOccured> GetErrorHandler() const;
 
 private:
 
@@ -258,14 +503,21 @@ private:
 		return new_old;
 	}
 
+	template<class TCallback>
+	static void ClearCallbackTag(std::shared_ptr<const TCallback>* member, const void* tag)
+	{
+		if( bool(*member) && ((*member)->m_tag==tag) )
+			(*member) = {};
+	}
+
 private:
 
 
 	mutable MAssIpc_ThreadSafe::mutex	m_lock;
 	std::map<MAssIpcCallInternal::CallInfoImpl::SignatureKey, CallData>	m_name_procs;
 
-	std::shared_ptr<const TCallCountChanged>		m_OnCallCountChanged = std::make_shared<const TCallCountChanged>();
-	std::shared_ptr<const TErrorHandler>			m_OnInvalidRemoteCall = std::make_shared<const TErrorHandler>();
+	std::shared_ptr<const CallCountChanged>		m_OnCallCountChanged;
+	std::shared_ptr<const ErrorOccured>			m_OnInvalidRemoteCall;
 };
 
 
@@ -274,19 +526,6 @@ class Sig_RetVoidNo;
 
 template<class TDelProc>
 class Sig_RetVoid;
-
-template<class TFunction>
-struct InfoDelproc;
-
-template<class TRet, class TCls, class ...Args>
-struct InfoDelproc<TRet(TCls::*)(Args...) const>
-{
-	typedef TRet TRetType;
-
-	typedef TRet(*THandProcUnifiedType_RetType)(Args...);
-	typedef void(*THandProcUnifiedType_RetVoid)(Args...);
-};
-
 
 //-------------------------------------------------------
 
@@ -316,13 +555,13 @@ struct make_indexes: make_indexes_impl<0, index_tuple<>, Types...>
 
 
 template<class TFunc, class Ret, class... Args, size_t... Indexes >
-Ret ExpandHelper(const TFunc& pf, index_tuple< Indexes... >, std::tuple<Args...>& tup)
+Ret ExpandHelper(TFunc& pf, index_tuple< Indexes... >, std::tuple<Args...>& tup)
 {
 	return pf(std::forward<Args>(std::get<Indexes>(tup))...);
 }
 
 template<class TFunc, class Ret, class ... Args>
-Ret ExpandTupleCall(const TFunc& pf, std::tuple<Args...>& tup)
+Ret ExpandTupleCall(TFunc& pf, std::tuple<Args...>& tup)
 {
 	return ExpandHelper<TFunc, Ret>(pf, typename make_indexes<Args...>::type(), tup);
 }
@@ -519,24 +758,6 @@ struct ProcSignature<TRet(*)(TArgs... args)>
 	};
 };
 
-struct IsCallable_Check
-{
-	template<class TDelegate>
-	static inline bool ToBool(const TDelegate& del){return bool(del);}
-};
-
-struct IsCallable_True
-{
-	template<class TDelegate>
-	static constexpr bool ToBool(const TDelegate& del){return true;}
-};
-
-template<class TDelegate>
-static inline bool IsBoolConvertible_Callable(const TDelegate& del)
-{
-	return std::conditional<IsConvertible<TDelegate, bool>::value, IsCallable_Check, IsCallable_True>::type::ToBool(del);
-}
-
 //-------------------------------------------------------
 
 std::unique_ptr<const MAssIpc_Data> SerializeReturn(const std::weak_ptr<MAssIpc_TransportShare>& transport,
@@ -561,11 +782,11 @@ class Sig_RetVoid<void(*)(TArgs...)>
 public:
 
 	template<class TDelegate>
-	class Imp: public CallInfoImpl
+	class Imp: public InvokeRemoteBase
 	{
 	private:
 
-		TDelegate m_del;
+		mutable TDelegate m_del;
 
 	private:
 
@@ -591,8 +812,9 @@ public:
 
 	public:
 
-		Imp(const TDelegate& del, MAssIpc_TransthreadTarget::Id thread_id, const MAssIpc_RawString& name)
-			:CallInfoImpl(thread_id, name, CallInfoImpl::MakeParamsType<TDelegate>() ), m_del(del)
+		Imp(const TDelegate& del, MAssIpc_TransthreadTarget::Id thread_id, const void* tag)
+			:InvokeRemoteBase(thread_id, tag)
+			, m_del(del)
 		{
 		};
 	};
@@ -604,11 +826,11 @@ class Sig_RetVoidNo<TRet(*)(TArgs...)>
 public:
 
 	template<class TDelegate>
-	class Imp: public CallInfoImpl
+	class Imp: public InvokeRemoteBase
 	{
 	private:
 
-		TDelegate m_del;
+		mutable TDelegate m_del;
 
 	private:
 
@@ -634,8 +856,9 @@ public:
 
 	public:
 
-		Imp(const TDelegate& del, MAssIpc_TransthreadTarget::Id thread_id, const MAssIpc_RawString& name)
-			:CallInfoImpl(thread_id, name, CallInfoImpl::MakeParamsType<TDelegate>()), m_del(del)
+		Imp(const TDelegate& del, MAssIpc_TransthreadTarget::Id thread_id, const void* tag)
+			:InvokeRemoteBase(thread_id, tag)
+			, m_del(del)
 		{
 		};
 	};
@@ -645,18 +868,13 @@ public:
 template<class TDelegate>
 class Impl_Selector
 {
-	typedef decltype(&TDelegate::operator()) TDelProc;
+	using FuncPtr = typename FuncSig<TDelegate>::FuncPtr;
 public:
 
-	typedef typename InfoDelproc<TDelProc>::THandProcUnifiedType_RetType TDelProcUnified;
-
-	typedef typename
-		std::conditional<std::is_same<typename InfoDelproc<TDelProc>::TRetType,void>::value,
-
-		Sig_RetVoid<typename InfoDelproc<TDelProc>::THandProcUnifiedType_RetType>,
-		Sig_RetVoidNo<typename InfoDelproc<TDelProc>::THandProcUnifiedType_RetType> >::type
-
-		::template Imp<TDelegate> Res;
+	using Res = typename std::conditional<std::is_same<typename FuncSig<TDelegate>::FuncRet,void>::value,
+		
+		Sig_RetVoid<FuncPtr>, Sig_RetVoidNo<FuncPtr> >::type
+		::template Imp<TDelegate>;
 };
 
 //-------------------------------------------------------
@@ -665,13 +883,12 @@ template<class TDelegate>
 std::string CallInfoImpl::MakeParamsType()
 {
 	MAssIpcCallInternal::ParamsTypeHolder_TPacketSize params_type_calc;
-	using TreatProc = typename MAssIpcCallInternal::Impl_Selector<TDelegate>::TDelProcUnified;
-	MAssIpcCallInternal::ProcSignature<TreatProc>::GetParams(&params_type_calc);
+	using FuncPtr = typename MAssIpcCallInternal::FuncSig<TDelegate>::FuncPtr;
+	MAssIpcCallInternal::ProcSignature<FuncPtr>::GetParams(&params_type_calc);
 	MAssIpcCallInternal::ParamsTypeHolder_string params_type_string(params_type_calc.m_size);
-	MAssIpcCallInternal::ProcSignature<TreatProc>::GetParams(&params_type_string);
+	MAssIpcCallInternal::ProcSignature<FuncPtr>::GetParams(&params_type_string);
 	return std::move(params_type_string.m_value);
 }
-
 
 //-------------------------------------------------------
 

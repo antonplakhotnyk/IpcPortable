@@ -63,53 +63,74 @@ MAssIpcCall::DeserializedFindCallInfo MAssIpcCall::DeserializeNameSignature(MAss
 }
 
 MAssIpcCall::Internals::AnalizeInvokeDataRes MAssIpcCall::Internals::ReportError_FindCallInfo(const DeserializedFindCallInfo& find_call_info, ErrorType error,
-																							  const std::shared_ptr<const TErrorHandler>& on_invalid_remote_call) const
+																							  const std::shared_ptr<const ErrorOccured>& on_invalid_remote_call,
+																							  const std::shared_ptr<CallInfoImpl>& call_info,
+																							  const std::shared_ptr<MAssIpc_Transthread>& inter_thread_nullable) const
 {
-	AnalizeInvokeDataRes res = {};
+	AnalizeInvokeDataRes res = {call_info};
 	res.send_return = find_call_info.send_return;
+
+	res.error_arg = std::make_shared<ErrorJob::Arg>(ErrorJob::Arg{error});
 
 	// message format "return_type proc_name(params_type)"
 	constexpr char message_formaters[] = " ()";
-	res.message.reserve(sizeof(message_formaters)+find_call_info.return_type.Length()+find_call_info.name.Length()+find_call_info.params_type.Length());
+	res.error_arg->message.reserve(sizeof(message_formaters)+find_call_info.return_type.Length()+find_call_info.name.Length()+find_call_info.params_type.Length());
 
-	res.message.append(find_call_info.return_type.C_String(), find_call_info.return_type.Length());
-	res.message+=(message_formaters[0]);
-	res.message.append(find_call_info.name.C_String(), find_call_info.name.Length());
-	res.message+=message_formaters[1];
-	res.message.append(find_call_info.params_type.C_String(), find_call_info.params_type.Length());
-	res.message += message_formaters[2];
+	res.error_arg->message.append(find_call_info.return_type.C_String(), find_call_info.return_type.Length());
+	res.error_arg->message +=(message_formaters[0]);
+	res.error_arg->message.append(find_call_info.name.C_String(), find_call_info.name.Length());
+	res.error_arg->message +=message_formaters[1];
+	res.error_arg->message.append(find_call_info.params_type.C_String(), find_call_info.params_type.Length());
+	res.error_arg->message += message_formaters[2];
 
-	res.error = error;
-	if( bool(on_invalid_remote_call) && bool(*on_invalid_remote_call.get()) )
-		(*on_invalid_remote_call.get())(res.error, res.message);
+	SendErrorMessage(inter_thread_nullable, on_invalid_remote_call, res.error_arg);
 	return res;
 }
 
+void MAssIpcCall::Internals::SendErrorMessage(const std::shared_ptr<MAssIpc_Transthread>& inter_thread_nullable,
+											  const std::shared_ptr<const ErrorOccured>& on_invalid_remote_call, const std::shared_ptr<ErrorJob::Arg>& error_arg)
+{
+	if( bool(on_invalid_remote_call) && on_invalid_remote_call->IsCallable() )
+	{
+		if( inter_thread_nullable )
+		{
+			auto thread_id = on_invalid_remote_call->m_thread_id;
+
+			std::unique_ptr<ErrorJob> count_job(std::make_unique<ErrorJob>(on_invalid_remote_call, std::move(error_arg)));
+			inter_thread_nullable->CallFromThread(thread_id, std::move(count_job));
+		}
+		else
+			ErrorJob::Invoke(on_invalid_remote_call, std::move(error_arg));
+	}
+}
+
 MAssIpcCall::Internals::AnalizeInvokeDataRes MAssIpcCall::Internals::AnalizeInvokeData(const std::shared_ptr<MAssIpc_TransportShare>& transport,
-																			   MAssIpc_DataStream& call_info_data,
-																			   MAssIpcCallInternal::MAssIpc_PacketParser::TCallId id) const
+																					   const std::shared_ptr<MAssIpc_Transthread>& inter_thread_nullable,
+																					   MAssIpc_DataStream& call_info_data,
+																					   MAssIpcCallInternal::MAssIpc_PacketParser::TCallId id) const
 {
 	DeserializedFindCallInfo find_call_info = DeserializeNameSignature(call_info_data);
 
 	ProcMap::FindCallInfoRes find_res = m_proc_map.FindCallInfo(find_call_info.name, find_call_info.params_type);
-	if( !bool(find_res.call_info) )
-		return ReportError_FindCallInfo(find_call_info, ErrorType::no_matching_call_name_parameters, find_res.on_invalid_remote_call);
+
+	if( !bool(find_res.call_info) || !bool(find_res.invoke_base) )
+		return ReportError_FindCallInfo(find_call_info, ErrorType::no_matching_call_name_parameters, find_res.on_invalid_remote_call, find_res.call_info, inter_thread_nullable);
 
 	if( find_call_info.return_type.Length()!=0 )
 	{
-		const MAssIpc_RawString return_type_call(find_res.call_info->GetSignature_RetType());
+		const MAssIpc_RawString return_type_call(find_res.invoke_base->GetSignature_RetType());
 		if( find_call_info.return_type != return_type_call )
-			return ReportError_FindCallInfo(find_call_info, ErrorType::no_matching_call_return_type, find_res.on_invalid_remote_call);
+			return ReportError_FindCallInfo(find_call_info, ErrorType::no_matching_call_return_type, find_res.on_invalid_remote_call, find_res.call_info, inter_thread_nullable);
 	}
 
-	return {find_res.call_info, find_call_info.send_return, find_res.on_call_count_changed};
+	return {find_res.call_info, find_res.invoke_base, find_call_info.send_return, find_res.on_call_count_changed};
 }
 
-void MAssIpcCall::Internals::StoreReturnFailCall(MAssIpc_DataStream* result_str, const AnalizeInvokeDataRes& call_job, 
+void MAssIpcCall::Internals::StoreReturnFailCall(MAssIpc_DataStream* result_str, const MAssIpcCallInternal::ErrorJob::Arg& error_arg,
 												 MAssIpcCallInternal::MAssIpc_PacketParser::TCallId id)
 {
-	(*result_str)<<call_job.error;
-	(*result_str)<<call_job.message;
+	(*result_str)<<error_arg.error;
+	(*result_str)<<error_arg.message;
 }
 
 void MAssIpcCall::Internals::InvokeLocal(MAssIpc_DataStream& call_info_data, MAssIpcCallInternal::MAssIpc_PacketParser::TCallId id) const
@@ -117,38 +138,57 @@ void MAssIpcCall::Internals::InvokeLocal(MAssIpc_DataStream& call_info_data, MAs
 	std::shared_ptr<MAssIpc_TransportShare> transport = m_transport.lock();
 	mass_return_if_equal(bool(transport), false);
 
-	AnalizeInvokeDataRes invoke = AnalizeInvokeData(transport, call_info_data, id);
+	const std::shared_ptr<MAssIpc_Transthread> inter_thread_nullable = m_inter_thread_nullable.lock();
 
-	if( invoke.call_info )
+	AnalizeInvokeDataRes invoke = AnalizeInvokeData(transport, inter_thread_nullable, call_info_data, id);
+
+	if( invoke.invoke_base )
 	{
-		invoke.call_info->IncrementCallCount();
-		auto inter_thread_nullable = m_inter_thread_nullable.lock();
 		auto respond_id = CallJob::CalcRespondId(invoke.send_return, id);
 		if( inter_thread_nullable )
 		{
-			auto thread_id = invoke.call_info->m_thread_id;
+			auto thread_id = invoke.invoke_base->m_thread_id;
 
-			std::unique_ptr<CallJob> call_job(std::make_unique<CallJob>(transport, m_inter_thread_nullable, invoke.on_call_count_changed, call_info_data, respond_id, invoke.call_info));
+			std::unique_ptr<CallJob> call_job(std::make_unique<CallJob>(transport, m_inter_thread_nullable, call_info_data, respond_id, invoke.invoke_base));
 			inter_thread_nullable->CallFromThread(thread_id, std::move(call_job));
 		}
 		else
-			CallJob::Invoke(transport, m_inter_thread_nullable, invoke.on_call_count_changed, call_info_data, invoke.call_info, respond_id);
+			CallJob::Invoke(transport, m_inter_thread_nullable, call_info_data, invoke.invoke_base, respond_id);
 	}
 	else
 	{// fail to call
-		if( invoke.send_return )
+		if( bool(invoke.error_arg) )
 		{
-			MAssIpc_DataStream measure_size;
-			StoreReturnFailCall(&measure_size, invoke, id);
-			MAssIpc_DataStream result_str(CreateDataStream(m_transport, measure_size.GetWritePos(), MAssIpc_PacketParser::PacketType::pt_return_fail_call, id));
-			StoreReturnFailCall(&result_str, invoke, id);
+			if( invoke.send_return )
+			{
+				MAssIpc_DataStream measure_size;
+				StoreReturnFailCall(&measure_size, *invoke.error_arg.get(), id);
+				MAssIpc_DataStream result_str(CreateDataStream(m_transport, measure_size.GetWritePos(), MAssIpc_PacketParser::PacketType::pt_return_fail_call, id));
+				StoreReturnFailCall(&result_str, *invoke.error_arg.get(), id);
 
-			// send error result message always from current thread same as message processing thread
-			// may be this behavior should be configured or permanently changed 
-			auto data(result_str.DetachWrite());
-			if( data )
-				transport->Write(std::move(data));
+				// send error result message always from current thread same as message processing thread
+				// may be this behavior should be configured or permanently changed 
+				auto data(result_str.DetachWrite());
+				if( data )
+					transport->Write(std::move(data));
+			}
 		}
+		else
+			mass_assert_msg("unexpected fail without error_arg");
+	}
+
+	if(bool(invoke.call_info) && bool(invoke.on_call_count_changed) && invoke.on_call_count_changed->IsCallable() )
+	{
+		invoke.call_info->IncrementCallCount();
+		if( inter_thread_nullable )
+		{
+			auto thread_id = invoke.on_call_count_changed->m_thread_id;
+
+			std::unique_ptr<CountJob> count_job(std::make_unique<CountJob>(invoke.on_call_count_changed, invoke.call_info));
+			inter_thread_nullable->CallFromThread(thread_id, std::move(count_job));
+		}
+		else
+			CountJob::Invoke(invoke.on_call_count_changed, invoke.call_info);
 	}
 }
 
@@ -329,21 +369,20 @@ MAssIpc_DataStream MAssIpcCall::Internals::ProcessBuffer(CallDataBuffer buffer) 
 		break;
 		case MAssIpc_PacketParser::PacketType::pt_return_fail_call:
 		{
-			MAssIpcCall::ErrorType error = ErrorType::unknown_error;
-			std::string message;
-			buffer.data>>error;
-			buffer.data>>message;
+			std::shared_ptr<ErrorJob::Arg> error_arg{std::make_shared<ErrorJob::Arg>(ErrorJob::Arg{ErrorType::unknown_error})};
+			buffer.data>>error_arg->error;
+			buffer.data>>error_arg->message;
 
-			if( error == ErrorType::no_matching_call_name_parameters )
-				error = ErrorType::respond_no_matching_call_name_parameters;
-			else if( error == ErrorType::no_matching_call_return_type )
-				error = ErrorType::respond_no_matching_call_return_type;
+			if( error_arg->error == ErrorType::no_matching_call_name_parameters )
+				error_arg->error = ErrorType::respond_no_matching_call_name_parameters;
+			else if( error_arg->error == ErrorType::no_matching_call_return_type )
+				error_arg->error = ErrorType::respond_no_matching_call_return_type;
 			else
-				error = ErrorType::unknown_error;
+				error_arg->error = ErrorType::unknown_error;
 
-			std::shared_ptr<const TErrorHandler> on_invalid_remote_call = m_proc_map.GetErrorHandler();
-			if( bool(on_invalid_remote_call) && bool(*on_invalid_remote_call.get()) )
-				(*on_invalid_remote_call.get())(error, message);
+			const std::shared_ptr<MAssIpc_Transthread> inter_thread_nullable = m_inter_thread_nullable.lock();
+			std::shared_ptr<const ErrorOccured> on_invalid_remote_call = m_proc_map.GetErrorHandler();
+			SendErrorMessage(inter_thread_nullable, on_invalid_remote_call, error_arg);
 		}
 		break;
 		case MAssIpc_PacketParser::PacketType::pt_return_enumerate:
@@ -392,16 +431,6 @@ MAssIpcCall_EnumerateData MAssIpcCall::EnumerateRemote() const
 MAssIpcCall_EnumerateData MAssIpcCall::EnumerateLocal() const
 {
 	return m_int->m_proc_map.EnumerateHandlers();
-}
-
-void MAssIpcCall::SetErrorHandler(TErrorHandler OnInvalidRemoteCall)
-{
-	m_int->m_proc_map.SetErrorHandler(std::make_shared<const TErrorHandler>(OnInvalidRemoteCall));
-}
-
-std::shared_ptr<const TCallCountChanged> MAssIpcCall::SetCallCountChanged(const TCallCountChanged& OnCallCountChanged)
-{
-	return m_int->m_proc_map.SetCallCountChanged(std::make_shared<const TCallCountChanged>(OnCallCountChanged));
 }
 
 MAssIpcCallInternal::MAssIpc_PacketParser::TCallId MAssIpcCall::NewCallId() const

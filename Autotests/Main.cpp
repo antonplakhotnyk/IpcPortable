@@ -1,3 +1,6 @@
+#include <vector>
+#include <cstring>
+#include <atomic>
 #include <iostream>
 #include <thread>
 #include <condition_variable>
@@ -5,14 +8,75 @@
 #include <sstream>
 #include <mutex>
 #include <condition_variable>
-#include <functional>
 #include <list>
 #include <map>
 
-//static constexpr const char* main_start_mark = {};
+// #include <functional>
+static constexpr const char* main_start_mark = {};// help generating preprocessed to file cpp
 
 #include "../Ipc/MAssIpcCall.h"
 #include "../Ipc/MAssIpc_Macros.h"
+
+//-------------------------------------------------------
+
+static constexpr const char* main_mark_before_include_functional_is_bind_expression_begin = {};// help generating preprocessed to file cpp
+
+
+template<bool expect_t, class TDelegateW>
+void AddHandler(const TDelegateW& del)
+{
+	static_assert(MAssIpcCallInternal::Check_is_bind_expression<TDelegateW>::value==expect_t, "bint NOT match");
+}
+void before_include_functional_is_bind_expression_CheckCompile()
+{
+	AddHandler<false>([](){});
+}
+
+#include <functional>
+
+void after_include_functional_is_bind_expression_CheckCompile()
+{
+	AddHandler<true>(std::bind([](){}));
+	AddHandler<false>([](){});
+}
+
+static constexpr const char* main_mark_before_include_functional_is_bind_expression_end = {};// help generating preprocessed to file cpp
+
+//-------------------------------------------------------
+
+void CheckCompilation()
+{ 
+	MAssIpcCall call{{}};
+
+	{
+		struct Handler
+		{
+			void operator()() const{}
+			operator bool() const{return true;}
+		} const_handler;
+		call.AddHandler("Handler", const_handler);
+	}
+
+	{
+		struct Handler
+		{
+			void operator()() const{}
+			operator bool(){return true;}
+		} mutable_handler;
+		call.AddHandler("Handler", mutable_handler);
+	}
+
+	{
+		struct Handler
+		{
+			void operator()(){}
+		} no_bool_handler;
+		call.AddHandler("Handler", no_bool_handler);
+	}
+
+ 	call.AddHandler("Handler", []()mutable{});
+ 	call.AddHandler("Handler", [](){});
+}
 
 // struct TestStruct
 // {
@@ -349,7 +413,7 @@ public:
 static MAssIpcCall::ErrorType s_state_error_et;
 static std::string s_state_error_message;
 
-static void OnInvalidRemoteCall(MAssIpcCall::ErrorType et, std::string message)
+static void OnInvalidRemoteCall(MAssIpcCall::ErrorType et, const std::string& message)
 {
 	s_state_error_et = et;
 	s_state_error_message = message;
@@ -459,14 +523,14 @@ void TestThreads_MainThread()
 	MAssIpcCall call_sender({});
 	MAssIpcCall call_handler({});
 
-	call_sender.SetErrorHandler(MAssIpcCall::TErrorHandler(&OnInvalidRemoteCall));
+	call_sender.SetHandler_ErrorOccured(&OnInvalidRemoteCall);
 	call_sender.SetTransport(transport_buffer);
 
 	call_sender.AddHandler("TestThreads_SenderCallBack", std::function<std::string()>(std::bind(&TestThreads_SenderCallBack, call_sender)));
 
 
 
-	call_handler.SetErrorHandler(MAssIpcCall::TErrorHandler(&OnInvalidRemoteCall));
+	call_handler.SetHandler_ErrorOccured(&OnInvalidRemoteCall);
 	call_handler.SetTransport(complementar_buffer);
 
 	transport_buffer->SetHnadler_OnRead([&](){call_sender.ProcessTransport();}, true);
@@ -616,7 +680,7 @@ MAssIpc_DataStream& operator>>(MAssIpc_DataStream& stream, DataStruct2*& v)
 
 static std::vector<std::string> s_calls;
 
-void CallCountChanged(std::shared_ptr<const MAssIpcCall::CallInfo> call_info)
+void CallCountChanged(const std::shared_ptr<const MAssIpcCall::CallInfo>& call_info)
 {
 	uint32_t count = call_info->GetCallCount();
 	std::string call_data = "CallCountChanged:" + std::to_string(count) + std::string(" ") + call_info->GetName();
@@ -649,15 +713,17 @@ void Main_IpcService(std::shared_ptr<IpcPackerTransportMemory> transport_buffer)
 	MAssIpcCall call(thread_transport);
 	bool run = true;
 
-	call.SetErrorHandler(MAssIpcCall::TErrorHandler(&OnInvalidRemoteCall));
+	call.SetHandler_ErrorOccured(&OnInvalidRemoteCall);
 
 	std::shared_ptr<const MAssIpcCall::CallInfo> call_info;
 
 	call.AddHandler("Proc_NoDefConstruct", std::function<NoDefConstruct(NoDefConstruct)>(&Proc_NoDefConstruct));
 	call.AddHandler("Proc_NoDefConstruct_unique_ptr", std::function<std::unique_ptr<NoDefConstruct>(std::unique_ptr<NoDefConstruct>)>(&Proc_NoDefConstruct_unique_ptr));
 	
-
-	call.AddHandler(sig_Static_String_StringU32Double, std::function<decltype(Static_String_StringU32Double)>(&Static_String_StringU32Double), {}, {}, {});
+	auto call_info1 = call.AddCallInfo(sig_Static_String_StringU32Double);
+	auto call_info2 = call.AddHandler(sig_Static_String_StringU32Double, std::function<decltype(Static_String_StringU32Double)>(&Static_String_StringU32Double), {}, {}, {});
+	mass_return_if_not_equal(call_info1, call_info2);
+	// call.AddHandler(sig_Static_String_StringU32Double, std::function<std::string(std::string, uint32_t, float)>(&Static_String_StringU32Double), {}, {}, {});// compile error
 
 	// 	call.AddHandler("Ipc_Proc1", DelegateW<std::string(uint8_t, std::string, uint32_t)>().BindS(&Ipc_Proc1));
 	call.AddHandler("IsLinkUp_Sta", std::function<bool()>(&IsLinkUp), CreateCustomId(3));
@@ -696,7 +762,8 @@ void Main_IpcService(std::shared_ptr<IpcPackerTransportMemory> transport_buffer)
 
 	call.SetTransport(transport_buffer);
 
-	call.SetCallCountChanged(&CallCountChanged);
+// 	call.SetHandler_CallCountChanged([](const std::shared_ptr<const MAssIpcCall::CallInfo>& call_info){});
+	call.SetHandler_CallCountChanged(&CallCountChanged);
 
 
 	while( true )
@@ -756,7 +823,7 @@ void Main_IpcClient()
 
 // 	call.AddHandler("ClientProc", DelegateW<void(uint8_t, uint32_t)>().BindS(&ClientProc));
 
-	call.SetErrorHandler(MAssIpcCall::TErrorHandler(&OnInvalidRemoteCall));
+	call.SetHandler_ErrorOccured(&OnInvalidRemoteCall);
 
 	std::shared_ptr<IpcPackerTransportMemory> transport_buffer(new IpcPackerTransportMemory);
 
