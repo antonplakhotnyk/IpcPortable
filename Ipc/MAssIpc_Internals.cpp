@@ -136,12 +136,13 @@ std::shared_ptr<const CallInfo> ProcMap::AddProcSignature(const MAssIpc_RawStrin
 	}
 	else
 	{
-		mass_return_x_if_equal(bool(it_name_params->second.call_info->IsInvokable()), true, {});
+		mass_return_x_if_equal(bool(it_name_params->second.call_info->IsInvokable()) && bool(invoke), true, {});// add or override currently actual invoke
 		it_name_params->second = CallData{it_name_params->second.call_info, comment};
 		result_call_info = it_name_params->second.call_info;
 	}
 
-	result_call_info->SetInvoke(std::move(invoke));
+	if( bool(invoke) )
+		result_call_info->SetInvoke(std::move(invoke));
 	return result_call_info;
 }
 

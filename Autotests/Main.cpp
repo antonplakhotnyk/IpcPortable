@@ -11,21 +11,21 @@
 #include <list>
 #include <map>
 
-// #include <functional>
+#include <functional>
 static constexpr const char* main_start_mark = {};// help generating preprocessed to file cpp
 
-#include "../Ipc/MAssIpcCall.h"
-#include "../Ipc/MAssIpc_Macros.h"
+#include "MAssIpcCall.h"
+#include "MAssIpc_Macros.h"
 
 //-------------------------------------------------------
 
 static constexpr const char* main_mark_before_include_functional_is_bind_expression_begin = {};// help generating preprocessed to file cpp
 
 
-template<bool expect_t, class TDelegateW>
-void AddHandler(const TDelegateW& del)
+template<bool expect_t, class TDelegate>
+void AddHandler(const TDelegate& del)
 {
-	static_assert(MAssIpcCallInternal::Check_is_bind_expression<TDelegateW>::value==expect_t, "bint NOT match");
+	static_assert(MAssIpcCallInternal::Check_is_bind_expression<TDelegate>::value==expect_t, "bint NOT match");
 }
 void before_include_functional_is_bind_expression_CheckCompile()
 {
@@ -43,6 +43,11 @@ void after_include_functional_is_bind_expression_CheckCompile()
 static constexpr const char* main_mark_before_include_functional_is_bind_expression_end = {};// help generating preprocessed to file cpp
 
 //-------------------------------------------------------
+
+#include "IpcTransport_MemoryCopy.h"
+#include "IpcTransport_MemoryShare.h"
+#include "IpcTransthread_Memory.h"
+#include "TaskRunnerThread.h"
 
 void CheckCompilation()
 { 
@@ -70,12 +75,62 @@ void CheckCompilation()
 		struct Handler
 		{
 			void operator()(){}
+			void MemberFunc() const{}
 		} no_bool_handler;
 		call.AddHandler("Handler", no_bool_handler);
 	}
 
+	{
+		struct Handler
+		{
+			void MemberFunc() const{}
+			static void StaticFunc(){}
+		};
+		// call.AddHandler("Handler", &Handler::MemberFunc);// compilation error
+		call.AddHandler("Handler", &Handler::StaticFunc);
+	}
+
  	call.AddHandler("Handler", []()mutable{});
  	call.AddHandler("Handler", [](){});
+
+	call.SetHandler_CallCountChanged([](const std::shared_ptr<const MAssIpcCall::CallInfo>& call_info){});
+
+	{
+		struct Handler
+		{
+			void operator()(const std::shared_ptr<const MAssIpcCall::CallInfo>& call_info) const{}
+
+			void MemberFunc(const std::shared_ptr<const MAssIpcCall::CallInfo>& call_info) const{}
+
+		} handler;
+		call.SetHandler_CallCountChanged(handler);
+		// call.SetHandler_CallCountChanged(&Handler::MemberFunc, &handler);// compilation error
+	}
+
+	{
+		struct Handler
+		{
+			bool MemberFunc(float) const{return true;}
+			static bool StaticFunc(float){return true;}
+		};
+
+		auto lambda_proc = [](float)->bool{return true; };
+
+		constexpr const MAssIpcCall::SigName<bool(float)> sig_1 = {"sig_1"};
+		constexpr const MAssIpcCall::SigName<bool(*)(float)> sig_2 = {"sig_2"};
+		constexpr const MAssIpcCall::SigName<decltype(&Handler::MemberFunc)> sig_3 = {"sig_3"};
+		constexpr const MAssIpcCall::SigName<decltype(&Handler::StaticFunc)> sig_4 = {"sig_4"};
+		constexpr const MAssIpcCall::SigName<decltype(lambda_proc)> sig_5 = {"sig_5"};
+
+		static_assert(std::is_same<decltype(sig_1)::SigProc, decltype(sig_2)::SigProc>::value, "must be same type");
+		static_assert(std::is_same<decltype(sig_1)::SigProc, decltype(sig_3)::SigProc>::value, "must be same type");
+		static_assert(std::is_same<decltype(sig_1)::SigProc, decltype(sig_4)::SigProc>::value, "must be same type");
+		static_assert(std::is_same<decltype(sig_1)::SigProc, decltype(sig_5)::SigProc>::value, "must be same type");
+
+		auto call_info1 = call.AddCallInfo(sig_1);
+		auto call_info2 = call.AddHandler(sig_1, std::function<decltype(Handler::StaticFunc)>(&Handler::StaticFunc), {}, {}, {});
+		auto call_info3 = call.AddHandler(sig_1, &Handler::StaticFunc, {}, {}, {});
+	}
 }
 
 // struct TestStruct
@@ -166,232 +221,6 @@ static MAssIpc_TransthreadTarget::Id CreateCustomId(size_t value)
 	return id;
 }
 
-
-class IpcTransportMemory: public MAssIpc_TransportCopy
-{
-private:
-	struct SyncData
-	{
-		std::function<void()> on_read;
-		std::mutex	lock;
-		bool incoming_data = false;
-		bool cancel_wait_respond = false;
-		std::condition_variable cond;
-		std::vector<uint8_t> data;
-	};
-
-	IpcTransportMemory(std::shared_ptr<SyncData> read, std::shared_ptr<SyncData> write)
-		:m_read(read)
-		, m_write(write)
-	{
-	}
-
-public:
-
-	IpcTransportMemory()
-		:m_read(new SyncData)
-		, m_write(new SyncData)
-	{
-	}
-
-	void SetHnadler_OnRead(std::function<void()> on_read, bool sync_data_read)
-	{
-		std::shared_ptr<SyncData>& sync_data = sync_data_read ? m_read : m_write;
-		sync_data->on_read = on_read;
-	}
-
-	std::shared_ptr<IpcTransportMemory> CreateComplementar()
-	{
-		return std::shared_ptr<IpcTransportMemory>(new IpcTransportMemory(m_write, m_read));
-	}
-
-	void WaitIncomingData()
-	{
-		std::unique_lock<std::mutex> lock(m_read->lock);
-		while( !m_read->incoming_data )
-			m_read->cond.wait(lock);
-	}
-
-	bool	WaitRespond(size_t expected_size) override
-	{
-		std::unique_lock<std::mutex> lock(m_read->lock);
-		while( (m_read->data.size()<expected_size) && (!m_read->cancel_wait_respond) )
-			m_read->cond.wait(lock);
-		return !m_read->cancel_wait_respond;
-	}
-
-	size_t	ReadBytesAvailable() override
-	{
-		std::lock_guard<std::mutex> lock(m_read->lock);
-		return m_read->data.size();
-	}
-
-	void	Read(uint8_t* data, size_t size) override
-	{
-		std::lock_guard<std::mutex> lock(m_read->lock);
-		SyncData& sync = *m_read;
-		if( sync.on_read )
-			sync.on_read();// it not necessary but ipc must survive this
-		if( sync.data.size()<size )
-			return;// unexpected
-		std::copy(sync.data.begin(), sync.data.begin()+size, data);
-		sync.data.erase(sync.data.begin(), sync.data.begin()+size);
-		sync.incoming_data = false;
-	}
-
-	void	Write(const uint8_t* data, size_t size) override
-	{
-		std::lock_guard<std::mutex> lock(m_write->lock);
-		SyncData& sync = *m_write;
-		sync.data.insert(sync.data.end(), data, data+size);
-		sync.incoming_data = true;
-		sync.cond.notify_all();
-	}
-
-	void CancelWaitRespond()
-	{
-		std::unique_lock<std::mutex> lock(m_read->lock);
-		SyncData& sync = *m_read;
-		sync.cancel_wait_respond = true;
-		sync.cond.notify_all();
-	}
-
-private:
-
-
-	std::shared_ptr<SyncData>	m_write;
-	std::shared_ptr<SyncData>	m_read;
-};
-
-//-------------------------------------------------------
-
-class IpcPackerTransportMemory: public MAssIpc_TransportShare
-{
-private:
-	struct SyncData
-	{
-		std::function<void()> on_read;
-		std::mutex	lock;
-		bool incoming_data = false;
-		bool cancel_wait_respond = false;
-		std::condition_variable cond;
-		std::list<std::unique_ptr<const MAssIpc_Data> > data;
-	};
-
-public:
-
-	class MemoryPacket: public MAssIpc_Data
-	{
-	public:
-
-		MemoryPacket(size_t size)
-			:m_data(size)
-		{
-		}
-
-	private:
-
-		MAssIpc_Data::TPacketSize Size() const override
-		{
-			return MAssIpc_Data::TPacketSize(m_data.size());
-		}
-
-		uint8_t* Data() override
-		{
-			return m_data.data();
-		}
-
-		const uint8_t* Data() const override
-		{
-			return m_data.data();
-		}
-
-	private:
-
-		std::vector<uint8_t>	m_data;
-	};
-
-	IpcPackerTransportMemory(std::shared_ptr<SyncData> read, std::shared_ptr<SyncData> write)
-		:m_read(read)
-		, m_write(write)
-	{
-	}
-
-public:
-
-	IpcPackerTransportMemory()
-		:m_read(new SyncData)
-		, m_write(new SyncData)
-	{
-	}
-
-	void SetHnadler_OnRead(std::function<void()> on_read, bool sync_data_read)
-	{
-		std::shared_ptr<SyncData>& sync_data = sync_data_read ? m_read : m_write;
-		sync_data->on_read = on_read;
-	}
-
-	std::shared_ptr<IpcPackerTransportMemory> CreateComplementar()
-	{
-		return std::shared_ptr<IpcPackerTransportMemory>(new IpcPackerTransportMemory(m_write, m_read));
-	}
-
-	void WaitIncomingData()
-	{
-		std::unique_lock<std::mutex> lock(m_read->lock);
-		while( !m_read->incoming_data )
-			m_read->cond.wait(lock);
-	}
-
-	std::unique_ptr<MAssIpc_Data> Create(MAssIpc_Data::TPacketSize size) override
-	{
-		return std::unique_ptr<MAssIpc_Data>(new MemoryPacket(size));
-	}
-
-	bool	Read(bool wait_incoming_packet, std::unique_ptr<const MAssIpc_Data>* packet) override
-	{
-		std::unique_lock<std::mutex> lock(m_read->lock);
-		if( m_read->on_read )
-			m_read->on_read();// it not necessary but ipc must survive this
-		while( m_read->data.empty() && (!m_read->cancel_wait_respond) )
-		{
-			if( wait_incoming_packet )
-				m_read->cond.wait(lock);
-			else
-				return true;
-		}
-		if( m_read->cancel_wait_respond )
-			return false;
-
-		*packet = std::move(m_read->data.front());
-		m_read->data.pop_front();
-		return true;
-	}
-
-	void	Write(std::unique_ptr<const MAssIpc_Data> packet) override
-	{
-		std::lock_guard<std::mutex> lock(m_write->lock);
-		SyncData& sync = *m_write;
-		sync.data.push_back(std::move(packet));
-		sync.incoming_data = true;
-		sync.cond.notify_all();
-	}
-
-	void CancelWaitRespond()
-	{
-		std::unique_lock<std::mutex> lock(m_read->lock);
-		SyncData& sync = *m_read;
-		sync.cancel_wait_respond = true;
-		sync.cond.notify_all();
-	}
-
-private:
-
-
-	std::shared_ptr<SyncData>	m_write;
-	std::shared_ptr<SyncData>	m_read;
-};
-
 //-------------------------------------------------------
 class MAssCallThreadTransport_Stub: public MAssIpc_Transthread
 {
@@ -442,7 +271,7 @@ static std::string TestThreads_Proc3(uint8_t a, std::string b, uint32_t c)
 	return ss.str();
 }
 
-void TestThreads_Handler(std::shared_ptr<IpcPackerTransportMemory> transport_buffer, MAssIpcCall call)
+void TestThreads_Handler(std::shared_ptr<IpcTransport_MemoryShare> transport_buffer, MAssIpcCall call)
 {
 	while( true )
 	{
@@ -453,7 +282,7 @@ void TestThreads_Handler(std::shared_ptr<IpcPackerTransportMemory> transport_buf
 	}
 }
 
-void TestThreads_Sender(std::shared_ptr<IpcPackerTransportMemory> transport_buffer, MAssIpcCall call)
+void TestThreads_Sender(std::shared_ptr<IpcTransport_MemoryShare> transport_buffer, MAssIpcCall call)
 {
 	std::stringstream ss;
 	ss<<MAssIpc_ThreadSafe::get_id();
@@ -518,8 +347,8 @@ void TestThreads_Sender(std::shared_ptr<IpcPackerTransportMemory> transport_buff
 
 void TestThreads_MainThread()
 {
-	std::shared_ptr<IpcPackerTransportMemory> transport_buffer(new IpcPackerTransportMemory);
-	std::shared_ptr<IpcPackerTransportMemory> complementar_buffer = transport_buffer->CreateComplementar();
+	std::shared_ptr<IpcTransport_MemoryShare> transport_buffer(new IpcTransport_MemoryShare);
+	std::shared_ptr<IpcTransport_MemoryShare> complementar_buffer = transport_buffer->CreateComplementar();
 	MAssIpcCall call_sender({});
 	MAssIpcCall call_handler({});
 
@@ -702,12 +531,12 @@ public:
 };
 
 constexpr const MAssIpcCall::SigName<std::string(std::string, uint32_t, double)> sig_Static_String_StringU32Double = {"Float_StringDouble"};
-constexpr const MAssIpcCall::Make_SigName<decltype(&Static_String_StringU32Double)>::type sig2_Static_String_StringU32Double = {"Float_StringDouble"};
-constexpr const MAssIpcCall::Make_SigName<decltype(&SigCheck::Static_String_StringU32Double)>::type sig3_Static_String_StringU32Double = {"Float_StringDouble"};
-static_assert(std::is_same<decltype(sig_Static_String_StringU32Double), decltype(sig2_Static_String_StringU32Double)>::value, "must be same type");
-static_assert(std::is_same<decltype(sig_Static_String_StringU32Double), decltype(sig3_Static_String_StringU32Double)>::value, "must be same type");
+constexpr const MAssIpcCall::SigName<decltype(&Static_String_StringU32Double)> sig2_Static_String_StringU32Double = {"Float_StringDouble"};
+constexpr const MAssIpcCall::SigName<decltype(&SigCheck::Static_String_StringU32Double)> sig3_Static_String_StringU32Double = {"Float_StringDouble"};
+static_assert(std::is_same<decltype(sig_Static_String_StringU32Double)::SigProc, decltype(sig2_Static_String_StringU32Double)::SigProc>::value, "must be same type");
+static_assert(std::is_same<decltype(sig_Static_String_StringU32Double)::SigProc, decltype(sig3_Static_String_StringU32Double)::SigProc>::value, "must be same type");
 
-void Main_IpcService(std::shared_ptr<IpcPackerTransportMemory> transport_buffer)
+void Main_IpcService(std::shared_ptr<IpcTransport_MemoryShare> transport_buffer)
 {
 	std::shared_ptr<MAssCallThreadTransport_Stub> thread_transport(new MAssCallThreadTransport_Stub);
 	MAssIpcCall call(thread_transport);
@@ -825,16 +654,16 @@ void Main_IpcClient()
 
 	call.SetHandler_ErrorOccured(&OnInvalidRemoteCall);
 
-	std::shared_ptr<IpcPackerTransportMemory> transport_buffer(new IpcPackerTransportMemory);
+	std::shared_ptr<IpcTransport_MemoryShare> transport_buffer(new IpcTransport_MemoryShare);
 
-	std::shared_ptr<IpcPackerTransportMemory> complementar_buffer = transport_buffer->CreateComplementar();
+	std::shared_ptr<IpcTransport_MemoryShare> complementar_buffer = transport_buffer->CreateComplementar();
 	std::thread serv_thread(&Main_IpcService, complementar_buffer);
 
 	call.SetTransport(transport_buffer);
 
 	{
 		auto packet_size = MAssIpcCall::CalcCallSize<void>(true, "NotExistProc", 0);
-		std::unique_ptr<MAssIpc_Data> ipc_buffer(new IpcPackerTransportMemory::MemoryPacket(packet_size));
+		std::unique_ptr<MAssIpc_Data> ipc_buffer(new IpcTransport_MemoryShare::MemoryPacket(packet_size));
  		call.AsyncInvoke({"NotExistProc", std::move(ipc_buffer)}, 0);
 // 		call.InvokeWait("NotExistProc", std::move(ipc_buffer)).RetArgs<int>();
 //  	call[{std::move(ipc_buffer), "NotExistProc"}];

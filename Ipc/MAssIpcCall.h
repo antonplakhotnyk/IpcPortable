@@ -84,13 +84,14 @@ private:
 
 public:
 
-    template<class SigProc>
+	// constexpr MAssIpcCall::SigName<bool(float)> sig_Proc = {"Proc"};
+    template<class FunctionSignature>
     struct SigName
     {
     public:
 
+		using SigProc = typename MAssIpcCallInternal::FuncSig<FunctionSignature>::FuncType;
         static_assert(IsSigProc<SigProc>::value, "SigProc must be function type like TRet(TArgs...)");
-        using TSigProc = SigProc;
 
 		constexpr TInvokeSetting<SigName<SigProc>> operator()(std::unique_ptr<MAssIpc_Data>&& inplace_send_buffer, ProcIn process_incoming_calls) const
 		{
@@ -113,30 +114,6 @@ public:
         }
 
         const MAssIpcCallInternal::MAssIpc_RawString proc_name;
-    };
-
-    template<class SigProcPtr>
-    struct Make_SigName
-    {
-        static_assert(sizeof(SigProcPtr)<0, "specialization not found, SigProcPtr must be (member or) function pointer like decltype(&Cls::Proc)");
-    };
-
-    template<class THandler, class TRet, class... Args>
-    struct Make_SigName<TRet (THandler::*)(Args...)>
-    {
-        using type = SigName<TRet(Args...)>;
-    };
-
-    template<class THandler, class TRet, class... Args>
-    struct Make_SigName<TRet (THandler::*)(Args...) const>
-    {
-        using type = SigName<TRet(Args...)>;
-    };
-
-    template<class TRet, class... Args>
-    struct Make_SigName<TRet (*)(Args...)>
-    {
-        using type = SigName<TRet(Args...)>;
     };
 
 public:
@@ -208,29 +185,29 @@ public:
 	template<class TRet, class... TArgs>
 	static MAssIpc_Data::TPacketSize CalcCallSize(bool send_return, const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TArgs&... args);
 
-	template<class TDelegateW>
-	std::shared_ptr<const CallInfo> AddHandler(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TDelegateW& del,
+	template<class TDelegate>
+	std::shared_ptr<const CallInfo> AddHandler(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TDelegate& del,
 											   MAssIpc_TransthreadTarget::Id thread_id = MAssIpc_TransthreadTarget::CurrentThread());
-	template<class TDelegateW>
-	std::shared_ptr<const CallInfo> AddHandler(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TDelegateW& del, const std::string& comment,
+	template<class TDelegate>
+	std::shared_ptr<const CallInfo> AddHandler(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TDelegate& del, const std::string& comment,
 											   MAssIpc_TransthreadTarget::Id thread_id = MAssIpc_TransthreadTarget::CurrentThread());
-	template<class TDelegateW>
-	std::shared_ptr<const CallInfo> AddHandler(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TDelegateW& del, const void* tag,
+	template<class TDelegate>
+	std::shared_ptr<const CallInfo> AddHandler(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TDelegate& del, const void* tag,
 											   MAssIpc_TransthreadTarget::Id thread_id, const std::string& comment = {});
-	template<class TDelegateW>
-	std::shared_ptr<const CallInfo> AddHandler(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TDelegateW& del, const void* tag);
+	template<class TDelegate>
+	std::shared_ptr<const CallInfo> AddHandler(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TDelegate& del, const void* tag);
 
-	template<class TDelegateW>
-	std::shared_ptr<const CallInfo> AddHandler(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TDelegateW& del, const std::string& comment,
+	template<class TDelegate>
+	std::shared_ptr<const CallInfo> AddHandler(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TDelegate& del, const std::string& comment,
 											   MAssIpc_TransthreadTarget::Id thread_id, const void* tag);// obsolete
 
 
-	template<class SigProc_Ret, class TDelegateW, class... SigProc_Args>
-	std::shared_ptr<const CallInfo> AddHandler(const SigName<SigProc_Ret(SigProc_Args...)>& signame, const TDelegateW& handler, const void* tag,
+	template<class SigProc_Ret, class TDelegate, class... SigProc_Args>
+	std::shared_ptr<const CallInfo> AddHandler(const SigName<SigProc_Ret(SigProc_Args...)>& signame, const TDelegate& handler, const void* tag = nullptr,
 											   MAssIpc_TransthreadTarget::Id thread_id = MAssIpc_TransthreadTarget::CurrentThread(), const std::string& comment = {})
 	{
-		static_assert(MAssIpcCallInternal::Check_is_signame_and_handler_describe_same_call_signatures(typename MAssIpcCallInternal::FuncSig<SigProc_Ret(SigProc_Args...)>::FuncPtr{}, typename MAssIpcCallInternal::FuncSig<TDelegateW>::FuncPtr{}), "'signame' and 'handler' must have same callable function signature");
-		return AddHandler<TDelegateW>(signame.proc_name, handler, tag, thread_id, comment);
+		static_assert(MAssIpcCallInternal::Check_is_signame_and_handler_describe_same_call_signatures(typename MAssIpcCallInternal::FuncSig<SigProc_Ret(SigProc_Args...)>::FuncPtr{}, typename MAssIpcCallInternal::FuncSig<TDelegate>::FuncPtr{}), "'signame' and 'handler' must have same callable function signature");
+		return AddHandler<TDelegate>(signame.proc_name, handler, tag, thread_id, comment);
 	}
 
 	template<class SigProc_Ret, class... SigProc_Args>
@@ -244,11 +221,12 @@ public:
 		return m_int->m_proc_map.SetErrorHandler(new_val);
 	}
 
-	template<class THandler>
-	std::shared_ptr<const ErrorOccured> SetHandler_ErrorOccured(const THandler& handler, const void* tag = nullptr, MAssIpc_TransthreadTarget::Id thread_id = MAssIpc_TransthreadTarget::CurrentThread())
+	template<class TDelegate>
+	std::shared_ptr<const ErrorOccured> SetHandler_ErrorOccured(const TDelegate& handler, const void* tag = nullptr, MAssIpc_TransthreadTarget::Id thread_id = MAssIpc_TransthreadTarget::CurrentThread())
 	{
-		static_assert(MAssIpcCallInternal::Check_is_signame_and_handler_describe_same_call_signatures(typename MAssIpcCallInternal::FuncSig<decltype(&ErrorOccured::Invoke)>::FuncPtr{}, typename MAssIpcCallInternal::FuncSig<THandler>::FuncPtr{}), "THandler signature not match");
-		std::shared_ptr<const ErrorOccured> new_handler = std::make_shared<MAssIpcCallInternal::ErrorOccured_Imp<THandler> >(handler, thread_id, tag);
+		static_assert(MAssIpcCallInternal::Check_is_signame_and_handler_describe_same_call_signatures(typename MAssIpcCallInternal::FuncSig<decltype(&ErrorOccured::Invoke)>::FuncPtr{}, typename MAssIpcCallInternal::FuncSig<TDelegate>::FuncPtr{}), "TDelegate signature not match");
+		static_assert(MAssIpcCallInternal::IsHandlerTypeCompatible<TDelegate>::value, "TDelegate is not compatible handler type");
+		std::shared_ptr<const ErrorOccured> new_handler = std::make_shared<MAssIpcCallInternal::ErrorOccured_Imp<TDelegate> >(handler, thread_id, tag);
 		return SetHandler_ErrorOccured(new_handler);
 	}
 
@@ -258,11 +236,12 @@ public:
 		return m_int->m_proc_map.SetCallCountChanged(new_val);
 	}
 
-	template<class THandler>
-	std::shared_ptr<const CallCountChanged> SetHandler_CallCountChanged(const THandler& handler, const void* tag=nullptr, MAssIpc_TransthreadTarget::Id thread_id = MAssIpc_TransthreadTarget::CurrentThread())
+	template<class TDelegate>
+	std::shared_ptr<const CallCountChanged> SetHandler_CallCountChanged(const TDelegate& handler, const void* tag=nullptr, MAssIpc_TransthreadTarget::Id thread_id = MAssIpc_TransthreadTarget::CurrentThread())
 	{
-		static_assert(MAssIpcCallInternal::Check_is_signame_and_handler_describe_same_call_signatures(typename MAssIpcCallInternal::FuncSig<decltype(&CallCountChanged::Invoke)>::FuncPtr{}, typename MAssIpcCallInternal::FuncSig<THandler>::FuncPtr{}), "THandler signature not match");
-		std::shared_ptr<const CallCountChanged> new_handler = std::make_shared<MAssIpcCallInternal::CallCountChanged_Imp<THandler> >(handler, thread_id, tag);
+		static_assert(MAssIpcCallInternal::Check_is_signame_and_handler_describe_same_call_signatures(typename MAssIpcCallInternal::FuncSig<decltype(&CallCountChanged::Invoke)>::FuncPtr{}, typename MAssIpcCallInternal::FuncSig<TDelegate>::FuncPtr{}), "TDelegate signature not match");
+		static_assert(MAssIpcCallInternal::IsHandlerTypeCompatible<TDelegate>::value, "TDelegate is not compatible handler type");
+		std::shared_ptr<const CallCountChanged> new_handler = std::make_shared<MAssIpcCallInternal::CallCountChanged_Imp<TDelegate> >(handler, thread_id, tag);
 		return SetHandler_CallCountChanged(new_handler);
 	}
 
@@ -416,8 +395,7 @@ private:
 									   MAssIpc_DataStream& call_info_data, 
 									   MAssIpcCallInternal::MAssIpc_PacketParser::TCallId id) const;
 		AnalizeInvokeDataRes ReportError_FindCallInfo(const DeserializedFindCallInfo& find_call_info, ErrorType error, 
-													  const std::shared_ptr<const  ErrorOccured>& on_invalid_remote_call,
-													  const std::shared_ptr<MAssIpcCallInternal::CallInfoImpl>& call_info,
+													  const MAssIpcCallInternal::ProcMap::FindCallInfoRes& find_res,
 													  const std::shared_ptr<MAssIpc_Transthread>& inter_thread_nullable) const;
 		static void StoreReturnFailCall(MAssIpc_DataStream* result_str, const MAssIpcCallInternal::ErrorJob::Arg& error_arg,
 										MAssIpcCallInternal::MAssIpc_PacketParser::TCallId id);
@@ -446,11 +424,12 @@ public:
 			m_ipc_int->m_proc_map.SetCallCountChanged(m_old_handler);
 		}
 
-		template<class THandler>
-		static std::shared_ptr<const CallCountChanged> MakeHandler_CallCountChanged(const THandler& handler, const void* tag = nullptr, MAssIpc_TransthreadTarget::Id thread_id = MAssIpc_TransthreadTarget::CurrentThread())
+		template<class TDelegate>
+		static std::shared_ptr<const CallCountChanged> MakeHandler_CallCountChanged(const TDelegate& handler, const void* tag = nullptr, MAssIpc_TransthreadTarget::Id thread_id = MAssIpc_TransthreadTarget::CurrentThread())
 		{
-			static_assert(MAssIpcCallInternal::Check_is_signame_and_handler_describe_same_call_signatures(typename MAssIpcCallInternal::FuncSig<decltype(&CallCountChanged::Invoke)>::FuncPtr{}, typename MAssIpcCallInternal::FuncSig<THandler>::FuncPtr{}), "THandler signature not match");
-			std::shared_ptr<const CallCountChanged> new_handler = std::make_shared<MAssIpcCallInternal::CallCountChanged_Imp<THandler> >(handler, thread_id, tag);
+			static_assert(MAssIpcCallInternal::Check_is_signame_and_handler_describe_same_call_signatures(typename MAssIpcCallInternal::FuncSig<decltype(&CallCountChanged::Invoke)>::FuncPtr{}, typename MAssIpcCallInternal::FuncSig<TDelegate>::FuncPtr{}), "TDelegate signature not match");
+			static_assert(MAssIpcCallInternal::IsHandlerTypeCompatible<TDelegate>::value, "TDelegate is not compatible handler type");
+			std::shared_ptr<const CallCountChanged> new_handler = std::make_shared<MAssIpcCallInternal::CallCountChanged_Imp<TDelegate> >(handler, thread_id, tag);
 			return new_handler;
 		}
 
@@ -498,39 +477,40 @@ inline bool MAssIpcCall::IsProcessIncomingCalls(ProcIn process_incoming_calls) c
 
 //-------------------------------------------------------
 
-template<class TDelegateW>
-std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TDelegateW& del, MAssIpc_TransthreadTarget::Id thread_id)
+template<class TDelegate>
+std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TDelegate& del, MAssIpc_TransthreadTarget::Id thread_id)
 {
 	return AddHandler(proc_name, del, nullptr, thread_id, std::string());
 }
 
-template<class TDelegateW>
-std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TDelegateW& del, const std::string& comment,
+template<class TDelegate>
+std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TDelegate& del, const std::string& comment,
 							 MAssIpc_TransthreadTarget::Id thread_id)
 {
 	return AddHandler(proc_name, del, nullptr, thread_id, comment);
 }
 
-template<class TDelegateW>
-std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TDelegateW& del, const void* tag)
+template<class TDelegate>
+std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TDelegate& del, const void* tag)
 {
 	return AddHandler(proc_name, del, tag, MAssIpc_TransthreadTarget::CurrentThread(), std::string());
 }
 
-template<class TDelegateW>
-std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TDelegateW& del, const std::string& comment,
+template<class TDelegate>
+std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TDelegate& del, const std::string& comment,
 										   MAssIpc_TransthreadTarget::Id thread_id, const void* tag)
 {
 	return AddHandler(proc_name, del, tag, thread_id, comment);
 }
 
-template<class TDelegateW>
-std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TDelegateW& del, const void* tag,
+template<class TDelegate>
+std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssIpcCallInternal::MAssIpc_RawString& proc_name, const TDelegate& del, const void* tag,
 						 MAssIpc_TransthreadTarget::Id thread_id, const std::string& comment)
 {
-	static_assert(!MAssIpcCallInternal::Check_is_bind_expression<TDelegateW>::value, "can not deduce signature from bind_expression, use std::function<>(std::bind())");
-	std::unique_ptr<MAssIpcCallInternal::InvokeRemoteBase> invoke(new typename MAssIpcCallInternal::Impl_Selector<TDelegateW>::Res(del, thread_id, tag));
-	return m_int->m_proc_map.AddProcSignature(proc_name, MAssIpcCallInternal::CallInfoImpl::MakeParamsType<TDelegateW>(), std::move(invoke), comment);
+	static_assert(!MAssIpcCallInternal::Check_is_bind_expression<TDelegate>::value, "can not deduce signature from bind_expression, use std::function<>(std::bind())");
+	static_assert(MAssIpcCallInternal::IsHandlerTypeCompatible<TDelegate>::value, "TDelegate is not compatible handler type");
+	std::unique_ptr<MAssIpcCallInternal::InvokeRemoteBase> invoke(new typename MAssIpcCallInternal::Impl_Selector<TDelegate>::Res(del, thread_id, tag));
+	return m_int->m_proc_map.AddProcSignature(proc_name, MAssIpcCallInternal::CallInfoImpl::MakeParamsType<TDelegate>(), std::move(invoke), comment);
 }
 
 template<class TRet, class... TArgs>

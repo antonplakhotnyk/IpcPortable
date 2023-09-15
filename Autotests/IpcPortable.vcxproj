@@ -90,9 +90,9 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
-      <LanguageStandard>stdcpp14</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <PreprocessorDefinitions>_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>../Ipc/Integration;../Ipc/Integration/Multithread;../Ipc/Integration/CustomDataPacket;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../Ipc;../Ipc/Integration;../Ipc/Integration/Multithread;../Ipc/Integration/CustomDataPacket;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -128,9 +128,9 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
-      <LanguageStandard>stdcpp14</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <PreprocessorDefinitions>_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>../Ipc/Integration;../Ipc/Integration/Multithread;../Ipc/Integration/CustomDataPacket;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../Ipc;../Ipc/Integration;../Ipc/Integration/Multithread;../Ipc/Integration/CustomDataPacket;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -192,7 +192,11 @@
     <ClInclude Include="..\Ipc\MAssIpc_Transport.h" />
     <ClInclude Include="..\Ipc\MAssIpc_TransportProxy.h" />
     <ClInclude Include="..\Ipc\MAssIpc_Transthread.h" />
+    <ClInclude Include="IpcTransport_MemoryCopy.h" />
+    <ClInclude Include="IpcTransport_MemoryShare.h" />
+    <ClInclude Include="IpcTransthread_Memory.h" />
     <ClInclude Include="stdafx.h" />
+    <ClInclude Include="TaskRunnerThread.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

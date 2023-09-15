@@ -17,6 +17,11 @@ public:
 
 		constexpr Id() = default;
 
+		constexpr bool operator<(const Id& other) const
+		{
+			return m_id < other.m_id;
+		}
+
 	private:
 		size_t m_id = -1;// no thread
 	};
@@ -26,20 +31,20 @@ public:
 		return Id();
 	}
 
-	// possible implementations:
-	// 
-	// Same as MAssIpc_ThreadSafe
-	// using Id = MAssIpc_ThreadSafe::Id;
-	// static Id CurrentThread()
-	// {
-	// 	return MAssIpc_ThreadSafe::get_id();
-	// }
-	//
-	// based on std::thread
-	// using Id = std::thread::id
-	// static inline id get_id()
-	// {
-	// 	return std::this_thread::get_id();
-	// }
+	// Possible implementations:
+	 
+// 	// Same as MAssIpc_ThreadSafe
+// 	using Id = MAssIpc_ThreadSafe::id;
+// 	static Id CurrentThread()
+// 	{
+// 		return MAssIpc_ThreadSafe::get_id();
+// 	}
+	
+// 	// based on std::thread
+// 	using Id = std::thread::id;
+// 	static inline Id CurrentThread()
+// 	{
+// 		return std::this_thread::get_id();
+// 	}
 
 };

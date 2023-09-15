@@ -82,12 +82,17 @@ static inline bool IsBoolConvertible_Callable(TDelegate& del)
 //-------------------------------------------------------
 
 
-template<typename TSig>
-struct FuncSig;
+template<typename SigProc, typename = void>
+struct FuncSig
+{
+	static_assert(sizeof(SigProc) < 0, "specialization not found, SigProc must be member or static function pointer like decltype(&Cls::Proc) or function like TRet(T1,T2) or callable with operator()");
+	using IsHandlerType = std::false_type;
+};
 
 template<typename Ret, typename... Args>
-struct FuncSig<Ret(Args...)>
+struct FuncSig< Ret(Args...)>
 {
+	using FuncType = Ret(Args...);
 	using FuncPtr = Ret(*)(Args...);
 	using FuncRet = Ret;
 };
@@ -95,20 +100,30 @@ struct FuncSig<Ret(Args...)>
 template<typename Ret, typename... Args>
 struct FuncSig<Ret(*)(Args...)>: public FuncSig<Ret(Args...)>
 {
+	using IsHandlerType = std::true_type;
 };
 
 template<typename Class, typename Ret, typename... Args>
 struct FuncSig<Ret(Class::*)(Args...)>: public FuncSig<Ret(Args...)>
 {
+	using IsHandlerType = std::false_type;
 };
 
 template<typename Class, typename Ret, typename... Args>
 struct FuncSig<Ret(Class::*)(Args...) const>: public FuncSig<Ret(Args...)>
 {
+	using IsHandlerType = std::false_type;
 };
 
 template<typename Callable>
-struct FuncSig: public FuncSig<decltype( &Callable::operator() )>
+struct FuncSig<Callable, typename std::enable_if<std::is_member_function_pointer<decltype(&Callable::operator())>::value>::type>
+	: public FuncSig<decltype(&Callable::operator())>
+{
+	using IsHandlerType = std::true_type;
+};
+
+template<class THandler>
+struct IsHandlerTypeCompatible: FuncSig<THandler>::IsHandlerType
 {
 };
 
@@ -133,8 +148,11 @@ static constexpr bool Check_is_signame_and_handler_describe_same_call_signatures
 class CallInfo
 {
 public:
+
+	using TCounter = uint32_t;
+
 	virtual ~CallInfo() = default;
-	virtual uint32_t GetCallCount() const = 0;
+	virtual TCounter GetCallCount() const = 0;
 	virtual const std::string& GetName() const = 0;
 };
 

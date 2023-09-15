@@ -63,11 +63,11 @@ MAssIpcCall::DeserializedFindCallInfo MAssIpcCall::DeserializeNameSignature(MAss
 }
 
 MAssIpcCall::Internals::AnalizeInvokeDataRes MAssIpcCall::Internals::ReportError_FindCallInfo(const DeserializedFindCallInfo& find_call_info, ErrorType error,
-																							  const std::shared_ptr<const ErrorOccured>& on_invalid_remote_call,
-																							  const std::shared_ptr<CallInfoImpl>& call_info,
+																							  const MAssIpcCallInternal::ProcMap::FindCallInfoRes& find_res,
 																							  const std::shared_ptr<MAssIpc_Transthread>& inter_thread_nullable) const
 {
-	AnalizeInvokeDataRes res = {call_info};
+	AnalizeInvokeDataRes res = {find_res.call_info};
+	res.on_call_count_changed = find_res.on_call_count_changed;
 	res.send_return = find_call_info.send_return;
 
 	res.error_arg = std::make_shared<ErrorJob::Arg>(ErrorJob::Arg{error});
@@ -83,7 +83,7 @@ MAssIpcCall::Internals::AnalizeInvokeDataRes MAssIpcCall::Internals::ReportError
 	res.error_arg->message.append(find_call_info.params_type.C_String(), find_call_info.params_type.Length());
 	res.error_arg->message += message_formaters[2];
 
-	SendErrorMessage(inter_thread_nullable, on_invalid_remote_call, res.error_arg);
+	SendErrorMessage(inter_thread_nullable, find_res.on_invalid_remote_call, res.error_arg);
 	return res;
 }
 
@@ -114,13 +114,13 @@ MAssIpcCall::Internals::AnalizeInvokeDataRes MAssIpcCall::Internals::AnalizeInvo
 	ProcMap::FindCallInfoRes find_res = m_proc_map.FindCallInfo(find_call_info.name, find_call_info.params_type);
 
 	if( !bool(find_res.call_info) || !bool(find_res.invoke_base) )
-		return ReportError_FindCallInfo(find_call_info, ErrorType::no_matching_call_name_parameters, find_res.on_invalid_remote_call, find_res.call_info, inter_thread_nullable);
+		return ReportError_FindCallInfo(find_call_info, ErrorType::no_matching_call_name_parameters, find_res, inter_thread_nullable);
 
 	if( find_call_info.return_type.Length()!=0 )
 	{
 		const MAssIpc_RawString return_type_call(find_res.invoke_base->GetSignature_RetType());
 		if( find_call_info.return_type != return_type_call )
-			return ReportError_FindCallInfo(find_call_info, ErrorType::no_matching_call_return_type, find_res.on_invalid_remote_call, find_res.call_info, inter_thread_nullable);
+			return ReportError_FindCallInfo(find_call_info, ErrorType::no_matching_call_return_type, find_res, inter_thread_nullable);
 	}
 
 	return {find_res.call_info, find_res.invoke_base, find_call_info.send_return, find_res.on_call_count_changed};
@@ -141,6 +141,9 @@ void MAssIpcCall::Internals::InvokeLocal(MAssIpc_DataStream& call_info_data, MAs
 	const std::shared_ptr<MAssIpc_Transthread> inter_thread_nullable = m_inter_thread_nullable.lock();
 
 	AnalizeInvokeDataRes invoke = AnalizeInvokeData(transport, inter_thread_nullable, call_info_data, id);
+
+	if(bool(invoke.call_info))
+		invoke.call_info->IncrementCallCount();
 
 	if( invoke.invoke_base )
 	{
@@ -179,7 +182,6 @@ void MAssIpcCall::Internals::InvokeLocal(MAssIpc_DataStream& call_info_data, MAs
 
 	if(bool(invoke.call_info) && bool(invoke.on_call_count_changed) && invoke.on_call_count_changed->IsCallable() )
 	{
-		invoke.call_info->IncrementCallCount();
 		if( inter_thread_nullable )
 		{
 			auto thread_id = invoke.on_call_count_changed->m_thread_id;

@@ -98,5 +98,17 @@
     <ClInclude Include="..\Ipc\MAssIpcCall.h">
       <Filter>Ipc</Filter>
     </ClInclude>
+    <ClInclude Include="IpcTransport_MemoryCopy.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="IpcTransport_MemoryShare.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="IpcTransthread_Memory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TaskRunnerThread.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
