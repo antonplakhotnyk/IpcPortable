@@ -70,7 +70,7 @@ struct IsCallable_Check
 struct IsCallable_True
 {
 	template<class TDelegate>
-	static constexpr bool ToBool(const TDelegate& del){return true;}
+	static constexpr bool ToBool(TDelegate&& del){return true;}
 };
 
 template<class TDelegate>
@@ -116,8 +116,8 @@ struct FuncSig<Ret(Class::*)(Args...) const>: public FuncSig<Ret(Args...)>
 };
 
 template<typename Callable>
-struct FuncSig<Callable, typename std::enable_if<std::is_member_function_pointer<decltype(&Callable::operator())>::value>::type>
-	: public FuncSig<decltype(&Callable::operator())>
+struct FuncSig<Callable, typename std::enable_if<std::is_member_function_pointer<decltype(&std::decay<Callable>::type::operator())>::value>::type>
+	: public FuncSig<decltype(&std::decay<Callable>::type::operator())>
 {
 	using IsHandlerType = std::true_type;
 };
@@ -359,25 +359,25 @@ class CallCountChanged_Imp: public CallCountChanged
 {
 public:
 
-	CallCountChanged_Imp(const TDelegate& handler, MAssIpc_TransthreadTarget::Id thread_id, const void* tag)
+	CallCountChanged_Imp(TDelegate&& del, MAssIpc_TransthreadTarget::Id thread_id, const void* tag)
 		: CallCountChanged(thread_id, tag)
-		, m_handler(handler)
+		, m_del(std::move(del))
 	{
 	}
 
 	void Invoke(const std::shared_ptr<const CallInfo>& call_info) const override
 	{
-		m_handler(call_info);
+		m_del(call_info);
 	}
 
 	bool IsCallable() const override
 	{
-		return IsBoolConvertible_Callable(m_handler);
+		return IsBoolConvertible_Callable(m_del);
 	}
 
 private:
 
-	const TDelegate m_handler;
+	const typename std::decay<TDelegate>::type m_del;
 };
 
 class CountJob: public MAssIpc_Transthread::Job
@@ -426,25 +426,25 @@ class ErrorOccured_Imp: public ErrorOccured
 {
 public:
 
-	ErrorOccured_Imp(const TDelegate& handler, MAssIpc_TransthreadTarget::Id thread_id, const void* tag)
+	ErrorOccured_Imp(TDelegate&& del, MAssIpc_TransthreadTarget::Id thread_id, const void* tag)
 		: ErrorOccured(thread_id, tag)
-		, m_handler(handler)
+		, m_del(std::move(del))
 	{
 	}
 
 	void Invoke(ErrorType et, const std::string& message) const override
 	{
-		m_handler(et, message);
+		m_del(et, message);
 	}
 
 	bool IsCallable() const override
 	{
-		return IsBoolConvertible_Callable(m_handler);
+		return IsBoolConvertible_Callable(m_del);
 	}
 
 private:
 
-	const TDelegate m_handler;
+	const typename std::decay<TDelegate>::type m_del;
 };
 
 class ErrorJob: public MAssIpc_Transthread::Job
@@ -804,7 +804,7 @@ public:
 	{
 	private:
 
-		mutable TDelegate m_del;
+		mutable typename std::decay<TDelegate>::type m_del;
 
 	private:
 
@@ -830,9 +830,9 @@ public:
 
 	public:
 
-		Imp(const TDelegate& del, MAssIpc_TransthreadTarget::Id thread_id, const void* tag)
+		Imp(TDelegate&& del, MAssIpc_TransthreadTarget::Id thread_id, const void* tag)
 			:InvokeRemoteBase(thread_id, tag)
-			, m_del(del)
+			, m_del(std::move(del))
 		{
 		};
 	};
@@ -848,7 +848,7 @@ public:
 	{
 	private:
 
-		mutable TDelegate m_del;
+		mutable typename std::decay<TDelegate>::type m_del;
 
 	private:
 
@@ -874,9 +874,9 @@ public:
 
 	public:
 
-		Imp(const TDelegate& del, MAssIpc_TransthreadTarget::Id thread_id, const void* tag)
+		Imp(TDelegate&& del, MAssIpc_TransthreadTarget::Id thread_id, const void* tag)
 			:InvokeRemoteBase(thread_id, tag)
-			, m_del(del)
+			, m_del(std::move(del))
 		{
 		};
 	};

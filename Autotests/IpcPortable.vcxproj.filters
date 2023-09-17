@@ -25,6 +25,9 @@
     <Filter Include="Ipc\Integration\Singlethread">
       <UniqueIdentifier>{9e7462b1-f370-4c0d-8735-567d723a7d33}</UniqueIdentifier>
     </Filter>
+    <Filter Include="IpcIntegration">
+      <UniqueIdentifier>{246c66bf-0368-4e35-858c-f8b159272140}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -109,6 +112,15 @@
     </ClInclude>
     <ClInclude Include="TaskRunnerThread.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="IpcIntegration\MAssIpc_Assert.h">
+      <Filter>IpcIntegration</Filter>
+    </ClInclude>
+    <ClInclude Include="IpcIntegration\MAssIpc_TransthreadTarget.h">
+      <Filter>IpcIntegration</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Ipc\MAssIpcWaiter.h">
+      <Filter>Ipc</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

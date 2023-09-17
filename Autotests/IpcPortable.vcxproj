@@ -90,9 +90,9 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp14</LanguageStandard>
       <PreprocessorDefinitions>_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>../Ipc;../Ipc/Integration;../Ipc/Integration/Multithread;../Ipc/Integration/CustomDataPacket;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../Ipc;$(ProjectDir)/IpcIntegration;../Ipc/Integration/Multithread;../Ipc/Integration/CustomDataPacket;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -128,9 +128,9 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp14</LanguageStandard>
       <PreprocessorDefinitions>_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>../Ipc;../Ipc/Integration;../Ipc/Integration/Multithread;../Ipc/Integration/CustomDataPacket;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../Ipc;$(ProjectDir)/IpcIntegration;../Ipc/Integration/Multithread;../Ipc/Integration/CustomDataPacket;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -183,6 +183,7 @@
     <ClInclude Include="..\Ipc\Integration\Multithread\MAssIpc_ThreadSafe.h" />
     <ClInclude Include="..\Ipc\Integration\Singlethread\MAssIpc_ThreadSafe.h" />
     <ClInclude Include="..\Ipc\MAssIpcCall.h" />
+    <ClInclude Include="..\Ipc\MAssIpcWaiter.h" />
     <ClInclude Include="..\Ipc\MAssIpc_Data.h" />
     <ClInclude Include="..\Ipc\MAssIpc_DataStream.h" />
     <ClInclude Include="..\Ipc\MAssIpc_Internals.h" />
@@ -192,6 +193,8 @@
     <ClInclude Include="..\Ipc\MAssIpc_Transport.h" />
     <ClInclude Include="..\Ipc\MAssIpc_TransportProxy.h" />
     <ClInclude Include="..\Ipc\MAssIpc_Transthread.h" />
+    <ClInclude Include="IpcIntegration\MAssIpc_Assert.h" />
+    <ClInclude Include="IpcIntegration\MAssIpc_TransthreadTarget.h" />
     <ClInclude Include="IpcTransport_MemoryCopy.h" />
     <ClInclude Include="IpcTransport_MemoryShare.h" />
     <ClInclude Include="IpcTransthread_Memory.h" />

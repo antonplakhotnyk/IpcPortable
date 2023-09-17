@@ -1,26 +1,26 @@
 #pragma once
 
 #include "IpcQt_Net.h"
+#include "MAssIpcWaiter.h"
 
 class AutotestServerInternals
 {
 public:
 
-	void IpcCallCountChanged(const std::shared_ptr<const MAssIpcCall::CallInfo>& call_info)
+	AutotestServerInternals()
 	{
 	}
 
-private:
+public:
 
+	const std::shared_ptr<MAssIpcWaiter>		m_waiter = std::make_shared<MAssIpcWaiter>();
+	const std::shared_ptr<MAssIpcWaiter::ConnectionEvent::Signaling> m_connection_signaling = m_waiter->CreateSignaling<MAssIpcWaiter::ConnectionEvent>();
 };
 
 //-------------------------------------------------------
 
 class AutotestServer_Client
 {
-protected:
-
-	struct Internals;
 
 public:
 
@@ -31,11 +31,16 @@ public:
 			, m_internals{internals}
 		{
 			this->ipc_net.ipc_call.SetHandler_ErrorOccured(&SutConnection::IpcError, this);
-			this->ipc_net.ipc_call.SetHandler_CallCountChanged([this](const std::shared_ptr<const MAssIpcCall::CallInfo>& call_info)
+
+			if(auto internals = m_internals.lock())
 			{
-				if( auto client_int = m_internals.lock() )
-					client_int->IpcCallCountChanged(call_info);
-			}, this);
+				std::unique_ptr<MAssIpcWaiter::CallEvent::Signaling> call_signaling = internals->m_waiter->CreateSignaling<MAssIpcWaiter::CallEvent>();
+
+				this->ipc_net.ipc_call.SetHandler_CallCountChanged([call_signaling = std::move(call_signaling)](const std::shared_ptr<const MAssIpcCall::CallInfo>& call_info)
+				{
+					call_signaling->OnCallCountChanged(call_info);
+				}, this);
+			}
 		}
 
 		~SutConnection()
@@ -68,8 +73,9 @@ public:
 		std::function<void()> OnDisconnectedSut;
 	};
 
-	AutotestServer_Client(const Handlers& handlers)
+	AutotestServer_Client(const Handlers& handlers, const std::weak_ptr<AutotestServerInternals>& server_internals)
 		: m_handlers{handlers}
+		, m_server_internals(server_internals)
 	{
 	}
 
@@ -83,22 +89,16 @@ public:
 		return m_client_connections[size_t(sut_index_id)]->ipc_net.ipc_call;
 	};
 
-private:
-
-	MAssIpcCall		m_disconnected_stub{std::weak_ptr<MAssIpc_Transthread>{}};
-
-	struct Waiter
-	{
-	};
-
 public:
 
-	class Event
+	class Event: public MAssIpcWaiter::Event
 	{
 	public:
-		Event(std::weak_ptr<AutotestServerInternals> internals)
-			:m_internals{internals}
+		Event(const std::shared_ptr<MAssIpcWaiter::ConditionWaitLock>& cwl, std::shared_ptr<AutotestServerInternals> internals)
+			: MAssIpcWaiter::Event(cwl)
+			, m_internals{internals}
 		{
+			mass_return_if_equal(bool(m_internals), false);
 		}
 
 		enum struct LocalId
@@ -109,30 +109,48 @@ public:
 
 		void BindLocal(LocalId event_id)
 		{
+			switch( event_id )
+			{
+				case LocalId::ConnectedSut:
+				case LocalId::DisconnectedSut:
+				{
+					std::unique_ptr<MAssIpcWaiter::ConnectionEvent> connect_event{m_internals->m_waiter->CreateEvent<MAssIpcWaiter::ConnectionEvent>()};
+					MAssIpcWaiter::ConnectionEvent::State signal_state = (event_id == LocalId::ConnectedSut) ? MAssIpcWaiter::ConnectionEvent::State::on_connected : MAssIpcWaiter::ConnectionEvent::State::on_disconnected;
+					connect_event->BindConnect(signal_state, m_internals->m_connection_signaling);
+					this->BindEvent(std::move(connect_event));
+				}
+				break;
+			default:
+				mass_assert();
+			    break;
+			}
 		}
 
 		void BindSut(std::shared_ptr<const MAssIpcCall::CallInfo> event_id)
 		{
+			std::unique_ptr<MAssIpcWaiter::CallEvent> call_event{m_internals->m_waiter->CreateEvent<MAssIpcWaiter::CallEvent>()};
+			call_event->BindCall(event_id);
+			this->BindEvent(std::move(call_event));
 		}
 
-		void Wait()
-		{
-		}
 
 	private:
-		const std::weak_ptr<AutotestServerInternals> m_internals;
+
+		const std::shared_ptr<AutotestServerInternals> m_internals;
 	};
 
 	std::unique_ptr<Event> CreateEvent()
 	{
-		return std::unique_ptr<Event>{new Event(m_server_internals)};
+		return m_server_internals->m_waiter->CreateEvent<Event>(m_server_internals);
 	}
 
+private:
+	MAssIpcCall		m_disconnected_stub{std::weak_ptr<MAssIpc_Transthread>{}};
 protected:
 
 	std::shared_ptr<SutConnection> m_client_connections[size_t(SutIndexId::max_count)];
 	const Handlers		m_handlers;
 
-	std::weak_ptr<AutotestServerInternals> m_server_internals;
+	const std::shared_ptr<AutotestServerInternals> m_server_internals;
 
 };

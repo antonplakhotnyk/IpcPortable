@@ -6,12 +6,17 @@
 #include <condition_variable>
 #include <mutex>
 #include <sstream>
-#include <mutex>
 #include <condition_variable>
 #include <list>
 #include <map>
+#include <queue>
+#include <future>
 
-#include <functional>
+static constexpr const char* general_includes_end_mark = {};// help generating preprocessed to file cpp
+
+
+//#include <functional>
+
 static constexpr const char* main_start_mark = {};// help generating preprocessed to file cpp
 
 #include "MAssIpcCall.h"
@@ -94,6 +99,7 @@ void CheckCompilation()
  	call.AddHandler("Handler", [](){});
 
 	call.SetHandler_CallCountChanged([](const std::shared_ptr<const MAssIpcCall::CallInfo>& call_info){});
+	call.SetHandler_ErrorOccured([](MAssIpcCall::ErrorType et, const std::string& message){});
 
 	{
 		struct Handler
@@ -105,6 +111,69 @@ void CheckCompilation()
 		} handler;
 		call.SetHandler_CallCountChanged(handler);
 		// call.SetHandler_CallCountChanged(&Handler::MemberFunc, &handler);// compilation error
+	}
+
+	{
+		struct Handler
+		{
+			Handler() = default;
+			Handler(Handler&& other) = default;
+
+			Handler(const Handler&) = delete;
+			Handler& operator= (const Handler&) = delete;
+
+			void operator()() const{}
+			void MemberFunc() const{}
+
+		} handler;
+		call.AddHandler("name", handler);
+		call.AddHandler("name", Handler());
+		std::unique_ptr<int> iptr{new int()};
+#if __cplusplus >= 201402L
+		call.AddHandler("name", [iptr = std::move(iptr)]()mutable{});
+#endif
+	}
+
+	{
+		struct Handler
+		{
+			Handler() = default;
+			Handler(Handler&& other) = default;
+
+			Handler(const Handler&) = delete;
+			Handler& operator= (const Handler&) = delete;
+
+			void operator()(const std::shared_ptr<const MAssIpcCall::CallInfo>& call_info) const{}
+			void MemberFunc() const{}
+
+		} handler;
+		call.SetHandler_CallCountChanged(handler);
+		call.SetHandler_CallCountChanged(Handler());
+		std::unique_ptr<int> iptr{new int()};
+#if __cplusplus >= 201402L
+		call.SetHandler_CallCountChanged([iptr = std::move(iptr)](const std::shared_ptr<const MAssIpcCall::CallInfo>& call_info){});
+#endif
+	}
+
+	{
+		struct Handler
+		{
+			Handler() = default;
+			Handler(Handler&& other) = default;
+
+			Handler(const Handler&) = delete;
+			Handler& operator= (const Handler&) = delete;
+
+			void operator()(MAssIpcCall::ErrorType et, const std::string& message) const{}
+			void MemberFunc() const{}
+
+		} handler;
+		call.SetHandler_ErrorOccured(handler);
+		call.SetHandler_ErrorOccured(Handler());
+		std::unique_ptr<int> iptr{new int()};
+#if __cplusplus >= 201402L
+		call.SetHandler_ErrorOccured([iptr = std::move(iptr)](MAssIpcCall::ErrorType et, const std::string& message){});
+#endif
 	}
 
 	{
@@ -508,11 +577,23 @@ MAssIpc_DataStream& operator>>(MAssIpc_DataStream& stream, DataStruct2*& v)
 }
 
 static std::vector<std::string> s_calls;
+static std::mutex s_calls_access;
+
+void CallCountChanged_BeforeInvoke()
+{
+	std::unique_lock<std::mutex> lock(s_calls_access, std::try_to_lock);
+	mass_return_if_not_equal(lock.owns_lock(), true);
+	s_calls.push_back("CallCountChanged_BeforeInvoke");
+}
 
 void CallCountChanged(const std::shared_ptr<const MAssIpcCall::CallInfo>& call_info)
 {
 	uint32_t count = call_info->GetCallCount();
 	std::string call_data = "CallCountChanged:" + std::to_string(count) + std::string(" ") + call_info->GetName();
+//	std::unique_lock<std::mutex> lock(s_calls_access);
+
+	std::unique_lock<std::mutex> lock(s_calls_access, std::try_to_lock);
+	mass_return_if_not_equal(lock.owns_lock(), true);
 	s_calls.push_back(call_data);
 }
 
@@ -561,6 +642,7 @@ void Main_IpcService(std::shared_ptr<IpcTransport_MemoryShare> transport_buffer)
 	call.AddHandler("Ipc_Proc3", std::function<void(uint8_t, std::string, uint32_t)>(&Ipc_Proc3));
 	call.AddHandler("Ipc_UniquePtr1", std::function<void(std::unique_ptr<DataStruct1>)>(&Ipc_UniquePtr1));
 	call.AddHandler("Ipc_UniquePtr2", std::function<void(DataStruct2*)>(&Ipc_Ptr2));
+	call.AddHandler("CallCountChanged_BeforeInvoke",&CallCountChanged_BeforeInvoke);
 	//	call.AddHandler("IsLinkUp_Sta", std::function<void(uint8_t, std::string, uint32_t)>(&Ipc_Proc3));
 
 	class TagLocal
@@ -690,7 +772,11 @@ void Main_IpcClient()
 	std::string res2 = call.WaitInvokeRet<std::string>("Ipc_Proc1",a, b, c);
 	mass_return_if_not_equal(res2, "Ipc_Proc1 result 123456789012345");
 	mass_return_if_not_equal(s_state_error_et, MAssIpcCall::ErrorType::unknown_error);
-	mass_return_if_not_equal(s_calls.empty(), false);
+	{
+		std::unique_lock<std::mutex> lock(s_calls_access, std::try_to_lock);
+		mass_return_if_not_equal(lock.owns_lock(), true);
+		mass_return_if_not_equal(s_calls.empty(), false);
+	}
 
 	std::string str = call.WaitInvoke(sig_Static_String_StringU32Double, "str:", uint8_t(2), double(123.5));
 	mass_return_if_not_equal(str, "str:247");
@@ -701,7 +787,11 @@ void Main_IpcClient()
 	res2 = call.WaitInvokeRet<std::string>(string_pointer_Ipc_Proc1, a, b, c);
 	mass_return_if_not_equal(res2, "Ipc_Proc1 result 1234567654321");
 	mass_return_if_not_equal(s_state_error_et, MAssIpcCall::ErrorType::unknown_error);
-	mass_return_if_not_equal(s_calls[s_calls.size()-1], "CallCountChanged:2 Ipc_Proc1");
+	{
+		std::unique_lock<std::mutex> lock(s_calls_access, std::try_to_lock);
+		mass_return_if_not_equal(lock.owns_lock(), true);
+		mass_return_if_not_equal(s_calls[s_calls.size()-1], "CallCountChanged:2 Ipc_Proc1");
+	}
 
 	s_state_error_et = MAssIpcCall::ErrorType::unknown_error;
 	std::string res3 = call.WaitInvokeRet<std::string>("NotExistProc", a, b, c);
@@ -745,6 +835,17 @@ void Main_IpcClient()
 	CheckVectorT(val_int16_t);
 	CheckVectorT(val_int32_t);
 	CheckVectorT(val_int64_t);
+
+	for(size_t i=1; i<100; i++)
+	{
+		std::string expect_calls_1 = std::string("CallCountChanged:") + std::to_string(i) + std::string(" CallCountChanged_BeforeInvoke");
+		s_calls.clear();
+		call.WaitInvoke("CallCountChanged_BeforeInvoke");
+		mass_return_if_not_equal(s_calls.size(), 2);
+		mass_return_if_not_equal(s_calls[0], expect_calls_1);
+		mass_return_if_not_equal(s_calls[1], "CallCountChanged_BeforeInvoke");
+	}
+	
 
 
 	call.WaitInvoke("ServerStop");

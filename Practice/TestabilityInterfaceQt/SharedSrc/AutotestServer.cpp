@@ -31,10 +31,14 @@ void AutotestServer::OnConnected(std::weak_ptr<IpcQt_TransporTcp> transport_weak
 					client->SetConnection(sut_index_id, connection);
 			}
 	}
+
+	m_server_internals->m_connection_signaling->SignalChangeState(MAssIpcWaiter::ConnectionEvent::State::on_connected);
 }
 
 void AutotestServer::OnDisconnected(std::weak_ptr<IpcQt_TransporTcp> transport)
 {
+	m_server_internals->m_connection_signaling->SignalChangeState(MAssIpcWaiter::ConnectionEvent::State::on_disconnected);
+
 	m_sut_handler.reset();
 //	this->ListenRestart();
 
@@ -48,7 +52,7 @@ void AutotestServer::OnDisconnected(std::weak_ptr<IpcQt_TransporTcp> transport)
 
 std::shared_ptr<AutotestServer_Client> AutotestServer::CreateClient(const AutotestServer_Client::Handlers& handlers)
 {
-	std::shared_ptr<AutotestServer::ClientPrivate> new_client{new AutotestServer::ClientPrivate(handlers)};
+	std::shared_ptr<AutotestServer::ClientPrivate> new_client{new AutotestServer::ClientPrivate(handlers, m_server_internals)};
 	m_clients.push_back(new_client);
 	return new_client;
 }

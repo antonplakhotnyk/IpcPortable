@@ -4,7 +4,7 @@
 #include "IpcQt_TransthreadCaller.h"
 #include "IpcQt_TransportTcpServer.h"
 #include "IpcQt_Net.h"
-
+#include "MAssIpcWaiter.h"
 
 class AutotestServer: public IpcQt_TransportTcpServer
 {

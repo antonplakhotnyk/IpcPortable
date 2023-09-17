@@ -19,6 +19,29 @@ class TaskRunnerThread
 	template<class TRet>
 	struct Task: TaskBase
 	{
+	private:
+
+		struct SetPromise_TRet
+		{
+			static void Value(const std::function<TRet()>& task, std::promise<TRet>& promise)
+			{
+				promise.set_value(task());
+			}
+		};
+
+		// Nested class to handle void type
+		struct SetPromise_Void
+		{
+			static void Value(const std::function<TRet()>& task, std::promise<TRet>& promise)
+			{
+				task();
+				promise.set_value();
+			}
+		};
+
+		using SetPromise = typename std::conditional<std::is_void<TRet>::value, SetPromise_Void, SetPromise_TRet>::type;
+
+	public:
 		const std::function<TRet()> task;
 		std::promise<TRet> promise;
 
@@ -29,22 +52,7 @@ class TaskRunnerThread
 
 		void Invoke() override
 		{
-			SetPromiseValue<TRet>();
-		}
-
-	private:
-
-		template<class TRet>
-		void SetPromiseValue()
-		{
-			promise.set_value(task());
-		}
-
-		template<>
-		void SetPromiseValue<void>()
-		{
-			task();
-			promise.set_value();
+			SetPromise::Value(task, promise);
 		}
 	};
 

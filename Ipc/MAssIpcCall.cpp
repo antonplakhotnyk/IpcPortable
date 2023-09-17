@@ -143,7 +143,22 @@ void MAssIpcCall::Internals::InvokeLocal(MAssIpc_DataStream& call_info_data, MAs
 	AnalizeInvokeDataRes invoke = AnalizeInvokeData(transport, inter_thread_nullable, call_info_data, id);
 
 	if(bool(invoke.call_info))
+	{
 		invoke.call_info->IncrementCallCount();
+
+		if( bool(invoke.on_call_count_changed) && invoke.on_call_count_changed->IsCallable() )
+		{
+			if( inter_thread_nullable )
+			{
+				auto thread_id = invoke.on_call_count_changed->m_thread_id;
+
+				std::unique_ptr<CountJob> count_job(std::make_unique<CountJob>(invoke.on_call_count_changed, invoke.call_info));
+				inter_thread_nullable->CallFromThread(thread_id, std::move(count_job));
+			}
+			else
+				CountJob::Invoke(invoke.on_call_count_changed, invoke.call_info);
+		}
+	}
 
 	if( invoke.invoke_base )
 	{
@@ -178,19 +193,6 @@ void MAssIpcCall::Internals::InvokeLocal(MAssIpc_DataStream& call_info_data, MAs
 		}
 		else
 			mass_assert_msg("unexpected fail without error_arg");
-	}
-
-	if(bool(invoke.call_info) && bool(invoke.on_call_count_changed) && invoke.on_call_count_changed->IsCallable() )
-	{
-		if( inter_thread_nullable )
-		{
-			auto thread_id = invoke.on_call_count_changed->m_thread_id;
-
-			std::unique_ptr<CountJob> count_job(std::make_unique<CountJob>(invoke.on_call_count_changed, invoke.call_info));
-			inter_thread_nullable->CallFromThread(thread_id, std::move(count_job));
-		}
-		else
-			CountJob::Invoke(invoke.on_call_count_changed, invoke.call_info);
 	}
 }
 
