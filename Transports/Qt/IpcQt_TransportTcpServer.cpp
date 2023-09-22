@@ -1,4 +1,5 @@
 #include "IpcQt_TransportTcpServer.h"
+#include "MAssIpc_Macros.h"
 
 
 IpcQt_TransportTcpServer::IpcQt_TransportTcpServer(uint16_t listen_port)
@@ -24,9 +25,17 @@ void IpcQt_TransportTcpServer::NewConnection()
 
 	QObject::connect(transport.get(), &IpcQt_TransporTcp::HandlerOnConnected, this, &IpcQt_TransportTcpServer::OnConnected, Qt::QueuedConnection);
 	QObject::connect(transport.get(), &IpcQt_TransporTcp::HandlerOnDisconnected, this, &IpcQt_TransportTcpServer::OnDisconnected, Qt::QueuedConnection);
+	QObject::connect(transport.get(), &IpcQt_TransporTcp::HandlerOnDisconnected, this, &IpcQt_TransportTcpServer::ClearConnection, Qt::QueuedConnection);
 
 	transport->AssignConnection(transport, connection);
 //	m_server.close();
+}
+
+void IpcQt_TransportTcpServer::ClearConnection(std::weak_ptr<IpcQt_TransporTcp> transport)
+{
+ 	auto connection_transport = transport.lock();
+	mass_return_if_equal(bool(connection_transport), false);
+	m_connection_transports.erase(connection_transport);
 }
 
 QTcpServer* IpcQt_TransportTcpServer::Server()

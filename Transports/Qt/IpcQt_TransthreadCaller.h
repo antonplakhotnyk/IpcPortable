@@ -154,6 +154,7 @@ private:
 	};
 
 	static std::shared_ptr<Internals> GetInternals();
+	decltype(Internals::threads)::iterator MakeFindThread(MAssIpc_TransthreadTarget::Id receiver_thread_id);
 
 private:
 

@@ -9,12 +9,14 @@ public:
 
 	AutotestServerInternals()
 	{
+		m_disconnect_event->BindConnect(MAssIpcWaiter::ConnectionEvent::State::on_disconnected, m_connection_signaling);
 	}
 
 public:
 
 	const std::shared_ptr<MAssIpcWaiter>		m_waiter = std::make_shared<MAssIpcWaiter>();
 	const std::shared_ptr<MAssIpcWaiter::ConnectionEvent::Signaling> m_connection_signaling = m_waiter->CreateSignaling<MAssIpcWaiter::ConnectionEvent>();
+	const std::unique_ptr<MAssIpcWaiter::ConnectionEvent> m_disconnect_event{m_waiter->CreateEvent<MAssIpcWaiter::ConnectionEvent>()};
 };
 
 //-------------------------------------------------------
@@ -94,11 +96,18 @@ public:
 	class Event: public MAssIpcWaiter::Event
 	{
 	public:
-		Event(const std::shared_ptr<MAssIpcWaiter::ConditionWaitLock>& cwl, std::shared_ptr<AutotestServerInternals> internals)
+		Event(const std::shared_ptr<MAssIpcWaiter::ConditionWaitLock>& cwl, std::shared_ptr<AutotestServerInternals> internals, bool skip_canceling_by_disconnect)
 			: MAssIpcWaiter::Event(cwl)
 			, m_internals{internals}
 		{
 			mass_return_if_equal(bool(m_internals), false);
+
+			if( !skip_canceling_by_disconnect )
+			{
+				const std::unique_ptr<MAssIpcWaiter::ConnectionEvent> disconnect_event{m_internals->m_waiter->CreateEvent<MAssIpcWaiter::ConnectionEvent>()};
+				disconnect_event->BindConnect(MAssIpcWaiter::ConnectionEvent::State::on_disconnected, m_internals->m_connection_signaling, InitialCount::current, true);
+				this->BindEvent(disconnect_event.get());
+			}
 		}
 
 		enum struct LocalId
@@ -106,6 +115,8 @@ public:
 			ConnectedSut,
 			DisconnectedSut,
 		};
+
+		using InitialCount = MAssIpcWaiter::CallEvent::InitialCount;
 
 		void BindLocal(LocalId event_id)
 		{
@@ -117,7 +128,7 @@ public:
 					std::unique_ptr<MAssIpcWaiter::ConnectionEvent> connect_event{m_internals->m_waiter->CreateEvent<MAssIpcWaiter::ConnectionEvent>()};
 					MAssIpcWaiter::ConnectionEvent::State signal_state = (event_id == LocalId::ConnectedSut) ? MAssIpcWaiter::ConnectionEvent::State::on_connected : MAssIpcWaiter::ConnectionEvent::State::on_disconnected;
 					connect_event->BindConnect(signal_state, m_internals->m_connection_signaling);
-					this->BindEvent(std::move(connect_event));
+					this->BindEvent(connect_event.get());
 				}
 				break;
 			default:
@@ -126,11 +137,11 @@ public:
 			}
 		}
 
-		void BindSut(std::shared_ptr<const MAssIpcCall::CallInfo> event_id)
+		void BindSut(std::shared_ptr<const MAssIpcCall::CallInfo> event_id, InitialCount initial_count = InitialCount::current)
 		{
 			std::unique_ptr<MAssIpcWaiter::CallEvent> call_event{m_internals->m_waiter->CreateEvent<MAssIpcWaiter::CallEvent>()};
-			call_event->BindCall(event_id);
-			this->BindEvent(std::move(call_event));
+			call_event->BindCall(event_id, initial_count);
+			this->BindEvent(call_event.get());
 		}
 
 
@@ -139,9 +150,9 @@ public:
 		const std::shared_ptr<AutotestServerInternals> m_internals;
 	};
 
-	std::unique_ptr<Event> CreateEvent()
+	std::unique_ptr<Event> CreateEvent(bool skip_canceling_by_disconnect = false)
 	{
-		return m_server_internals->m_waiter->CreateEvent<Event>(m_server_internals);
+		return m_server_internals->m_waiter->CreateEvent<Event>(m_server_internals, skip_canceling_by_disconnect);
 	}
 
 private:

@@ -12,4 +12,9 @@ public:
 		return thread;
 	}
 
+	static QThread* GetQThread(MAssIpc_TransthreadTarget::Id id)
+	{
+		return id;
+	}
+
 };

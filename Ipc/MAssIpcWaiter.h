@@ -63,13 +63,29 @@ public:
 	{
 	public:
 
+        enum struct ResetType
+        {
+            wait_next_after_trigger,
+            wait_next_after_reset,
+        };
+
+		enum struct InitialCount: MAssIpcCall::CallInfo::TCounter
+		{
+			zero = 0,
+			current = std::numeric_limits<MAssIpcCall::CallInfo::TCounter>::max(),
+		};
+
+
 		class Check
 		{
 		public:
+			Check(bool interpret_as_cancel):interpret_as_cancel(interpret_as_cancel){};
 			virtual ~Check() = default;
 			virtual bool IsTriggeredLocked() const = 0;
-			virtual void ResetLocked() = 0;
+			virtual void ResetLocked(ResetType rt) = 0;
 			virtual const void* GetFilterId() const = 0;
+			
+			const bool interpret_as_cancel;
 		};
 
 		Event(const std::shared_ptr<ConditionWaitLock>& cwl)
@@ -91,11 +107,13 @@ public:
 				m_cwl->condition_events.notify_all();
 		}
 
-		void Reset()
+		void Reset(ResetType rt = ResetType::wait_next_after_trigger)
 		{
 			std::unique_lock<std::mutex> lock(m_cwl->lock_events);
 			for( auto& check: *m_checks )
-				check->ResetLocked();
+                if( check->IsTriggeredLocked() )
+					if( !check->interpret_as_cancel )
+						check->ResetLocked(rt);
 		}
 
 		template<class _Rep, class _Period>
@@ -112,7 +130,7 @@ public:
 		bool IsTriggered() const
 		{
 			std::unique_lock<std::mutex> lock(m_cwl->lock_events);
-			return IsTriggeredLocked();
+			return IsTriggeredLocked(nullptr);
 		}
 
 		void BindCheck(const std::shared_ptr<Check>& check, const void* filter_id)
@@ -120,23 +138,26 @@ public:
 			mass_return_if_equal(bool(check), false);
 			std::unique_lock<std::mutex> lock(m_cwl->lock_events);
 
-			m_cwl->change_filter.insert(filter_id);
-			m_checks->push_back(check);
+			InsertSharedCheckLocked(check, filter_id);
 
 			m_cwl->condition_events.notify_all();
 		}
 
-		void BindEvent(std::unique_ptr<Event> other_event)
+		void BindEvent(Event* other_shared_checks)
 		{
-			mass_return_if_equal(bool(other_event), false);
-			mass_return_if_not_equal(other_event->m_cwl.get(), m_cwl.get());
+			mass_return_if_equal(bool(other_shared_checks), false);
+			mass_return_if_not_equal(other_shared_checks->m_cwl.get(), m_cwl.get());
 
 			std::unique_lock<std::mutex> lock(m_cwl->lock_events);
 	
-			if( m_checks!=other_event->m_checks )
+			if( m_checks!=other_shared_checks->m_checks )
 			{
-				m_checks->insert(m_checks->end(), other_event->m_checks->begin(), other_event->m_checks->end());
-				other_event->m_checks = m_checks;
+
+                m_checks->reserve(m_checks->size()+other_shared_checks->m_checks->size());
+                for( const auto& check: *other_shared_checks->m_checks )
+					InsertSharedCheckLocked(check, check->GetFilterId());
+
+				//other_shared_checks->m_checks = m_checks;
 				m_cwl->condition_events.notify_all();
 			}
 		}
@@ -160,23 +181,34 @@ public:
 		WaitResult WaitDuration(const TDuration& rel_time) const
 		{
 			std::unique_lock<std::mutex> lock(m_cwl->lock_events);
-			auto predicate = [this]()
+			bool interpret_as_cancel = false;
+			auto predicate = [this, &interpret_as_cancel]()
 			{
 				if( m_cwl->cancel_all_waits )
 					return true;
-				return IsTriggeredLocked();
+				return IsTriggeredLocked(&interpret_as_cancel);
 			};
 
 			bool wait_ready = WaitT(lock, m_cwl->condition_events, rel_time, predicate);
 
-			return m_cwl->cancel_all_waits ? WaitResult::canceled : (wait_ready ? WaitResult::ready : WaitResult::timeout);
+			return (m_cwl->cancel_all_waits||interpret_as_cancel) ? WaitResult::canceled : (wait_ready ? WaitResult::ready : WaitResult::timeout);
 		}
 
-		bool IsTriggeredLocked() const
+		void InsertSharedCheckLocked(const std::shared_ptr<Check>& check, const void* filter_id)
+		{
+			m_cwl->change_filter.insert(filter_id);
+			m_checks->push_back(check);
+		}
+
+		bool IsTriggeredLocked(bool* interpret_as_cancel) const
 		{
 			for( auto& check: *m_checks )
 				if( check->IsTriggeredLocked() )
+				{
+					if( interpret_as_cancel!=nullptr )
+						*interpret_as_cancel = check->interpret_as_cancel;
 					return true;
+				}
 			return false;
 		}
 
@@ -194,9 +226,10 @@ public:
 
 		struct Call: public Event::Check
 		{
-			Call(const std::shared_ptr<const MAssIpcCall::CallInfo>& call_info)
-				:m_call_info(call_info)
-				, m_wait_start_call_count(call_info->GetCallCount())
+			Call(const std::weak_ptr<const MAssIpcCall::CallInfo>& call_info, bool interpret_as_cancel, MAssIpcCall::CallInfo::TCounter wait_start_call_count)
+				: Event::Check(interpret_as_cancel)
+				, m_call_info(call_info)
+				, m_wait_start_call_count(wait_start_call_count)
 			{
 			}
 
@@ -211,10 +244,20 @@ public:
 				return false;
 			}
 
-			void ResetLocked() override
+			void ResetLocked(ResetType rt) override
 			{
 				if( auto call_info = m_call_info.lock() )
-					m_wait_start_call_count = call_info->GetCallCount();
+                {
+                    switch( rt )
+                    {
+                        case ResetType::wait_next_after_reset:
+                            m_wait_start_call_count = call_info->GetCallCount();
+                            break;
+                        case ResetType::wait_next_after_trigger:
+                            m_wait_start_call_count++;
+                            break;
+                    }
+                }
 			}
 
 
@@ -246,7 +289,7 @@ public:
 				MAssIpcWaiter::CheckConditionChanged(m_cwl, call_info.get());
 			}
 
-			std::unique_ptr<MAssIpcWaiter::CallEvent> CreateCallEventBind(const std::initializer_list<std::shared_ptr<const MAssIpcCall::CallInfo> >& event_ids)
+			std::unique_ptr<MAssIpcWaiter::CallEvent> CreateCallEventBind(const std::initializer_list<std::weak_ptr<const MAssIpcCall::CallInfo> >& event_ids)
 			{
 				std::unique_ptr<MAssIpcWaiter::CallEvent> new_event{new MAssIpcWaiter::CallEvent(m_cwl)};
 
@@ -265,9 +308,16 @@ public:
 		{
 		}
 
-		void BindCall(std::shared_ptr<const MAssIpcCall::CallInfo> event_id)
+		void BindCall(const std::weak_ptr<const MAssIpcCall::CallInfo>& check_event_id,
+					  InitialCount initial_count = InitialCount::current,
+					  bool interpret_as_cancel = false)
 		{
-			BindCheck(std::make_shared<Call>(event_id), event_id.get());
+			auto event_id = check_event_id.lock();
+			mass_return_if_equal(bool(event_id), false);
+			
+			static_assert(InitialCount::zero == InitialCount(0));
+			MAssIpcCall::CallInfo::TCounter wait_start_call_count = (initial_count==InitialCount::current) ? event_id->GetCallCount() : MAssIpcCall::CallInfo::TCounter(initial_count);
+			BindCheck(std::make_shared<Call>(check_event_id, interpret_as_cancel, wait_start_call_count), event_id.get());
 		}
 
 		std::shared_ptr<Signaling> CreateSignaling()
@@ -300,8 +350,9 @@ public:
 
 		struct Connect: public Event::Check
 		{
-			Connect(const void* connection_filter_id, std::shared_ptr<ActualCounters> actual_counters, State signal_state, ActualCounters::TCounter wait_start_count)
-				: m_connection_filter_id(connection_filter_id)
+			Connect(const void* connection_filter_id, std::shared_ptr<ActualCounters> actual_counters, State signal_state, bool interpret_as_cancel, ActualCounters::TCounter wait_start_count)
+				: Event::Check(interpret_as_cancel)
+				, m_connection_filter_id(connection_filter_id)
 				, m_actual_counters(actual_counters)
 				, m_signal_state(signal_state)
 				, m_wait_start_count(wait_start_count)
@@ -316,9 +367,17 @@ public:
 				return false;
 			}
 
-			void ResetLocked() override
+			void ResetLocked(ResetType rt) override
 			{
-				m_wait_start_count = m_actual_counters->conters[size_t(m_signal_state)];
+                switch( rt )
+                {
+                    case ResetType::wait_next_after_reset:
+                        m_wait_start_count = m_actual_counters->conters[size_t(m_signal_state)];
+                        break;
+                    case ResetType::wait_next_after_trigger:
+                        m_wait_start_count++;
+                        break;
+                }
 			}
 
 			const void* GetFilterId() const override
@@ -366,18 +425,23 @@ public:
 		{
 		}
 
-		void BindConnect(State signal_state, const std::shared_ptr<Signaling>& signaling_actual_state)
+		void BindConnect(State signal_state, const std::shared_ptr<Signaling>& signaling_actual_state, InitialCount initial_count = InitialCount::current, bool interpret_as_cancel=false)
 		{
 			mass_return_if_not_equal(signaling_actual_state->m_cwl, m_cwl);
 			mass_return_if_equal(signal_state<State::undefined_enum_count, false);
 			const void* connection_filter_id = signaling_actual_state.get();
 
 			ActualCounters::TCounter wait_start_count;
+			static_assert(InitialCount::zero == InitialCount(0));
+			if( initial_count==InitialCount::current )
 			{
 				std::unique_lock<std::mutex> lock(m_cwl->lock_events);
 				wait_start_count = signaling_actual_state->m_actual_counters->conters[size_t(signal_state)];
 			}
-			m_connection = std::make_shared<Connect>(connection_filter_id, signaling_actual_state->m_actual_counters, signal_state, wait_start_count);
+			else
+				wait_start_count = MAssIpcCall::CallInfo::TCounter(initial_count);
+
+			m_connection = std::make_shared<Connect>(connection_filter_id, signaling_actual_state->m_actual_counters, signal_state, interpret_as_cancel, wait_start_count);
 			BindCheck(m_connection, connection_filter_id);
 		}
 

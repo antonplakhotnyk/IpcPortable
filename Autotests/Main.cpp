@@ -11,6 +11,8 @@
 #include <map>
 #include <queue>
 #include <future>
+#include <memory>
+#include <functional>
 
 static constexpr const char* general_includes_end_mark = {};// help generating preprocessed to file cpp
 
@@ -53,6 +55,8 @@ static constexpr const char* main_mark_before_include_functional_is_bind_express
 #include "IpcTransport_MemoryShare.h"
 #include "IpcTransthread_Memory.h"
 #include "TaskRunnerThread.h"
+
+// CheckCompilation_text_mark_begin
 
 void CheckCompilation()
 { 
@@ -129,7 +133,7 @@ void CheckCompilation()
 		call.AddHandler("name", handler);
 		call.AddHandler("name", Handler());
 		std::unique_ptr<int> iptr{new int()};
-#if __cplusplus >= 201402L
+#if __cpp_init_captures
 		call.AddHandler("name", [iptr = std::move(iptr)]()mutable{});
 #endif
 	}
@@ -150,7 +154,7 @@ void CheckCompilation()
 		call.SetHandler_CallCountChanged(handler);
 		call.SetHandler_CallCountChanged(Handler());
 		std::unique_ptr<int> iptr{new int()};
-#if __cplusplus >= 201402L
+#if __cpp_init_captures
 		call.SetHandler_CallCountChanged([iptr = std::move(iptr)](const std::shared_ptr<const MAssIpcCall::CallInfo>& call_info){});
 #endif
 	}
@@ -171,7 +175,7 @@ void CheckCompilation()
 		call.SetHandler_ErrorOccured(handler);
 		call.SetHandler_ErrorOccured(Handler());
 		std::unique_ptr<int> iptr{new int()};
-#if __cplusplus >= 201402L
+#if __cpp_init_captures
 		call.SetHandler_ErrorOccured([iptr = std::move(iptr)](MAssIpcCall::ErrorType et, const std::string& message){});
 #endif
 	}
@@ -201,6 +205,44 @@ void CheckCompilation()
 		auto call_info3 = call.AddHandler(sig_1, &Handler::StaticFunc, {}, {}, {});
 	}
 }
+
+// CheckCompilation_text_mark_end
+
+void CheckAddHandler()
+{
+	MAssIpcCall call{{}};
+	const void* tag = (const void*)(1);
+
+	{
+		struct Handler
+		{
+			void operator()() const{}
+			operator bool() const{return false;}
+		} const_handler;
+		call.AddHandler("Handler", const_handler);
+		call.AddHandler("Handler", const_handler);
+		call.AddHandler("Handler", std::function<void()>([]{}), tag);
+		call.AddHandler("Handler", std::function<void()>());
+		call.AddHandler("Handler", std::function<void()>());
+	}
+
+	call.ClearHandlersWithTag(tag);
+
+	{
+		struct Handler
+		{
+			void operator()() const{}
+			operator bool(){return false;}
+		} mutable_handler;
+		call.AddHandler("Handler", mutable_handler);
+		call.AddHandler("Handler", mutable_handler);
+		call.AddHandler("Handler", std::function<void()>([]{}), tag);
+		call.AddHandler("Handler", std::function<void()>());
+		call.AddHandler("Handler", std::function<void()>());
+	}
+
+}
+
 
 // struct TestStruct
 // {
@@ -873,6 +915,7 @@ void Main_IpcClient()
 
 int main()
 {
+	CheckAddHandler();
  	Main_IpcClient();
 	TestThreads_MainThread();
 	return 0;

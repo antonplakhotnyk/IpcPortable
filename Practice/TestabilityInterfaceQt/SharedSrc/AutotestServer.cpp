@@ -46,7 +46,8 @@ void AutotestServer::OnDisconnected(std::weak_ptr<IpcQt_TransporTcp> transport)
 		auto clients{m_clients};
 		for( std::weak_ptr<ClientPrivate> client_weak : clients )
 			if( std::shared_ptr<ClientPrivate> client = client_weak.lock() )
-				client->GetHandlers().OnDisconnectedSut();
+				if( auto OnDisconnectedSut = client->GetHandlers().OnDisconnectedSut )
+					OnDisconnectedSut();
 	}
 }
 
@@ -55,6 +56,12 @@ std::shared_ptr<AutotestServer_Client> AutotestServer::CreateClient(const Autote
 	std::shared_ptr<AutotestServer::ClientPrivate> new_client{new AutotestServer::ClientPrivate(handlers, m_server_internals)};
 	m_clients.push_back(new_client);
 	return new_client;
+}
+
+void		AutotestServer::Stop()
+{
+	Server()->close();
+	m_server_internals->m_waiter->CancelAllWaits();
 }
 
 //-------------------------------------------------------

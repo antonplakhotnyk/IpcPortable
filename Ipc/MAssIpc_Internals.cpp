@@ -128,6 +128,7 @@ std::shared_ptr<const CallInfo> ProcMap::AddProcSignature(const MAssIpc_RawStrin
 	MAssIpc_ThreadSafe::unique_lock<MAssIpc_ThreadSafe::mutex> lock(m_lock);
 	std::shared_ptr<CallInfoImpl> result_call_info;
 
+	const bool invoke_callable = (bool(invoke) && bool(invoke->IsCallable()));
 	auto it_name_params = m_name_procs.find(CallInfoImpl::SignatureKey{proc_name,params_type});
 	if( it_name_params==m_name_procs.end() )
 	{
@@ -136,12 +137,12 @@ std::shared_ptr<const CallInfo> ProcMap::AddProcSignature(const MAssIpc_RawStrin
 	}
 	else
 	{
-		mass_return_x_if_equal(bool(it_name_params->second.call_info->IsInvokable()) && bool(invoke), true, {});// add or override currently actual invoke
+		mass_return_x_if_equal(bool(it_name_params->second.call_info->IsInvokable()) && invoke_callable, true, {});// add or override currently actual invoke
 		it_name_params->second = CallData{it_name_params->second.call_info, comment};
 		result_call_info = it_name_params->second.call_info;
 	}
 
-	if( bool(invoke) )
+	if( invoke_callable )
 		result_call_info->SetInvoke(std::move(invoke));
 	return result_call_info;
 }

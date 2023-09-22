@@ -19,6 +19,7 @@ public:
 	AutotestServer(const Params& params);
 
 	std::shared_ptr<AutotestServer_Client> CreateClient(const AutotestServer_Client::Handlers& handlers);
+	void		Stop();
 
 private:
 
@@ -38,7 +39,7 @@ private:
 
 private:
 
-	std::set<std::shared_ptr<AutotestServer_Client::SutConnection>>	m_connections;
+//	std::set<std::shared_ptr<AutotestServer_Client::SutConnection>>	m_connections;
 
 	decltype(Params::autotest_container)		m_autotest_container;
 	std::unique_ptr<SutHandlerThread>			m_sut_handler;

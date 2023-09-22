@@ -1,20 +1,24 @@
 #pragma once
 
-#include <map>
 #include "MAssIpc_DataStream.h"
 #include "MAssIpc_Transthread.h"
 #include "MAssIpc_PacketParser.h"
 #include "MAssIpc_Transport.h"
 #include "MAssIpc_ThreadSafe.h"
 #include "MAssIpc_RawString.h"
+#include <map>
+#include <memory>// important include before __cpp_lib_atomic_shared_ptr
+#include <atomic>
+#include <type_traits>
 
 //-------------------------------------------------------
 
-namespace std
-{
-template< class T >
-struct is_bind_expression;
-}
+#include <functional>
+// namespace std
+// {
+// template< class T >
+// struct is_bind_expression;
+// }
 
 namespace MAssIpcCallInternal
 {
@@ -37,6 +41,128 @@ class Check_is_bind_expression: public decltype(IsAvailable_is_bind_expression<T
 namespace MAssIpcCallInternal
 {
 
+// class AtomicSharedPtr_autotest_start_mark_begin;
+
+#if __cpp_lib_atomic_shared_ptr
+
+template <typename T>
+class AtomicSharedPtr
+{
+public:
+	AtomicSharedPtr(std::shared_ptr<T> initial = std::shared_ptr<T>()): m_atomic_ptr(initial)
+	{
+	}
+
+	AtomicSharedPtr(const AtomicSharedPtr<T>& other)
+	{
+		m_atomic_ptr.store(other.m_atomic_ptr.load());
+	}
+
+	AtomicSharedPtr<T>& operator=(const AtomicSharedPtr<T>& other)
+	{
+		if( this == &other )
+			return *this;
+
+		m_atomic_ptr.store(other.m_atomic_ptr.load());
+		return *this;
+	}
+
+	AtomicSharedPtr(AtomicSharedPtr<T>&& other)
+	{
+		std::shared_ptr<T> tmp = other.m_atomic_ptr.exchange(std::shared_ptr<T>());
+		m_atomic_ptr.store(tmp);
+	}
+
+	AtomicSharedPtr<T>& operator=(AtomicSharedPtr<T>&& other)
+	{
+		if( this == &other )
+			return *this;
+
+		std::shared_ptr<T> tmp = other.m_atomic_ptr.exchange(std::shared_ptr<T>());
+		m_atomic_ptr.store(tmp);
+		return *this;
+	}
+
+	void store(const std::shared_ptr<T>& desired)
+	{
+		m_atomic_ptr.store(desired);
+	}
+
+	std::shared_ptr<T> load() const
+	{
+		return m_atomic_ptr.load();
+	}
+
+private:
+	std::atomic<std::shared_ptr<T>> m_atomic_ptr = {};
+};
+
+#else
+
+template <typename T>
+class AtomicSharedPtr
+{
+public:
+	AtomicSharedPtr(std::shared_ptr<T> initial = std::shared_ptr<T>()): m_ptr(initial)
+	{
+	}
+
+	AtomicSharedPtr(const AtomicSharedPtr<T>& other)
+	{
+		std::atomic_store(&m_ptr, std::atomic_load(&other.m_ptr));
+	}
+
+	AtomicSharedPtr& operator=(const AtomicSharedPtr<T>& other)
+	{
+		if( this == &other )
+			return *this;
+
+		std::atomic_store(&m_ptr, std::atomic_load(&other.m_ptr));
+		return *this;
+	}
+
+	AtomicSharedPtr(AtomicSharedPtr<T>&& other)
+	{
+		std::shared_ptr<T> tmp = std::atomic_exchange(&other.m_ptr, std::shared_ptr<T>());
+		std::atomic_store(&m_ptr, tmp);
+	}
+
+	AtomicSharedPtr& operator=(AtomicSharedPtr<T>&& other)
+	{
+		if( this == &other )
+			return *this;
+
+		std::shared_ptr<T> tmp = std::atomic_exchange(&other.m_ptr, std::shared_ptr<T>());
+		std::atomic_store(&m_ptr, tmp);
+		return *this;
+	}
+
+	void ltore(const std::shared_ptr<T>& desired)
+	{
+		std::atomic_store(&m_ptr, desired);
+	}
+
+	std::shared_ptr<T> load() const
+	{
+		return std::atomic_load(&m_ptr);
+	}
+
+private:
+	mutable std::shared_ptr<T> m_ptr;
+};
+
+#endif
+
+
+// class AtomicSharedPtr_autotest_start_mark_end;
+
+}
+//-------------------------------------------------------
+
+
+namespace MAssIpcCallInternal
+{
+
 MAssIpc_DataStream CreateDataStream(const std::weak_ptr<MAssIpc_TransportShare>& weak_transport,
 									   MAssIpc_Data::TPacketSize no_header_size,
 									   MAssIpc_PacketParser::PacketType pt,
@@ -49,16 +175,81 @@ MAssIpc_DataStream CreateDataStreamInplace(std::unique_ptr<MAssIpc_Data> inplace
 
 //-------------------------------------------------------
 
+template<typename SigProc, typename = void>
+struct FuncSigSilent
+{
+	using IsAssert = std::true_type;
+	using IsHandlerType = std::false_type;
+};
+
+template<typename Ret, typename... Args>
+struct FuncSigSilent< Ret(Args...)>
+{
+	using IsAssert = std::false_type;
+
+	using FuncType = Ret(Args...);
+	using FuncPtr = Ret(*)(Args...);
+	using FuncRet = Ret;
+};
+
+template<typename Ret, typename... Args>
+struct FuncSigSilent<Ret(*)(Args...)>: public FuncSigSilent<Ret(Args...)>
+{
+	using IsHandlerType = std::true_type;
+};
+
+template<typename Class, typename Ret, typename... Args>
+struct FuncSigSilent<Ret(Class::*)(Args...)>: public FuncSigSilent<Ret(Args...)>
+{
+	using IsHandlerType = std::false_type;
+};
+
+template<typename Class, typename Ret, typename... Args>
+struct FuncSigSilent<Ret(Class::*)(Args...) const>: public FuncSigSilent<Ret(Args...)>
+{
+	using IsHandlerType = std::false_type;
+};
+
+template<typename Callable>
+struct FuncSigSilent<Callable, typename std::enable_if<std::is_member_function_pointer<decltype(&std::decay<Callable>::type::operator())>::value>::type>
+	: public FuncSigSilent<decltype(&std::decay<Callable>::type::operator())>
+{
+	using IsHandlerType = std::true_type;
+};
+
+template<typename SigProc>
+struct FuncSig: FuncSigSilent<SigProc>
+{
+	static_assert(!FuncSigSilent<SigProc>::IsAssert::value, "specialization not found, SigProc must be member or static function pointer like decltype(&Cls::Proc) or function like TRet(T1,T2) or callable with operator()");
+};
+
+template<class THandler>
+struct IsHandlerTypeCompatible: FuncSig<THandler>::IsHandlerType
+{
+};
+
+//-------------------------------------------------------
 template<class TFrom, class TTo>
 auto ConversionAvailable(int) -> decltype(TTo(std::declval<TFrom>()), std::true_type{});
 
 template<class, class>
-auto ConversionAvailable(...)->std::false_type;
+auto ConversionAvailable(...) -> std::false_type;
 
 template<class TFrom, class TTo>
 class IsConvertible: public decltype(ConversionAvailable<TFrom, TTo>(0))
 {
 };
+
+
+template<typename T>
+auto IsConvertibleToFunctionPointer_Available(int) -> typename std::is_convertible<T, typename FuncSigSilent<T>::FuncPtr>;
+
+template<typename T>
+auto IsConvertibleToFunctionPointer_Available(...) -> std::false_type;
+
+template<typename T>
+struct IsConvertibleToFunctionPointer: public decltype(IsConvertibleToFunctionPointer_Available<T>(0)){};
+
 
 
 struct IsCallable_Check
@@ -70,62 +261,17 @@ struct IsCallable_Check
 struct IsCallable_True
 {
 	template<class TDelegate>
-	static constexpr bool ToBool(TDelegate&& del){return true;}
+	static constexpr bool ToBool(TDelegate&& del)
+	{
+		return true;
+	}
 };
 
 template<class TDelegate>
 static inline bool IsBoolConvertible_Callable(TDelegate& del)
 {
-	return std::conditional<IsConvertible<TDelegate, bool>::value, IsCallable_Check, IsCallable_True>::type::ToBool(del);
+	return std::conditional<IsConvertible<TDelegate, bool>::value && !IsConvertibleToFunctionPointer<TDelegate>::value, IsCallable_Check, IsCallable_True>::type::ToBool(del);
 }
-
-//-------------------------------------------------------
-
-
-template<typename SigProc, typename = void>
-struct FuncSig
-{
-	static_assert(sizeof(SigProc) < 0, "specialization not found, SigProc must be member or static function pointer like decltype(&Cls::Proc) or function like TRet(T1,T2) or callable with operator()");
-	using IsHandlerType = std::false_type;
-};
-
-template<typename Ret, typename... Args>
-struct FuncSig< Ret(Args...)>
-{
-	using FuncType = Ret(Args...);
-	using FuncPtr = Ret(*)(Args...);
-	using FuncRet = Ret;
-};
-
-template<typename Ret, typename... Args>
-struct FuncSig<Ret(*)(Args...)>: public FuncSig<Ret(Args...)>
-{
-	using IsHandlerType = std::true_type;
-};
-
-template<typename Class, typename Ret, typename... Args>
-struct FuncSig<Ret(Class::*)(Args...)>: public FuncSig<Ret(Args...)>
-{
-	using IsHandlerType = std::false_type;
-};
-
-template<typename Class, typename Ret, typename... Args>
-struct FuncSig<Ret(Class::*)(Args...) const>: public FuncSig<Ret(Args...)>
-{
-	using IsHandlerType = std::false_type;
-};
-
-template<typename Callable>
-struct FuncSig<Callable, typename std::enable_if<std::is_member_function_pointer<decltype(&std::decay<Callable>::type::operator())>::value>::type>
-	: public FuncSig<decltype(&std::decay<Callable>::type::operator())>
-{
-	using IsHandlerType = std::true_type;
-};
-
-template<class THandler>
-struct IsHandlerTypeCompatible: FuncSig<THandler>::IsHandlerType
-{
-};
 
 //-------------------------------------------------------
 
@@ -136,7 +282,7 @@ static constexpr bool Check_is_signame_and_handler_describe_same_call_signatures
 };
 
 template<class A1, class A2>
-static constexpr bool Check_is_signame_and_handler_describe_same_call_signatures(A1 ,A2, ...)
+static constexpr bool Check_is_signame_and_handler_describe_same_call_signatures(A1, A2, ...)
 {
 	static_assert(std::is_same<A1, A2>::value, "A1 and A2 must be same types");
 	return false;

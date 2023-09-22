@@ -213,12 +213,12 @@ public:
 	template<class SigProc_Ret, class... SigProc_Args>
 	std::shared_ptr<const CallInfo> AddCallInfo(const SigName<SigProc_Ret(SigProc_Args...)>& signame)
 	{
-		return m_int->m_proc_map.AddProcSignature(signame.proc_name, MAssIpcCallInternal::CallInfoImpl::MakeParamsType<SigProc_Ret(SigProc_Args...)>(), {}, {});
+		return m_int.load()->m_proc_map.AddProcSignature(signame.proc_name, MAssIpcCallInternal::CallInfoImpl::MakeParamsType<SigProc_Ret(SigProc_Args...)>(), {}, {});
 	}
 
 	std::shared_ptr<const ErrorOccured> SetHandler_ErrorOccured(const std::shared_ptr<const ErrorOccured>& new_val)
 	{
-		return m_int->m_proc_map.SetErrorHandler(new_val);
+		return m_int.load()->m_proc_map.SetErrorHandler(new_val);
 	}
 
 	template<class TDelegate>
@@ -233,7 +233,7 @@ public:
 
 	std::shared_ptr<const CallCountChanged> SetHandler_CallCountChanged(const std::shared_ptr<const CallCountChanged>& new_val)
 	{
-		return m_int->m_proc_map.SetCallCountChanged(new_val);
+		return m_int.load()->m_proc_map.SetCallCountChanged(new_val);
 	}
 
 	template<class TDelegate>
@@ -406,7 +406,7 @@ private:
 
 	friend class MAssIpcCall::Internals;
 
-	std::shared_ptr<Internals>		m_int;
+	MAssIpcCallInternal::AtomicSharedPtr<Internals>		m_int;
 
 
 public:
@@ -414,8 +414,8 @@ public:
 	{
 	public:
 		SetCallCountChangedGuard(MAssIpcCall& ipc, const std::shared_ptr<const CallCountChanged>& handler)
-			:m_ipc_int(ipc.m_int)
-			, m_old_handler(ipc.m_int->m_proc_map.SetCallCountChanged(handler))
+			:m_ipc_int(ipc.m_int.load())
+			, m_old_handler(m_ipc_int->m_proc_map.SetCallCountChanged(handler))
 		{
 		}
 
@@ -445,7 +445,7 @@ public:
 	{
 	public:
 		HandlerGuard(MAssIpcCall& ipc, const void* clear_tag)
-			:m_ipc_int(ipc.m_int)
+			:m_ipc_int(ipc.m_int.load())
 			, m_clear_tag(clear_tag)
 		{
 		}
@@ -471,7 +471,7 @@ inline bool MAssIpcCall::IsProcessIncomingCalls(ProcIn process_incoming_calls) c
 		case ProcIn::later: return false;
 		case ProcIn::now: return true;
 		default:
-		case ProcIn::bydefault: return m_int->m_process_incoming_calls_default;
+		case ProcIn::bydefault: return m_int.load()->m_process_incoming_calls_default;
 	}
 }
 
@@ -510,7 +510,7 @@ std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssI
 	static_assert(!MAssIpcCallInternal::Check_is_bind_expression<TDelegate>::value, "can not deduce signature from bind_expression, use std::function<>(std::bind())");
 	static_assert(MAssIpcCallInternal::IsHandlerTypeCompatible<TDelegate>::value, "TDelegate is not compatible del type");
 	std::unique_ptr<MAssIpcCallInternal::InvokeRemoteBase> invoke(new typename MAssIpcCallInternal::Impl_Selector<TDelegate>::Res(std::forward<TDelegate>(del), thread_id, tag));
-	return m_int->m_proc_map.AddProcSignature(proc_name, MAssIpcCallInternal::CallInfoImpl::MakeParamsType<TDelegate>(), std::move(invoke), comment);
+	return m_int.load()->m_proc_map.AddProcSignature(proc_name, MAssIpcCallInternal::CallInfoImpl::MakeParamsType<TDelegate>(), std::move(invoke), comment);
 }
 
 template<class TRet, class... TArgs>
@@ -563,7 +563,7 @@ void MAssIpcCall::InvokeUnified(InvokeSetting& settings, MAssIpc_DataStream* res
 	if( settings.inplace_send_buffer )
 		call_info = CreateDataStreamInplace(std::move(settings.inplace_send_buffer), measure_size.GetWritePos(), MAssIpcCallInternal::MAssIpc_PacketParser::PacketType::pt_call, new_id);
 	else
-		call_info = CreateDataStream(m_int->m_transport, measure_size.GetWritePos(), MAssIpcCallInternal::MAssIpc_PacketParser::PacketType::pt_call, new_id);
+		call_info = CreateDataStream(m_int.load()->m_transport, measure_size.GetWritePos(), MAssIpcCallInternal::MAssIpc_PacketParser::PacketType::pt_call, new_id);
 
 	SerializeCall<TRet>(call_info, settings.proc_name, (result_buf_wait_return!=nullptr), args...);
 

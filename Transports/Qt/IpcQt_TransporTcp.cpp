@@ -74,12 +74,14 @@ size_t	IpcQt_TransporTcp::ReadBytesAvailable()
 void	IpcQt_TransporTcp::Read(uint8_t* data, size_t size)
 {
 	mass_return_if_equal(m_connection.data(), nullptr);
+	mass_return_if_not_equal(m_connection->thread(), QThread::currentThread());
 	m_connection->read(reinterpret_cast<char*>(data), size);
 }
 
 void	IpcQt_TransporTcp::Write(const uint8_t* data, size_t size)
 {
 	mass_return_if_equal(m_connection.data(), nullptr);
+	mass_return_if_not_equal(m_connection->thread(), QThread::currentThread());
 	mass_return_if_not_equal(m_connection->state(), QAbstractSocket::ConnectedState);
 	auto ir = m_connection->write(reinterpret_cast<const char*>(data), size);
 	mass_return_if_not_equal(ir, size);

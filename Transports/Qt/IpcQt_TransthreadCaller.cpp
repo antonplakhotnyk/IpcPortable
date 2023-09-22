@@ -77,6 +77,18 @@ MAssIpc_TransthreadTarget::Id IpcQt_TransthreadCaller::AddTargetThread(QThread* 
 	return receiver_id;
 }
 
+decltype(IpcQt_TransthreadCaller::Internals::threads)::iterator IpcQt_TransthreadCaller::MakeFindThread(MAssIpc_TransthreadTarget::Id receiver_thread_id)
+{
+	auto it_receiver = m_int->threads.find(receiver_thread_id);
+	if( it_receiver==m_int->threads.end() )
+	{
+		AddTargetThread(IpcQt_TransthreadCaller::GetQThread(receiver_thread_id));
+		it_receiver = m_int->threads.find(receiver_thread_id);
+	}
+
+	return it_receiver;
+}
+
 std::shared_ptr<IpcQt_TransthreadCaller::CallWaiter> IpcQt_TransthreadCaller::CallFromThread(MAssIpc_TransthreadTarget::Id receiver_thread_id, std::unique_ptr<CallEvent> call)
 {
 //	qDebug()<<__func__<<' '<<QThread::currentThreadId()<<" ";
@@ -89,12 +101,12 @@ std::shared_ptr<IpcQt_TransthreadCaller::CallWaiter> IpcQt_TransthreadCaller::Ca
 	{
 		std::unique_lock<std::recursive_mutex> lock(*m_int->lock_threads.get());
 
-		auto it_receiver = m_int->threads.find(receiver_thread_id);
+		auto it_receiver = MakeFindThread(receiver_thread_id);
 		mass_return_x_if_equal(it_receiver, m_int->threads.end(), std::make_shared<CallWaiter>());
 
 		receiver_wait_return_processing_calls = it_receiver->second->GetWaitCallSync();
 
-		auto it_sender = m_int->threads.find(sender_thread_id);
+		auto it_sender = MakeFindThread(sender_thread_id);
 		mass_return_x_if_equal(it_sender, m_int->threads.end(), std::make_shared<CallWaiter>());
 
 		call_waiter_new = std::make_shared<CallWaiterPrivate>(it_sender->second->m_call_waiters_sender, 
