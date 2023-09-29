@@ -107,7 +107,7 @@ public:
 				m_cwl->condition_events.notify_all();
 		}
 
-		void Reset(ResetType rt = ResetType::wait_next_after_trigger)
+		void ResetTriggered(ResetType rt = ResetType::wait_next_after_trigger)
 		{
 			std::unique_lock<std::mutex> lock(m_cwl->lock_events);
 			for( auto& check: *m_checks )

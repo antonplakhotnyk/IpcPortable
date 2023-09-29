@@ -12,6 +12,7 @@ public:
 
 protected:
 	void SetApplicationReady(bool sut_ready);
+	bool IsConnectedTestability() const;
 
 private:
 

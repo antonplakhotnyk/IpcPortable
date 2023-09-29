@@ -2,11 +2,12 @@
 
 #include "SutHandlerThread.h"
 #include "IpcQt_TransthreadCaller.h"
-#include "IpcQt_TransportTcpServer.h"
 #include "IpcQt_Net.h"
 #include "MAssIpcWaiter.h"
+#include "TestabilityThreadQt.h"
+#include "IpcQt_TransportTcpServer.h"
 
-class AutotestServer: public IpcQt_TransportTcpServer
+class AutotestServer
 {
 public:
 
@@ -17,9 +18,10 @@ public:
 	};
 
 	AutotestServer(const Params& params);
+	~AutotestServer();
 
-	std::shared_ptr<AutotestServer_Client> CreateClient(const AutotestServer_Client::Handlers& handlers);
-	void		Stop();
+	std::shared_ptr<AutotestServer_Client> CreateClient();
+ 	void		Stop();
 
 private:
 
@@ -29,23 +31,60 @@ private:
 		template<class... Args>
 		ClientPrivate(Args&&... args):AutotestServer_Client(args...){};
 
-		const Handlers& GetHandlers() const {return m_handlers;}
-		void SetConnection(SutIndexId sut_id, std::shared_ptr<AutotestServer_Client::SutConnection> connection);
+		void AddNewConnection(const std::weak_ptr<IpcQt_TransporTcp>& transport, std::shared_ptr<SutConnection> connection)
+		{
+			std::unique_lock<std::recursive_mutex> lock(m_connections_mutex);
+			m_connections.insert(std::make_pair(transport, connection));
+			SetConnectionLocked(SutIndexId(0), connection);
+		}
+
+		void RemoveConnection(const std::weak_ptr<IpcQt_TransporTcp>& transport)
+		{
+			std::unique_lock<std::recursive_mutex> lock(m_connections_mutex);
+			m_connections.erase(transport);
+		}
+
+		void SetConnectionLocked(SutIndexId sut_id, std::shared_ptr<SutConnection> connection);
 	};
 
 
-	void OnConnected(std::weak_ptr<IpcQt_TransporTcp> transport) override;
-	void OnDisconnected(std::weak_ptr<IpcQt_TransporTcp> transport) override;
+	class ServerInternals: public IpcQt_TransportTcpServer
+	{
+	public:
+		ServerInternals(const Params& params, const std::weak_ptr<AutotestClient_Internals>& client_internals)
+			:IpcQt_TransportTcpServer(params.server_port)
+			, m_autotest_container(params.autotest_container)
+			, m_client_internals(client_internals)
+		{
+		}
+
+		void AddClient(const std::weak_ptr<ClientPrivate>& new_client);
+
+	private:
+
+		decltype(Params::autotest_container)		m_autotest_container;
+		std::unique_ptr<SutHandlerThread>			m_sut_handler;
+
+		std::vector<std::weak_ptr<ClientPrivate>>	m_clients;
+		std::recursive_mutex						m_clients_mutex;
+
+		const std::weak_ptr<AutotestClient_Internals> m_client_internals;
+
+	private:
+		void OnConnected(std::weak_ptr<IpcQt_TransporTcp> transport) override;
+		void OnDisconnected(std::weak_ptr<IpcQt_TransporTcp> transport) override;
+
+		const decltype(AutotestServer::ServerInternals::m_clients) RemoveExpiredClients();
+
+	};
+
+	void Background_Main(const Params& params);
 
 private:
 
-//	std::set<std::shared_ptr<AutotestServer_Client::SutConnection>>	m_connections;
+	TestabilityWaitReady						m_int_ready;
+	std::weak_ptr<AutotestClient_Internals>		m_client_internals;
+	std::weak_ptr<ServerInternals>				m_server_internals;
 
-	decltype(Params::autotest_container)		m_autotest_container;
-	std::unique_ptr<SutHandlerThread>			m_sut_handler;
-
-
-	std::vector<std::weak_ptr<ClientPrivate>>	m_clients;
-	std::shared_ptr<AutotestServerInternals>	m_server_internals = std::make_shared<AutotestServerInternals>();
-
+	TestabilityThreadQt							m_background_thread;
 };

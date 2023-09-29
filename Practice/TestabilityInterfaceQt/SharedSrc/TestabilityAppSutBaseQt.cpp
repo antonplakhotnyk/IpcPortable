@@ -35,3 +35,8 @@ void TestabilityAppSutBaseQt::SetApplicationReady(bool sut_ready)
 	m_sut_ready = sut_ready;
 	AutotestServerReady();
 }
+
+bool TestabilityAppSutBaseQt::IsConnectedTestability() const
+{
+	return m_testability.IsConnected();
+}

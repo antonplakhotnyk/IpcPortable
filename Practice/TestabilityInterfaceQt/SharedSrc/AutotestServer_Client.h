@@ -3,11 +3,13 @@
 #include "IpcQt_Net.h"
 #include "MAssIpcWaiter.h"
 
-class AutotestServerInternals
+//-------------------------------------------------------
+
+class AutotestClient_Internals
 {
 public:
 
-	AutotestServerInternals()
+	AutotestClient_Internals()
 	{
 		m_disconnect_event->BindConnect(MAssIpcWaiter::ConnectionEvent::State::on_disconnected, m_connection_signaling);
 	}
@@ -28,7 +30,7 @@ public:
 
 	struct SutConnection
 	{
-		SutConnection(MAssIpcCall& ipc_connection, std::shared_ptr<IpcQt_TransporTcp> transport, std::weak_ptr<AutotestServerInternals> internals)
+		SutConnection(MAssIpcCall& ipc_connection, std::shared_ptr<IpcQt_TransporTcp> transport, std::weak_ptr<AutotestClient_Internals> internals)
 			: ipc_net(ipc_connection, transport)
 			, m_internals{internals}
 		{
@@ -56,33 +58,26 @@ public:
 		static	void IpcError(MAssIpcCall::ErrorType et, const std::string& message);
 
 	private:
-		const std::weak_ptr<AutotestServerInternals> m_internals;
+		const std::weak_ptr<AutotestClient_Internals> m_internals;
 	};
 
 public:
 
 	enum struct SutIndexId:size_t
 	{
-		on_connected_sut = 16,
-		max_count = on_connected_sut+1,
+		on_connected_sut = 0,
+		max_count = 16,
 	};
 
-
-	// Must not exist. Use regular wait-event mechanism
-	struct Handlers
-	{
-		std::function<SutIndexId()> OnConnectedSut;
-		std::function<void()> OnDisconnectedSut;
-	};
-
-	AutotestServer_Client(const Handlers& handlers, const std::weak_ptr<AutotestServerInternals>& server_internals)
-		: m_handlers{handlers}
-		, m_server_internals(server_internals)
+	AutotestServer_Client(const std::weak_ptr<AutotestClient_Internals>& server_internals)
+		: m_client_internals(server_internals)
 	{
 	}
 
 	const MAssIpcCall& IpcCall(SutIndexId sut_index_id = {}) const
 	{
+		std::unique_lock<std::recursive_mutex> lock(m_connections_mutex);
+
 		if( sut_index_id >=SutIndexId::max_count )
 			return m_disconnected_stub;
 		if( !bool(m_client_connections[size_t(sut_index_id)]) )
@@ -96,7 +91,7 @@ public:
 	class Event: public MAssIpcWaiter::Event
 	{
 	public:
-		Event(const std::shared_ptr<MAssIpcWaiter::ConditionWaitLock>& cwl, std::shared_ptr<AutotestServerInternals> internals, bool skip_canceling_by_disconnect)
+		Event(const std::shared_ptr<MAssIpcWaiter::ConditionWaitLock>& cwl, std::shared_ptr<AutotestClient_Internals> internals, bool skip_canceling_by_disconnect)
 			: MAssIpcWaiter::Event(cwl)
 			, m_internals{internals}
 		{
@@ -147,21 +142,29 @@ public:
 
 	private:
 
-		const std::shared_ptr<AutotestServerInternals> m_internals;
+		const std::shared_ptr<AutotestClient_Internals> m_internals;
 	};
 
 	std::unique_ptr<Event> CreateEvent(bool skip_canceling_by_disconnect = false)
 	{
-		return m_server_internals->m_waiter->CreateEvent<Event>(m_server_internals, skip_canceling_by_disconnect);
+		return m_client_internals->m_waiter->CreateEvent<Event>(m_client_internals, skip_canceling_by_disconnect);
+	}
+
+	std::unique_ptr<Event> CreateEventSut(std::shared_ptr<const MAssIpcCall::CallInfo> event_id, Event::InitialCount initial_count = Event::InitialCount::current, bool skip_canceling_by_disconnect = false)
+	{
+		std::unique_ptr<Event> event_new = CreateEvent(skip_canceling_by_disconnect);
+		event_new->BindSut(event_id, initial_count);
+		return event_new;
 	}
 
 private:
 	MAssIpcCall		m_disconnected_stub{std::weak_ptr<MAssIpc_Transthread>{}};
 protected:
 
-	std::shared_ptr<SutConnection> m_client_connections[size_t(SutIndexId::max_count)];
-	const Handlers		m_handlers;
+	std::map<std::weak_ptr<IpcQt_TransporTcp>, std::shared_ptr<SutConnection>, std::owner_less<std::weak_ptr<IpcQt_TransporTcp>> >	m_connections;
+	std::shared_ptr<SutConnection>			m_client_connections[size_t(SutIndexId::max_count)];
+	mutable std::recursive_mutex			m_connections_mutex;
 
-	const std::shared_ptr<AutotestServerInternals> m_server_internals;
+	const std::shared_ptr<AutotestClient_Internals> m_client_internals;
 
 };
