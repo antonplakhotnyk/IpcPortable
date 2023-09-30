@@ -6,9 +6,14 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <array>
 
 class EventHandlerMap
 {
+	using event_name_t = std::string;
+public:
+	using event_name_arg_t = const std::string&;
+
 private:
 
 	template<typename T>
@@ -57,76 +62,76 @@ private:
 	class CallerBase
 	{
 	public:
-		constexpr CallerBase(const void* tag) :tag(tag) {};
+		constexpr CallerBase(const void* tag, bool skip_type_handler) :tag(tag), skip_type_handler(skip_type_handler){};
 		virtual ~CallerBase() = default;
 
 		const void* const tag;
+		const bool skip_type_handler;
 	};
 
 	template<class... Args>
-	class TCaller: public CallerBase
+	class CallerArgs: public CallerBase
 	{
 	public:
 
-		TCaller(std::function<void(Args...)> invoke, const void* tag):CallerBase{tag}, invoke(std::move(invoke))
+		CallerArgs(std::function<void(Args...)> invoke, const void* tag, bool skip_type_handler):CallerBase{tag, skip_type_handler}, invoke(std::move(invoke))
 		{
 		}
 
 		const std::function<void(Args...)> invoke;
 	};
 
-
-	template<class TRet, class TCls, class... Args>
-	static auto GetArgsTuple_helper(TRet(TCls::* proc)(Args...), int)->std::tuple<Args...>;
-
-	template<class TRet, class... Args>
-	static auto GetArgsTuple_helper(TRet(*proc)(Args...), int)->std::tuple<Args...>;
-
-	template<class TCall>
-	static void GetArgsTuple_helper(TCall, ...)
+	template<class... Args>
+	class CallerNameArgs: public CallerBase
 	{
-	}
+	public:
 
-	template<class TCall>
-	struct TupleArgsFunction
-	{
-		using type = decltype(GetArgsTuple_helper(TCall(nullptr), 0));
+		CallerNameArgs(std::function<void(event_name_arg_t name, Args...)> invoke, const void* tag):CallerBase{tag}, invoke(std::move(invoke))
+		{
+		}
+
+		const std::function<void(event_name_arg_t name, Args...)> invoke;
 	};
 
 
-	template<class TypeCheckParams, class... Args>
-	struct TKeyTypeIndex
+	template<class... Args>
+	struct Info_CallerArgs
 	{
-		using TKeyHandler = typename TupleArgsFunction<typename GetFunctionSignature<TypeCheckParams>::TFuncPtr>::type;
-		using TKeyCall = typename std::tuple<Args...>;
-		static_assert(std::is_same<TKeyHandler, TKeyCall>::value, "TypeCheckParams must be callable or function pointer with exactly same Args");
+		using TypeCheckFunction = typename std::function<void(Args...)>;
+		using Caller = CallerArgs<Args...>;
 
 		static std::type_index HandlerTypeIndex()
 		{
-			return std::type_index{typeid(TKeyHandler)};
+			return std::type_index{typeid(void(*)(Args...))};
 		}
 	};
 
-	template<class TypeCheckParams, class... Args>
-	struct AddHandlerInfo
+	template<class... Args>
+	struct Info_CallerNameArgs
 	{
-		using TypeCheckFunction = typename std::function<void(Args...)>;
-		using KeyTypeIndex = TKeyTypeIndex<TypeCheckParams, Args...>;
-		using Caller = TCaller<Args...>;
+		using TypeCheckFunction = typename std::function<void(event_name_arg_t, Args...)>;
+		using Caller = CallerArgs<event_name_arg_t, Args...>;
+
+		static std::type_index HandlerTypeIndex()
+		{
+			return std::type_index{typeid(void(*)(event_name_arg_t, Args...))};
+		}
 	};
 
-	template<class TypeCheckParams, class TRet, class... Args>
-	static auto GetAddHandlerInfo(TRet(* proc)(Args...))->AddHandlerInfo<TypeCheckParams, Args...>;
 
-	template<class TypeCheckParams>
-	struct GetTInfo
+	template<template<class...> class TCaller, class TRet, class... Args>
+	static auto GetInfo_TCaller_helper(TRet(* proc)(Args...))-> TCaller<Args...>;
+
+	template<template<class...> class TCaller, class TypeCheckParams>
+	struct GetInfo: decltype(GetInfo_TCaller_helper<TCaller>(typename GetFunctionSignature<TypeCheckParams>::TFuncPtr(nullptr)))
 	{
-		using type = decltype(GetAddHandlerInfo<TypeCheckParams>(typename GetFunctionSignature<TypeCheckParams>::TFuncPtr(nullptr)));
 	};
+
+
 
 	struct Key
 	{
-		std::string name;
+		event_name_t name;
 		std::type_index params_type;
 
 		bool operator<(const Key& other) const
@@ -139,94 +144,152 @@ private:
 	};
 
 	mutable std::mutex	m_lock;
-	std::map<Key, std::shared_ptr<CallerBase> >	m_name_procs;
+	std::map<Key, std::shared_ptr<CallerBase> >				m_name_procs;
+	std::map<std::type_index, std::shared_ptr<CallerBase> >	m_type_procs;
 
 private:
 
-	std::shared_ptr<CallerBase> FindCaller(const Key& key)
+	template<class TMap>
+	std::shared_ptr<CallerBase> FindCaller_Locked(const TMap& procs_map, const typename TMap::key_type& key) const
 	{
-		std::unique_lock<std::mutex> lock(m_lock);
-
-		auto it_name_params = m_name_procs.find(key);
-		if( it_name_params==m_name_procs.end() )
-			return nullptr;
+		auto it_name_params = procs_map.find(key);
+		if( it_name_params==procs_map.end() )
+			return {};
 		return it_name_params->second;
 	};
 
+// 	template<typename TMap, typename TKey, typename IteratorType_AddTo>
+// 	static void PushCallers(IteratorType_AddTo& it, IteratorType_AddTo it_end, const TMap& procs_map, const TKey& key)
+// 	{
+// 		auto it_procs = procs_map.find(key);
+// 		if( it_procs != procs_map.end() && it != it_end )
+// 			*(it++) = it_procs->second;
+// 	}
+// 	 
+// 	auto FindCallers(const Key& key) const
+// 	{
+// 		std::array<std::shared_ptr<CallerBase>, 2> callers;
+// 		auto it_callers = callers.begin();
+// 		auto it_callers_end = callers.end();
+// 
+// 		std::unique_lock<std::mutex> lock(m_lock);
+// 		PushCallers(it_callers, it_callers_end, m_name_procs, key);
+// 		PushCallers(it_callers, it_callers_end, m_type_procs, key.params_type);
+// 
+// 		return callers;
+// 	};
+
+	template<typename TInfo, class THandlerProc, typename TMap, typename TKey>
+	void AddHandlerProc(TMap& procs_map, const TKey& key, THandlerProc&& handler_proc, const void* tag, bool skip_type_handler)
+	{
+		std::unique_lock<std::mutex> lock(m_lock);
+
+		auto it_name_params = procs_map.find(key);
+		if(it_name_params != procs_map.end())
+			procs_map.erase(it_name_params);
+ 		typename TInfo::TypeCheckFunction proc(std::forward<THandlerProc>(handler_proc));
+ 		procs_map.emplace(std::make_pair(key, new typename TInfo::Caller(proc, tag, skip_type_handler)));
+	}
 
 public:
 
 	template<class TypeCheckParams, class THandlerProc>
-	void AddHandler(THandlerProc handler_proc, const void* tag = nullptr)
+	void AddHandler(THandlerProc handler_proc, const void* tag = nullptr, bool skip_type_handler = false)
 	{
-		AddHandlerName<TypeCheckParams, THandlerProc>(std::string{}, std::forward<THandlerProc>(handler_proc), tag);
+		AddHandlerName<TypeCheckParams, THandlerProc>(event_name_t{}, std::forward<THandlerProc>(handler_proc), tag, skip_type_handler);
 	}
 
 	template<class TypeCheckParams, class THandlerProc>
-	void AddHandlerName(std::string name, THandlerProc handler_proc, const void* tag = nullptr)
+	void AddHandlerName(event_name_arg_t name, THandlerProc handler_proc, const void* tag = nullptr, bool skip_type_handler = false)
 	{
-		static_assert(Check_is_signame_and_handler_describe_same_call_signatures(typename GetFunctionSignature<TypeCheckParams>::TFuncPtr{}, typename GetFunctionSignature<THandlerProc>::TFuncPtr{}), "TypeCheckParams and THandlerProc signatures not match");
+		using TInfo = GetInfo<Info_CallerArgs,TypeCheckParams>;
+		static_assert(Check_is_signame_and_handler_describe_same_call_signatures(typename GetFunctionSignature<THandlerProc>::TFuncPtr{}, typename GetFunctionSignature< decltype(&decltype(TInfo::Caller::invoke)::operator()) >::TFuncPtr{}), "TypeCheckParams and THandlerProc signatures not match");
 
-		using TInfo = typename GetTInfo<TypeCheckParams>::type;
-		const Key key{std::move(name),TInfo::KeyTypeIndex::HandlerTypeIndex()};
-
-		{
-			std::unique_lock<std::mutex> lock(m_lock);
-
-			auto it_name_params = m_name_procs.find(key);
-			if(it_name_params != m_name_procs.end())
-				m_name_procs.erase(it_name_params);
-			typename TInfo::TypeCheckFunction proc(handler_proc);
-			m_name_procs.emplace(std::make_pair(key, new typename TInfo::Caller(proc, tag)));
-		}
+		const Key key{std::move(name),TInfo::HandlerTypeIndex()};
+		AddHandlerProc<TInfo>(m_name_procs, key, std::forward<THandlerProc>(handler_proc), tag, skip_type_handler);
 	}
 
-	template<class THandlerProc>
-	void AddName(std::string name, THandlerProc handler_proc, const void* tag = nullptr)
+	template<class TypeCheckParams, class THandlerProc>
+	void AddHandlerType(THandlerProc handler_proc, const void* tag = nullptr, bool skip_type_handler = false)
 	{
- 		AddHandlerName<typename GetFunctionSignature<THandlerProc>::TFuncPtr, THandlerProc>(name, std::forward<THandlerProc>(handler_proc), tag);
+		using TInfo = GetInfo<Info_CallerNameArgs,TypeCheckParams>;
+		static_assert(Check_is_signame_and_handler_describe_same_call_signatures(typename GetFunctionSignature<THandlerProc>::TFuncPtr{}, typename GetFunctionSignature< decltype(&decltype(TInfo::Caller::invoke)::operator()) >::TFuncPtr{}), "TypeCheckParams and THandlerProc signatures not match");
+		auto key{TInfo::HandlerTypeIndex()};
+		AddHandlerProc<TInfo>(m_type_procs, key, std::forward<THandlerProc>(handler_proc), tag, skip_type_handler);
+	}
+
+
+	template<class THandlerProc>
+	void AddName(event_name_arg_t name, THandlerProc handler_proc, const void* tag = nullptr, bool skip_type_handler = false)
+	{
+ 		AddHandlerName<typename GetFunctionSignature<THandlerProc>::TFuncPtr, THandlerProc>(name, std::forward<THandlerProc>(handler_proc), tag, skip_type_handler);
 	}
 
 	template<class TypeCheckParams>
 	void ClearHandler()
 	{
-		ClearHandlerName<TypeCheckParams>(std::string{});
+		ClearHandlerName<TypeCheckParams>(event_name_t{});
 	}
 
 	template<class TypeCheckParams>
-	void ClearHandlerName(std::string name)
+	void ClearHandlerName(event_name_arg_t name)
 	{
-		using TInfo = typename GetTInfo<TypeCheckParams>::type;
-		const Key key{std::move(name),TInfo::KeyTypeIndex::HandlerTypeIndex()};
+		using TInfo = GetInfo<Info_CallerArgs,TypeCheckParams>;
+		const Key key{std::move(name),TInfo::HandlerTypeIndex()};
 
 		m_name_procs.erase(key);
+	}
+
+	template<class TKey>
+	void RemoveTagFromMap_Locked(std::map<TKey, std::shared_ptr<CallerBase>>& map_procs, const void* tag)
+	{
+		for( auto it = map_procs.begin(); it != map_procs.end(); )
+			if( it->second->tag == tag )
+				it = map_procs.erase(it);
+			else
+				it++;
 	}
 
 	void ClearHandlersWithTag(const void* tag)
 	{
 		std::unique_lock<std::mutex> lock(m_lock);
-
-		for(auto it = m_name_procs.begin(); it != m_name_procs.end(); )
-			if(it->second->tag == tag)
-				it = m_name_procs.erase(it);
-			else
-				it++;
+		RemoveTagFromMap_Locked(m_name_procs, tag);
+		RemoveTagFromMap_Locked(m_type_procs, tag);
 	}
 
 	template<class TypeCheckParams, class... Args>
 	void Call(Args... args)
 	{
-		CallName<TypeCheckParams, Args...>(std::string{}, std::forward<Args>(args)...);
+		CallName<TypeCheckParams, Args...>(event_name_t{}, std::forward<Args>(args)...);
 	}
 
 	template<class TypeCheckParams, class... Args>
-	void CallName(std::string name, Args... args)
+	void CallName(event_name_arg_t name, Args... args)
 	{
-		using TInfo = typename GetTInfo<TypeCheckParams>::type;
-		const Key key{std::move(name),TInfo::KeyTypeIndex::HandlerTypeIndex()};
+		using TInfo = GetInfo<Info_CallerArgs, TypeCheckParams>;
+		const Key key{std::move(name),TInfo::HandlerTypeIndex()};
 
-		if(std::shared_ptr<CallerBase> caller_base = FindCaller(key) )
+		using TInfoName = GetInfo<Info_CallerNameArgs, TypeCheckParams>;
+		const auto& key_name{TInfoName::HandlerTypeIndex()};
+
+		std::unique_lock<std::mutex> lock(m_lock);
+// 		const auto& callers = FindCallers(key);
+		std::shared_ptr<CallerBase> caller_base = FindCaller_Locked(m_name_procs, key);
+		std::shared_ptr<CallerBase> caller_base_name = FindCaller_Locked(m_type_procs, key_name);
+		lock.unlock();
+
+		bool call_type_handler = !bool(caller_base);
+// 		for( std::shared_ptr<CallerBase> caller_base : callers )
+		if( caller_base )
 			if( auto* caller = dynamic_cast<typename TInfo::Caller*>(caller_base.get()) )
+			{
 				caller->invoke(args...);
+				call_type_handler |= !caller_base->skip_type_handler;
+			}
+
+		if( call_type_handler && bool(caller_base_name) )
+			if( auto* caller = dynamic_cast<typename TInfoName::Caller*>(caller_base_name.get()) )
+				caller->invoke(key.name, args...);
 	}
+
 };

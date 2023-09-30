@@ -17,11 +17,9 @@ protected:
 
 	template<class Object>
 	using RegisterUnregisterObjectProc = void (*)(Object*);
-    using Type_event_name = const std::string&;
 
 	static constexpr const char* c_register_proc_name = "RegisterObject@Sut";
 	static constexpr const char* c_unregister_proc_name = "UnregisterObject@Sut";
-    static constexpr const char* c_event_name = "EventName@Sut";
 
 	static std::weak_ptr<EventHandlerMap>* GetEventHandlerMap()
 	{
@@ -48,18 +46,12 @@ public:
 	}
 
 	template<class... Args>
-	static void EventName(const std::string& name, Args... args)
+	static void EventName(std::string name, Args... args)
 	{
 		if( auto event_call = GetEventHandlerMap()->lock() )
-			event_call->CallName<void(Type_event_name, Args...)>(c_event_name, name, args...);
-	}
-
-    template<class... Args>
-    static void Event(std::string name, Args... args)
-    {
-        if( auto event_call = GetEventHandlerMap()->lock() )
             event_call->CallName<void (*)(Args...)>(std::move(name), args...);
     }
+
 
 
 	template<class Object>

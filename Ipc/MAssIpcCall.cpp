@@ -325,7 +325,7 @@ void MAssIpcCall::LockCurrentThreadId::lock()
 {
 	mass_assert_if_not_equal(m_locked_id, MAssIpc_ThreadSafe::id());
 	m_locked_id = MAssIpc_ThreadSafe::get_id();
-	}
+}
 
 void MAssIpcCall::LockCurrentThreadId::unlock()
 {
