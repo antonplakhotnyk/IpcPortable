@@ -63,16 +63,16 @@ public:
 
 public:
 
+	AutotestServer_Client(const std::weak_ptr<AutotestClient_Internals>& server_internals)
+		: m_client_internals(server_internals)
+	{
+	}
+
 	enum struct SutIndexId:size_t
 	{
 		on_connected_sut = 0,
 		max_count = 16,
 	};
-
-	AutotestServer_Client(const std::weak_ptr<AutotestClient_Internals>& server_internals)
-		: m_client_internals(server_internals)
-	{
-	}
 
 	const MAssIpcCall& IpcCall(SutIndexId sut_index_id = {}) const
 	{
@@ -85,6 +85,134 @@ public:
 
 		return m_client_connections[size_t(sut_index_id)]->ipc_net.ipc_call;
 	};
+
+
+	enum struct ConnectionUsage
+	{
+		newly_connected,
+		not_used,
+		use_ipc_call,
+	};
+
+	using ConnectionId = std::weak_ptr<IpcQt_TransporTcp>;
+
+	bool Connections_IsValidId(const ConnectionId& connection_id) const
+	{
+		std::unique_lock<std::recursive_mutex> lock(m_connections_mutex);
+		auto it = m_connections.find(connection_id);
+		return (it != m_connections.end());
+	}
+
+	bool Connections_IsEqual(const ConnectionId& a, const ConnectionId& b) const
+	{
+		std::unique_lock<std::recursive_mutex> lock(m_connections_mutex);
+		auto comp = m_connections.key_comp();
+		return !comp(a, b) && !comp(b, a);
+	}
+
+	void Connections_SetIpcUse(ConnectionId connection_id, SutIndexId sut_index_id)
+	{
+		std::unique_lock<std::recursive_mutex> lock(m_connections_mutex);
+
+		if(sut_index_id==SutIndexId::on_connected_sut)
+			sut_index_id = SutIndexId::max_count;
+
+		auto it = m_connections.find(connection_id);
+		if( it != m_connections.end() )
+			if( SetConnectionLocked(sut_index_id, it->second.connection) )
+				it->second.usage = ConnectionUsage::use_ipc_call;
+	}
+
+	void Connections_SetNotUsed(ConnectionId connection_id)
+	{
+		std::unique_lock<std::recursive_mutex> lock(m_connections_mutex);
+
+		auto it = m_connections.find(connection_id);
+		if( it != m_connections.end() )
+			it->second.usage = ConnectionUsage::not_used;
+	}
+
+	void Connections_ClearIpcUse(SutIndexId sut_index_id)
+	{
+		std::unique_lock<std::recursive_mutex> lock(m_connections_mutex);
+
+		if( (sut_index_id >=SutIndexId::max_count) || (sut_index_id ==SutIndexId::on_connected_sut) )
+			return;
+		std::shared_ptr<SutConnection> connection = m_client_connections[size_t(sut_index_id)];
+		if( !bool(connection) )
+			return;
+
+		SetConnectionLocked(sut_index_id, {});
+
+		static_assert(size_t(SutIndexId::on_connected_sut)==0, "expected 0");
+		auto it_client_connection = std::find_if(std::begin(m_client_connections)+size_t(SutIndexId::on_connected_sut)+1, std::end(m_client_connections),
+								  [&](const std::shared_ptr<SutConnection>& sut_connection)
+		{
+			return sut_connection == connection;
+		});
+
+		if( it_client_connection == std::end(m_client_connections) )
+		{
+			auto it_connection = std::find_if(m_connections.begin(), m_connections.end(), [&](const decltype(m_connections)::value_type& entry)
+			{
+				return entry.second.connection == connection;
+			});
+
+			if( it_connection!=m_connections.end() )
+				it_connection->second.usage = ConnectionUsage::not_used;
+		}
+	}
+
+	const MAssIpcCall& Connections_GetIpc(ConnectionId connection_id) const
+	{
+		std::unique_lock<std::recursive_mutex> lock(m_connections_mutex);
+
+		auto it = m_connections.find(connection_id);
+		if( it != m_connections.end() )
+			return it->second.connection->ipc_net.ipc_call;
+		else
+			return m_disconnected_stub;
+	}
+
+	std::vector<ConnectionId> Connections_GetWithUsage(ConnectionUsage usage) const
+	{
+		std::unique_lock<std::recursive_mutex> lock(m_connections_mutex);
+
+		std::vector<ConnectionId> filtered_connections;
+		for( const auto& entry : m_connections )
+			if( entry.second.usage == usage )
+				filtered_connections.push_back(entry.first);
+
+		return filtered_connections;
+	}
+
+protected:
+
+	void AddNewConnection(const std::weak_ptr<IpcQt_TransporTcp>& transport, std::shared_ptr<SutConnection> connection)
+	{
+		std::unique_lock<std::recursive_mutex> lock(m_connections_mutex);
+		m_connections.insert(std::make_pair(transport, ConnectionState{connection}));
+		SetConnectionLocked(SutIndexId(0), connection);
+	}
+
+	void RemoveConnection(const std::weak_ptr<IpcQt_TransporTcp>& transport)
+	{
+		std::unique_lock<std::recursive_mutex> lock(m_connections_mutex);
+		
+		auto it = m_connections.find(transport);
+
+		if( it != m_connections.end() )
+		{
+			const auto& sut_connection = it->second.connection;
+			for( size_t i = 0; i < std::extent<decltype(m_client_connections)>::value; ++i )
+				if( m_client_connections[i] == sut_connection )
+					m_client_connections[i].reset();
+
+			m_connections.erase(it);
+		}
+	}
+
+	bool SetConnectionLocked(SutIndexId sut_id, std::shared_ptr<SutConnection> connection);
 
 public:
 
@@ -161,7 +289,14 @@ private:
 	MAssIpcCall		m_disconnected_stub{std::weak_ptr<MAssIpc_Transthread>{}};
 protected:
 
-	std::map<std::weak_ptr<IpcQt_TransporTcp>, std::shared_ptr<SutConnection>, std::owner_less<std::weak_ptr<IpcQt_TransporTcp>> >	m_connections;
+
+	struct ConnectionState
+	{
+		std::shared_ptr<SutConnection> connection;
+		ConnectionUsage usage = ConnectionUsage::newly_connected;
+	};
+
+	std::map<std::weak_ptr<IpcQt_TransporTcp>, ConnectionState, std::owner_less<std::weak_ptr<IpcQt_TransporTcp>> >	m_connections;
 	std::shared_ptr<SutConnection>			m_client_connections[size_t(SutIndexId::max_count)];
 	mutable std::recursive_mutex			m_connections_mutex;
 

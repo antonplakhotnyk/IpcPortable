@@ -28,6 +28,11 @@ void Application_Sut::Register(ApplicationUnderTest* application)
 
 	ipc.AddHandler("OpenFile", [this](QByteArray file_data)->bool{return OpenFile(file_data);}, this);
 	ipc.AddHandler("TransfetString", [this](QString str)->QString{return TransfetString(str);}, this);
+	ipc.AddHandler("GetType", []()->std::string
+	{
+		return "Application_Sut";
+	});
+	
 
 	SetApplicationReady(true);
 }

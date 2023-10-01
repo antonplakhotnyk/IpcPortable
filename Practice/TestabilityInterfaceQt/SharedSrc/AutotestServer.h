@@ -31,20 +31,8 @@ private:
 		template<class... Args>
 		ClientPrivate(Args&&... args):AutotestServer_Client(args...){};
 
-		void AddNewConnection(const std::weak_ptr<IpcQt_TransporTcp>& transport, std::shared_ptr<SutConnection> connection)
-		{
-			std::unique_lock<std::recursive_mutex> lock(m_connections_mutex);
-			m_connections.insert(std::make_pair(transport, connection));
-			SetConnectionLocked(SutIndexId(0), connection);
-		}
-
-		void RemoveConnection(const std::weak_ptr<IpcQt_TransporTcp>& transport)
-		{
-			std::unique_lock<std::recursive_mutex> lock(m_connections_mutex);
-			m_connections.erase(transport);
-		}
-
-		void SetConnectionLocked(SutIndexId sut_id, std::shared_ptr<SutConnection> connection);
+		using AutotestServer_Client::AddNewConnection;
+		using AutotestServer_Client::RemoveConnection;
 	};
 
 
