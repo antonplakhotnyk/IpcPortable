@@ -81,18 +81,6 @@ private:
 		const std::function<void(Args...)> invoke;
 	};
 
-	template<class... Args>
-	class CallerNameArgs: public CallerBase
-	{
-	public:
-
-		CallerNameArgs(std::function<void(event_name_arg_t name, Args...)> invoke, const void* tag):CallerBase{tag}, invoke(std::move(invoke))
-		{
-		}
-
-		const std::function<void(event_name_arg_t name, Args...)> invoke;
-	};
-
 
 	template<class... Args>
 	struct Info_CallerArgs
