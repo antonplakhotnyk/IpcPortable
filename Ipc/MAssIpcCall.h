@@ -323,6 +323,7 @@ private:
 	};
 	static DeserializedFindCallInfo DeserializeNameSignature(MAssIpc_DataStream& call_info);
 
+	static inline bool IsDirectCall(const std::shared_ptr<MAssIpc_Transthread>& inter_thread_nullable, const MAssIpc_TransthreadTarget::Id& thread_id);
 	inline bool IsProcessIncomingCalls(ProcIn process_incoming_calls) const;
 	MAssIpcCallInternal::MAssIpc_PacketParser::TCallId NewCallId() const;
 	
@@ -464,6 +465,11 @@ public:
 };
 
 //-------------------------------------------------------
+inline bool MAssIpcCall::IsDirectCall(const std::shared_ptr<MAssIpc_Transthread>& inter_thread_nullable, const MAssIpc_TransthreadTarget::Id& thread_id)
+{
+	return ( !bool(inter_thread_nullable) || (thread_id==MAssIpc_TransthreadTarget::DirectCallPseudoId()) );
+}
+
 inline bool MAssIpcCall::IsProcessIncomingCalls(ProcIn process_incoming_calls) const
 {
 	switch( process_incoming_calls )

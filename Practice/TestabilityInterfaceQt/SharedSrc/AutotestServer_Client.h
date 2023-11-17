@@ -34,7 +34,7 @@ public:
 			: ipc_net(ipc_connection, transport)
 			, m_internals{internals}
 		{
-			this->ipc_net.ipc_call.SetHandler_ErrorOccured(&SutConnection::IpcError, this);
+			this->ipc_net.ipc_call.SetHandler_ErrorOccured(&SutConnection::IpcError, this, MAssIpc_TransthreadTarget::DirectCallPseudoId());
 
 			if(auto internals = m_internals.lock())
 			{
@@ -74,7 +74,7 @@ public:
 		max_count = 16,
 	};
 
-	const MAssIpcCall& IpcCall(SutIndexId sut_index_id = {}) const
+	const MAssIpcCall& IpcCall(SutIndexId sut_index_id = SutIndexId::on_connected_sut) const
 	{
 		std::unique_lock<std::recursive_mutex> lock(m_connections_mutex);
 
@@ -117,6 +117,8 @@ public:
 		if(sut_index_id==SutIndexId::on_connected_sut)
 			sut_index_id = SutIndexId::max_count;
 
+		ClearIpcUseLocked(sut_index_id);
+
 		auto it = m_connections.find(connection_id);
 		if( it != m_connections.end() )
 			if( SetConnectionLocked(sut_index_id, it->second.connection) )
@@ -135,6 +137,35 @@ public:
 	void Connections_ClearIpcUse(SutIndexId sut_index_id)
 	{
 		std::unique_lock<std::recursive_mutex> lock(m_connections_mutex);
+		ClearIpcUseLocked(sut_index_id);
+	}
+
+	const MAssIpcCall& Connections_GetIpc(ConnectionId connection_id) const
+	{
+		std::unique_lock<std::recursive_mutex> lock(m_connections_mutex);
+
+		auto it = m_connections.find(connection_id);
+		if( it != m_connections.end() )
+			return it->second.connection->ipc_net.ipc_call;
+		else
+			return m_disconnected_stub;
+	}
+
+	std::vector<ConnectionId> Connections_GetWithUsage(ConnectionUsage usage) const
+	{
+		std::unique_lock<std::recursive_mutex> lock(m_connections_mutex);
+
+		std::vector<ConnectionId> filtered_connections;
+		for( const auto& entry : m_connections )
+			if( entry.second.usage == usage )
+				filtered_connections.push_back(entry.first);
+
+		return filtered_connections;
+	}
+
+private:
+	void ClearIpcUseLocked(SutIndexId sut_index_id)
+	{
 
 		if( (sut_index_id >=SutIndexId::max_count) || (sut_index_id ==SutIndexId::on_connected_sut) )
 			return;
@@ -163,28 +194,6 @@ public:
 		}
 	}
 
-	const MAssIpcCall& Connections_GetIpc(ConnectionId connection_id) const
-	{
-		std::unique_lock<std::recursive_mutex> lock(m_connections_mutex);
-
-		auto it = m_connections.find(connection_id);
-		if( it != m_connections.end() )
-			return it->second.connection->ipc_net.ipc_call;
-		else
-			return m_disconnected_stub;
-	}
-
-	std::vector<ConnectionId> Connections_GetWithUsage(ConnectionUsage usage) const
-	{
-		std::unique_lock<std::recursive_mutex> lock(m_connections_mutex);
-
-		std::vector<ConnectionId> filtered_connections;
-		for( const auto& entry : m_connections )
-			if( entry.second.usage == usage )
-				filtered_connections.push_back(entry.first);
-
-		return filtered_connections;
-	}
 
 protected:
 
@@ -192,7 +201,7 @@ protected:
 	{
 		std::unique_lock<std::recursive_mutex> lock(m_connections_mutex);
 		m_connections.insert(std::make_pair(transport, ConnectionState{connection}));
-		SetConnectionLocked(SutIndexId(0), connection);
+		SetConnectionLocked(SutIndexId::on_connected_sut, connection);
 	}
 
 	void RemoveConnection(const std::weak_ptr<IpcQt_TransporTcp>& transport)

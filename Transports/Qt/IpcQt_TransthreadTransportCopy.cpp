@@ -12,14 +12,14 @@ IpcQt_TransthreadTransportCopy::IpcQt_TransthreadTransportCopy(MAssIpc_Transthre
 
 void IpcQt_TransthreadTransportCopy::CallFromThread(std::function<void()> invoke_proc)
 {
-	if( MAssIpc_TransthreadTarget::CurrentThread() == m_transport_thread_id )
+	if( (MAssIpc_TransthreadTarget::CurrentThread() == m_transport_thread_id) 
+	   || (MAssIpc_TransthreadTarget::DirectCallPseudoId() == m_transport_thread_id) )
 		invoke_proc();
 	else
 	{
 		std::unique_ptr<Call> call(std::make_unique<Call>(m_transport, invoke_proc));
-		std::shared_ptr<IpcQt_TransthreadCaller::CallWaiter> call_waiter = m_inter_thread->CallFromThread(m_transport_thread_id, std::move(call));
-
-		call_waiter->WaitProcessing();
+		if(std::shared_ptr<IpcQt_TransthreadCaller::CallWaiter> call_waiter = m_inter_thread->CallFromThread(m_transport_thread_id, std::move(call)))
+			call_waiter->WaitProcessing();
 	}
 }
 

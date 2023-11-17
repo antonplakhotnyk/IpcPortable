@@ -53,7 +53,7 @@ MAssIpc_TransthreadTarget::Id IpcQt_TransthreadCaller::AddTargetThread(QThread* 
 {
 	std::shared_ptr<Internals> int_inter_thread = GetInternals();
 	// instance of IpcQt_TransthreadCaller - does not exist
-	mass_return_x_if_equal(bool(int_inter_thread),false, MAssIpc_TransthreadTarget::Id());
+	mass_return_x_if_equal(bool(int_inter_thread),false, MAssIpc_TransthreadTarget::CurrentThread());
 
 	MAssIpc_TransthreadTarget::Id receiver_id = IpcQt_TransthreadCaller::GetId(sender_or_receiver);
 	bool is_receiver_absent;
@@ -92,37 +92,43 @@ decltype(IpcQt_TransthreadCaller::Internals::threads)::iterator IpcQt_Transthrea
 std::shared_ptr<IpcQt_TransthreadCaller::CallWaiter> IpcQt_TransthreadCaller::CallFromThread(MAssIpc_TransthreadTarget::Id receiver_thread_id, std::unique_ptr<CallEvent> call)
 {
 //	qDebug()<<__func__<<' '<<QThread::currentThreadId()<<" ";
-	MAssIpc_TransthreadTarget::Id sender_thread_id = MAssIpc_TransthreadTarget::CurrentThread();
-	if( receiver_thread_id == MAssIpc_TransthreadTarget::Id() )
-		receiver_thread_id = sender_thread_id;
-
-	std::shared_ptr<CallWaiterPrivate> call_waiter_new;
-	std::shared_ptr<WaitSync> receiver_wait_return_processing_calls;
+	if( receiver_thread_id == MAssIpc_TransthreadTarget::DirectCallPseudoId() )
 	{
-		std::unique_lock<std::recursive_mutex> lock(*m_int->lock_threads.get());
-
-		auto it_receiver = MakeFindThread(receiver_thread_id);
-		mass_return_x_if_equal(it_receiver, m_int->threads.end(), std::make_shared<CallWaiter>());
-
-		receiver_wait_return_processing_calls = it_receiver->second->GetWaitCallSync();
-
-		auto it_sender = MakeFindThread(sender_thread_id);
-		mass_return_x_if_equal(it_sender, m_int->threads.end(), std::make_shared<CallWaiter>());
-
-		call_waiter_new = std::make_shared<CallWaiterPrivate>(it_sender->second->m_call_waiters_sender, 
-															  it_receiver->second->m_call_waiters_receiver, 
-															  it_sender->second->GetWaitCallSync(),
-															  m_int->lock_threads);
-		call->SetCallWaiter(call_waiter_new);
-		if( !bool(it_sender->second->m_call_waiters_sender) )
-			call_waiter_new->CallCancel();
-
-		QCoreApplication::postEvent(it_receiver->second.get(), call.release());
+		call->ProcessCallFromTargetThread();
+		return std::make_shared<CallWaiter>();
 	}
-	if( receiver_wait_return_processing_calls )
-		receiver_wait_return_processing_calls->ProcessIncomingCall();
+	else
+	{
+		MAssIpc_TransthreadTarget::Id sender_thread_id = MAssIpc_TransthreadTarget::CurrentThread();
 
-	return call_waiter_new;
+		std::shared_ptr<CallWaiterPrivate> call_waiter_new;
+		std::shared_ptr<WaitSync> receiver_wait_return_processing_calls;
+		{
+			std::unique_lock<std::recursive_mutex> lock(*m_int->lock_threads.get());
+
+			auto it_receiver = MakeFindThread(receiver_thread_id);
+			mass_return_x_if_equal(it_receiver, m_int->threads.end(), std::make_shared<CallWaiter>());
+
+			receiver_wait_return_processing_calls = it_receiver->second->GetWaitCallSync();
+
+			auto it_sender = MakeFindThread(sender_thread_id);
+			mass_return_x_if_equal(it_sender, m_int->threads.end(), std::make_shared<CallWaiter>());
+
+			call_waiter_new = std::make_shared<CallWaiterPrivate>(it_sender->second->m_call_waiters_sender,
+																  it_receiver->second->m_call_waiters_receiver,
+																  it_sender->second->GetWaitCallSync(),
+																  m_int->lock_threads);
+			call->SetCallWaiter(call_waiter_new);
+			if( !bool(it_sender->second->m_call_waiters_sender) )
+				call_waiter_new->CallCancel();
+
+			QCoreApplication::postEvent(it_receiver->second.get(), call.release());
+		}
+		if( receiver_wait_return_processing_calls )
+			receiver_wait_return_processing_calls->ProcessIncomingCall();
+
+		return call_waiter_new;
+	}
 }
 
 void IpcQt_TransthreadCaller::ProcessCalls()

@@ -94,15 +94,14 @@ void MAssIpcCall::Internals::SendErrorMessage(const std::shared_ptr<MAssIpc_Tran
 {
 	if( bool(on_invalid_remote_call) && on_invalid_remote_call->IsCallable() )
 	{
-		if( inter_thread_nullable )
+		auto thread_id = on_invalid_remote_call->m_thread_id;
+		if( IsDirectCall(inter_thread_nullable, thread_id) )
+			ErrorJob::Invoke(on_invalid_remote_call, std::move(error_arg));
+		else
 		{
-			auto thread_id = on_invalid_remote_call->m_thread_id;
-
 			std::unique_ptr<ErrorJob> count_job(std::make_unique<ErrorJob>(on_invalid_remote_call, std::move(error_arg)));
 			inter_thread_nullable->CallFromThread(thread_id, std::move(count_job));
 		}
-		else
-			ErrorJob::Invoke(on_invalid_remote_call, std::move(error_arg));
 	}
 }
 
@@ -150,30 +149,28 @@ void MAssIpcCall::Internals::InvokeLocal(MAssIpc_DataStream& call_info_data, MAs
 
 		if( bool(invoke.on_call_count_changed) && invoke.on_call_count_changed->IsCallable() )
 		{
-			if( inter_thread_nullable )
+			auto thread_id = invoke.on_call_count_changed->m_thread_id;
+			if( IsDirectCall(inter_thread_nullable, thread_id) )
+				CountJob::Invoke(invoke.on_call_count_changed, invoke.call_info);
+			else
 			{
-				auto thread_id = invoke.on_call_count_changed->m_thread_id;
-
 				std::unique_ptr<CountJob> count_job(std::make_unique<CountJob>(invoke.on_call_count_changed, invoke.call_info));
 				inter_thread_nullable->CallFromThread(thread_id, std::move(count_job));
 			}
-			else
-				CountJob::Invoke(invoke.on_call_count_changed, invoke.call_info);
 		}
 	}
 
 	if( invoke.invoke_base )
 	{
 		auto respond_id = CallJob::CalcRespondId(invoke.send_return, id);
-		if( inter_thread_nullable )
+		auto thread_id = invoke.invoke_base->m_thread_id;
+		if( IsDirectCall(inter_thread_nullable, thread_id) )
+			CallJob::Invoke(transport, m_inter_thread_nullable, call_info_data, invoke.invoke_base, respond_id);
+		else
 		{
-			auto thread_id = invoke.invoke_base->m_thread_id;
-
 			std::unique_ptr<CallJob> call_job(std::make_unique<CallJob>(transport, m_inter_thread_nullable, call_info_data, respond_id, invoke.invoke_base));
 			inter_thread_nullable->CallFromThread(thread_id, std::move(call_job));
 		}
-		else
-			CallJob::Invoke(transport, m_inter_thread_nullable, call_info_data, invoke.invoke_base, respond_id);
 	}
 	else
 	{// fail to call

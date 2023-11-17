@@ -20,7 +20,7 @@ void IpcQt_Transthread::CallFromThread(MAssIpc_TransthreadTarget::Id thread_id, 
 
 MAssIpc_TransthreadTarget::Id	IpcQt_Transthread::GetResultSendThreadId()
 {
-	return MAssIpc_TransthreadTarget::Id();
+	return MAssIpc_TransthreadTarget::DirectCallPseudoId();
 }
 
 //-------------------------------------------------------

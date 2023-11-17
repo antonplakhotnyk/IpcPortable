@@ -18,4 +18,9 @@ public:
 		return QThread::currentThread();
 	}
 
+	static Id DirectCallPseudoId()
+	{
+		return Id();
+	}
+
 };
