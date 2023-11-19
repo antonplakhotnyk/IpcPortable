@@ -12,8 +12,8 @@ class TaskRunnerThread
 {
 	struct TaskBase
 	{
-		virtual ~TaskBase() = default;
-		virtual void Invoke() = 0;
+		virtual ~TaskBase()=default;
+		virtual void Invoke()=0;
 	};
 
 	template<class TRet>

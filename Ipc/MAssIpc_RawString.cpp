@@ -1,12 +1,12 @@
 #include "MAssIpc_RawString.h"
 #include "MAssIpc_Macros.h"
 
-namespace MAssIpcCallInternal
+namespace MAssIpcImpl
 {
 
 MAssIpc_RawString MAssIpc_RawString::Read(MAssIpc_DataStream& stream)
 {
-	MAssIpc_Data::TPacketSize length = 0;
+	MAssIpc_Data::PacketSize length = 0;
 	stream>>length;
 	const char* raw_data = nullptr;
 	if( length!=0 )
@@ -16,14 +16,14 @@ MAssIpc_RawString MAssIpc_RawString::Read(MAssIpc_DataStream& stream)
 
 void MAssIpc_RawString::Write(MAssIpc_DataStream& stream) const
 {
-	const MAssIpc_Data::TPacketSize length = (m_len*sizeof(char));
+	const MAssIpc_Data::PacketSize length = (m_len*sizeof(char));
 	stream<<length;
 	stream.WriteRawData(reinterpret_cast<const uint8_t*>(m_str), length);
 }
 
-MAssIpc_Data::TPacketSize MAssIpc_RawString::ConvertCheckStrLen(size_t str_len)
+MAssIpc_Data::PacketSize MAssIpc_RawString::ConvertCheckStrLen(size_t str_len)
 {
-	MAssIpc_Data::TPacketSize res = MAssIpc_Data::TPacketSize(str_len);
+	MAssIpc_Data::PacketSize res = MAssIpc_Data::PacketSize(str_len);
 	mass_return_x_if_not_equal(res, str_len, 0);
 	return res;
 }

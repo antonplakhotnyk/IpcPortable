@@ -3,7 +3,7 @@
 #include "MAssIpc_DataStream.h"
 #include <cstring>
 
-namespace MAssIpcCallInternal
+namespace MAssIpcImpl
 {
 
 class MAssIpc_RawString
@@ -29,13 +29,13 @@ public:
 	{
 	}
 
-	constexpr MAssIpc_RawString(const char* str, MAssIpc_Data::TPacketSize len)
+	constexpr MAssIpc_RawString(const char* str, MAssIpc_Data::PacketSize len)
 		: m_str(str)
 		, m_len(len)
 	{
 	}
 
-	constexpr MAssIpc_RawString(const MAssIpc_RawString& other) = default;
+	constexpr MAssIpc_RawString(const MAssIpc_RawString& other)=default;
 
 	static MAssIpc_RawString Read(MAssIpc_DataStream& stream);
 	void Write(MAssIpc_DataStream& stream) const;
@@ -50,7 +50,7 @@ public:
 		return {m_str, m_len};
 	}
 
-	constexpr MAssIpc_Data::TPacketSize Length() const
+	constexpr MAssIpc_Data::PacketSize Length() const
 	{
 		return m_len;
 	}
@@ -75,12 +75,12 @@ public:
 
 private:
 
-	static MAssIpc_Data::TPacketSize ConvertCheckStrLen(size_t str_len);
+	static MAssIpc_Data::PacketSize ConvertCheckStrLen(size_t str_len);
 
 private:
 
 	const char* const m_str;
-	const MAssIpc_Data::TPacketSize m_len;
+	const MAssIpc_Data::PacketSize m_len;
 };
 
 }

@@ -5,10 +5,10 @@
 #include "MAssIpc_Transport.h"
 #include <vector>
 
-template<class TType>
+template<class Type>
 struct MAssIpcType
 {
-	static_assert(sizeof(TType)!=sizeof(TType), "custom MAssIpcType must be defined for type TType use MASS_IPC_TYPE_SIGNATURE");
+	static_assert(sizeof(Type)!=sizeof(Type), "custom MAssIpcType must be defined for type Type use MASS_IPC_TYPE_SIGNATURE");
 	static constexpr const char name_value[1] = "";
 };
 
@@ -26,7 +26,7 @@ template<>															  	\
 struct MAssIpcType<type>												\
 {																		\
 	static constexpr const char name_value[sizeof(#type)] = #type;		\
-	static constexpr MAssIpc_Data::TPacketSize NameLength()								\
+	static constexpr MAssIpc_Data::PacketSize NameLength()								\
 	{																	\
 		return std::extent<decltype(name_value)>::value-1;				\
 	}																	\
@@ -42,11 +42,11 @@ class MAssIpc_DataStream
 {
 public:
 
-	MAssIpc_DataStream(MAssIpc_DataStream&&) = default;
+	MAssIpc_DataStream(MAssIpc_DataStream&&)=default;
 	MAssIpc_DataStream(std::unique_ptr<const MAssIpc_Data> data_read);
 	MAssIpc_DataStream(std::unique_ptr<MAssIpc_Data> data_write);
-	MAssIpc_DataStream() = default;
-	MAssIpc_DataStream& operator= (MAssIpc_DataStream&&) = default;
+	MAssIpc_DataStream()=default;
+	MAssIpc_DataStream& operator= (MAssIpc_DataStream&&)=default;
 	~MAssIpc_DataStream();
 
 	MAssIpc_DataStream &operator>>(int8_t &i);
@@ -76,19 +76,19 @@ public:
 
  	MAssIpc_DataStream& operator<<(void* p)=delete;// protect for implicit conversion of pointer to bool
 
-	void ReadRawData(uint8_t* data, MAssIpc_Data::TPacketSize len);
-	void ReadRawData(char* data, MAssIpc_Data::TPacketSize len);
-	const uint8_t* ReadRawData(MAssIpc_Data::TPacketSize len);
-	const char* ReadRawDataChar(MAssIpc_Data::TPacketSize len);
-	void WriteRawData(const uint8_t* data, MAssIpc_Data::TPacketSize len);
-	void WriteRawData(const char* data, MAssIpc_Data::TPacketSize len);
-	uint8_t* WriteRawData(MAssIpc_Data::TPacketSize len);
+	void ReadRawData(uint8_t* data, MAssIpc_Data::PacketSize len);
+	void ReadRawData(char* data, MAssIpc_Data::PacketSize len);
+	const uint8_t* ReadRawData(MAssIpc_Data::PacketSize len);
+	const char* ReadRawDataChar(MAssIpc_Data::PacketSize len);
+	void WriteRawData(const uint8_t* data, MAssIpc_Data::PacketSize len);
+	void WriteRawData(const char* data, MAssIpc_Data::PacketSize len);
+	uint8_t* WriteRawData(MAssIpc_Data::PacketSize len);
 
 	std::unique_ptr<const MAssIpc_Data> DetachRead();
 	std::unique_ptr<MAssIpc_Data> DetachWrite();
 	const MAssIpc_Data* GetDataRead() const;
 	MAssIpc_Data* GetDataWrite() const;
-	MAssIpc_Data::TPacketSize GetWritePos();
+	MAssIpc_Data::PacketSize GetWritePos();
 	bool IsReadBufferPresent();
 
 private:
@@ -97,15 +97,15 @@ private:
 
 public:
 
-	bool IsReadAvailable(MAssIpc_Data::TPacketSize size);
+	bool IsReadAvailable(MAssIpc_Data::PacketSize size);
 
 	template<class T>
 	void WriteBytes(T t)
 	{
 		if( m_write )
 		{
-			MAssIpc_Data::TPacketSize size = m_write->Size();
-			if( CheckAssert((m_write_pos<(std::numeric_limits<MAssIpc_Data::TPacketSize>::max()-sizeof(t)))&&(size < m_write_pos+sizeof(t))) )
+			MAssIpc_Data::PacketSize size = m_write->Size();
+			if( CheckAssert((m_write_pos<(std::numeric_limits<MAssIpc_Data::PacketSize>::max()-sizeof(t)))&&(size < m_write_pos+sizeof(t))) )
 				return;
 
 			uint8_t* bytes = m_write->Data()+m_write_pos;
@@ -133,7 +133,7 @@ public:
 			bytes[0] = uint8_t(t);
 		else
 		{
-			for( MAssIpc_Data::TPacketSize i = 0; i<sizeof(T); i++ )
+			for( MAssIpc_Data::PacketSize i = 0; i<sizeof(T); i++ )
 			{
 				bytes[i] = (0xFF & t);
 				t >>= 8;
@@ -149,7 +149,7 @@ public:
 		else
 		{
 			T t = 0;
-			for( MAssIpc_Data::TPacketSize i = 0; i<sizeof(T); i++ )
+			for( MAssIpc_Data::PacketSize i = 0; i<sizeof(T); i++ )
 			{
 				t <<= 8;
 				t |= bytes[sizeof(T)-1-i];
@@ -164,8 +164,8 @@ private:
 	std::unique_ptr<const MAssIpc_Data> m_read;
 	std::unique_ptr<MAssIpc_Data> m_write;
 
-	MAssIpc_Data::TPacketSize	m_read_pos = 0;
-	MAssIpc_Data::TPacketSize	m_write_pos = 0;
+	MAssIpc_Data::PacketSize	m_read_pos = 0;
+	MAssIpc_Data::PacketSize	m_write_pos = 0;
 };
 
 //-------------------------------------------------------
@@ -203,9 +203,9 @@ MAssIpc_DataStream& operator>>(MAssIpc_DataStream& stream, std::string& v);
 
 MASS_IPC_TYPE_SIGNATURE(std::string);
 
-// template<class TType> 
+// template<class Type> 
 // struct MAssIpcType; 
-// template<> struct MAssIpcType<std::string> { static const char* Name() { return "std::string"; }; };;
+// template<> struct MAssIpcType<std::string> { static const char* Name() { return "std::string"; }; };
 
 //-------------------------------------------------------
 

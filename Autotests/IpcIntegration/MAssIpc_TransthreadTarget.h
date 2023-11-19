@@ -15,11 +15,16 @@ public:
 	{
 	public:
 
-		constexpr Id() = default;
+		constexpr Id()=default;
 
 		constexpr bool operator<(const Id& other) const
 		{
 			return m_id < other.m_id;
+		}
+
+		constexpr bool operator==(const Id& other) const
+		{
+			return m_id == other.m_id;
 		}
 
 	private:
@@ -31,6 +36,11 @@ public:
 		return Id();
 	}
 
+	static Id DirectCallPseudoId()
+	{
+		return CurrentThread();
+	}
+
 	// Possible implementations:
 	 
 // 	// Same as MAssIpc_ThreadSafe
@@ -39,12 +49,22 @@ public:
 // 	{
 // 		return MAssIpc_ThreadSafe::get_id();
 // 	}
-	
+// 
+// 	static Id DirectCallPseudoId()
+// 	{
+// 		return Id();
+// 	}
+
 // 	// based on std::thread
 // 	using Id = std::thread::id;
 // 	static inline Id CurrentThread()
 // 	{
 // 		return std::this_thread::get_id();
+// 	}
+// 
+// 	static Id DirectCallPseudoId()
+// 	{
+// 		return Id();
 // 	}
 
 };

@@ -23,7 +23,7 @@ private:
 	template<typename Ret, typename... Args>
 	struct GetFunctionSignature<Ret(Args...)>
 	{
-		using TFuncPtr = Ret(*)(Args...);
+		using FuncPtr = Ret(*)(Args...);
 	};
 
 	template<typename Ret, typename... Args>
@@ -107,11 +107,11 @@ private:
 	};
 
 
-	template<template<class...> class TCaller, class TRet, class... Args>
-	static auto GetInfo_TCaller_helper(TRet(* proc)(Args...))-> TCaller<Args...>;
+	template<template<class...> class TCaller, class Ret, class... Args>
+	static auto GetInfo_TCaller_helper(Ret(* proc)(Args...))-> TCaller<Args...>;
 
 	template<template<class...> class TCaller, class TypeCheckParams>
-	struct GetInfo: decltype(GetInfo_TCaller_helper<TCaller>(typename GetFunctionSignature<TypeCheckParams>::TFuncPtr(nullptr)))
+	struct GetInfo: decltype(GetInfo_TCaller_helper<TCaller>(typename GetFunctionSignature<TypeCheckParams>::FuncPtr(nullptr)))
 	{
 	};
 
@@ -191,7 +191,7 @@ public:
 	void AddHandlerName(event_name_arg_t name, THandlerProc handler_proc, const void* tag = nullptr, bool skip_type_handler = false)
 	{
 		using TInfo = GetInfo<Info_CallerArgs,TypeCheckParams>;
-		static_assert(Check_is_signame_and_handler_describe_same_call_signatures(typename GetFunctionSignature<THandlerProc>::TFuncPtr{}, typename GetFunctionSignature< decltype(&decltype(TInfo::Caller::invoke)::operator()) >::TFuncPtr{}), "TypeCheckParams and THandlerProc signatures not match");
+		static_assert(Check_is_signame_and_handler_describe_same_call_signatures(typename GetFunctionSignature<THandlerProc>::FuncPtr{}, typename GetFunctionSignature< decltype(&decltype(TInfo::Caller::invoke)::operator()) >::FuncPtr{}), "TypeCheckParams and THandlerProc signatures not match");
 
 		const Key key{std::move(name),TInfo::HandlerTypeIndex()};
 		AddHandlerProc<TInfo>(m_name_procs, key, std::forward<THandlerProc>(handler_proc), tag, skip_type_handler);
@@ -201,7 +201,7 @@ public:
 	void AddHandlerType(THandlerProc handler_proc, const void* tag = nullptr, bool skip_type_handler = false)
 	{
 		using TInfo = GetInfo<Info_CallerNameArgs,TypeCheckParams>;
-		static_assert(Check_is_signame_and_handler_describe_same_call_signatures(typename GetFunctionSignature<THandlerProc>::TFuncPtr{}, typename GetFunctionSignature< decltype(&decltype(TInfo::Caller::invoke)::operator()) >::TFuncPtr{}), "TypeCheckParams and THandlerProc signatures not match");
+		static_assert(Check_is_signame_and_handler_describe_same_call_signatures(typename GetFunctionSignature<THandlerProc>::FuncPtr{}, typename GetFunctionSignature< decltype(&decltype(TInfo::Caller::invoke)::operator()) >::FuncPtr{}), "TypeCheckParams and THandlerProc signatures not match");
 		auto key{TInfo::HandlerTypeIndex()};
 		AddHandlerProc<TInfo>(m_type_procs, key, std::forward<THandlerProc>(handler_proc), tag, skip_type_handler);
 	}
@@ -210,7 +210,7 @@ public:
 	template<class THandlerProc>
 	void AddName(event_name_arg_t name, THandlerProc handler_proc, const void* tag = nullptr, bool skip_type_handler = false)
 	{
- 		AddHandlerName<typename GetFunctionSignature<THandlerProc>::TFuncPtr, THandlerProc>(name, std::forward<THandlerProc>(handler_proc), tag, skip_type_handler);
+ 		AddHandlerName<typename GetFunctionSignature<THandlerProc>::FuncPtr, THandlerProc>(name, std::forward<THandlerProc>(handler_proc), tag, skip_type_handler);
 	}
 
 	template<class TypeCheckParams>

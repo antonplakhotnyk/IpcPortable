@@ -49,20 +49,20 @@ bool MAssIpc_DataStream::CheckAssert(bool assert)
 	return assert;
 }
 
-void MAssIpc_DataStream::WriteRawData(const uint8_t* data, MAssIpc_Data::TPacketSize len)
+void MAssIpc_DataStream::WriteRawData(const uint8_t* data, MAssIpc_Data::PacketSize len)
 {
 	uint8_t* bytes = WriteRawData(len);
 	if( bytes )
 		memcpy(bytes, data, len);
 }
 
-uint8_t* MAssIpc_DataStream::WriteRawData(MAssIpc_Data::TPacketSize len)
+uint8_t* MAssIpc_DataStream::WriteRawData(MAssIpc_Data::PacketSize len)
 {
 	uint8_t* bytes = nullptr;
 	if( m_write )
 	{
-		MAssIpc_Data::TPacketSize size = m_write->Size();
-		mass_return_x_if_equal((m_write_pos<(std::numeric_limits<MAssIpc_Data::TPacketSize>::max()-len))&&(size < m_write_pos+len), true, nullptr);
+		MAssIpc_Data::PacketSize size = m_write->Size();
+		mass_return_x_if_equal((m_write_pos<(std::numeric_limits<MAssIpc_Data::PacketSize>::max()-len))&&(size < m_write_pos+len), true, nullptr);
 
 		bytes = m_write->Data()+m_write_pos;
 	}
@@ -72,7 +72,7 @@ uint8_t* MAssIpc_DataStream::WriteRawData(MAssIpc_Data::TPacketSize len)
 	return bytes;
 }
 
-const uint8_t* MAssIpc_DataStream::ReadRawData(MAssIpc_Data::TPacketSize len)
+const uint8_t* MAssIpc_DataStream::ReadRawData(MAssIpc_Data::PacketSize len)
 {
 	mass_return_x_if_equal(IsReadAvailable(len), false, nullptr);
 	const uint8_t* pos = m_read->Data()+m_read_pos;
@@ -80,7 +80,7 @@ const uint8_t* MAssIpc_DataStream::ReadRawData(MAssIpc_Data::TPacketSize len)
 	return pos;
 }
 
-void MAssIpc_DataStream::ReadRawData(uint8_t* data, MAssIpc_Data::TPacketSize len)
+void MAssIpc_DataStream::ReadRawData(uint8_t* data, MAssIpc_Data::PacketSize len)
 {
 	const uint8_t* pos = ReadRawData(len);
 	if( pos )
@@ -89,7 +89,7 @@ void MAssIpc_DataStream::ReadRawData(uint8_t* data, MAssIpc_Data::TPacketSize le
 		memset(data, 0, len);
 }
 
-bool MAssIpc_DataStream::IsReadAvailable(MAssIpc_Data::TPacketSize size)
+bool MAssIpc_DataStream::IsReadAvailable(MAssIpc_Data::PacketSize size)
 {
 	if( m_read)
 	{
@@ -100,21 +100,21 @@ bool MAssIpc_DataStream::IsReadAvailable(MAssIpc_Data::TPacketSize size)
 	return false;
 }
 
-MAssIpc_Data::TPacketSize MAssIpc_DataStream::GetWritePos()
+MAssIpc_Data::PacketSize MAssIpc_DataStream::GetWritePos()
 {
 	return m_write_pos;
 }
 
 //-------------------------------------------------------
 
-void MAssIpc_DataStream::ReadRawData(char* data, MAssIpc_Data::TPacketSize len)
+void MAssIpc_DataStream::ReadRawData(char* data, MAssIpc_Data::PacketSize len)
 {
 	uint8_t* u8_data = reinterpret_cast<uint8_t*>(data);
 	static_assert(sizeof(*u8_data)==sizeof(*data), "must be same size");
 	ReadRawData(u8_data, len);
 }
 
-const char* MAssIpc_DataStream::ReadRawDataChar(MAssIpc_Data::TPacketSize len)
+const char* MAssIpc_DataStream::ReadRawDataChar(MAssIpc_Data::PacketSize len)
 {
 	const uint8_t* u8_data = ReadRawData(len);
 	const char* data = reinterpret_cast<const char*>(u8_data);
@@ -122,7 +122,7 @@ const char* MAssIpc_DataStream::ReadRawDataChar(MAssIpc_Data::TPacketSize len)
 	return data;
 }
 
-void MAssIpc_DataStream::WriteRawData(const char* data, MAssIpc_Data::TPacketSize len)
+void MAssIpc_DataStream::WriteRawData(const char* data, MAssIpc_Data::PacketSize len)
 {
 	const uint8_t* u8_data = reinterpret_cast<const uint8_t*>(data);
 	static_assert(sizeof(*u8_data)==sizeof(*data), "must be same size");
@@ -295,7 +295,7 @@ MAssIpc_DataStream& operator>>(MAssIpc_DataStream& stream, std::string& v)
 MAssIpc_DataStream& operator<<(MAssIpc_DataStream& stream, const MAssIpcCall_EnumerateData& v)
 {
 	stream<<uint32_t(v.size());
-	for( MAssIpc_Data::TPacketSize i = 0; i<v.size(); i++ )
+	for( MAssIpc_Data::PacketSize i = 0; i<v.size(); i++ )
 		stream<<v[i].name<<v[i].return_type<<v[i].params_types<<v[i].comment;
 	return stream;
 }
@@ -305,7 +305,7 @@ MAssIpc_DataStream& operator>>(MAssIpc_DataStream& stream, MAssIpcCall_Enumerate
 	uint32_t size=0;
 	stream>>size;
 	v.resize(size);
-	for( MAssIpc_Data::TPacketSize i = 0; i<v.size(); i++ )
+	for( MAssIpc_Data::PacketSize i = 0; i<v.size(); i++ )
 		stream>>v[i].name>>v[i].return_type>>v[i].params_types>>v[i].comment;
 	return stream;
 }

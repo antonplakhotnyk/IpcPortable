@@ -2,7 +2,7 @@
 #include "MAssIpc_Macros.h"
 #include "MAssIpc_Internals.h"
 
-namespace MAssIpcCallInternal
+namespace MAssIpcImpl
 {
 
 TransportProxy::TransportProxy(const std::weak_ptr<MAssIpc_TransportCopy>& transport)
@@ -10,7 +10,7 @@ TransportProxy::TransportProxy(const std::weak_ptr<MAssIpc_TransportCopy>& trans
 {
 }
 
-std::unique_ptr<MAssIpc_Data> TransportProxy::Create(MAssIpc_Data::TPacketSize size)
+std::unique_ptr<MAssIpc_Data> TransportProxy::Create(MAssIpc_Data::PacketSize size)
 {
 	return std::unique_ptr<MAssIpc_Data>(std::make_unique<MAssIpcData_Vector>(size));
 }

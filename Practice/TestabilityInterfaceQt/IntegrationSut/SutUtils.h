@@ -7,35 +7,35 @@ class SutUtils: public Sut
 {
 private:
 
-	template<class TProcPtr, class THandlerClass, class THandlerThis, class TSigName, class TRet, class... TArgs>
-	static void BindHandlerImpl(const TSigName& handler_name, TProcPtr handler_proc, THandlerThis handler_this)
+	template<class TProcPtr, class THandlerClass, class THandlerThis, class SigName, class Ret, class... Args>
+	static void BindHandlerImpl(const SigName& handler_name, TProcPtr handler_proc, THandlerThis handler_this)
 	{
 		static_assert(std::is_member_function_pointer<TProcPtr>::value, "member function expected");
 		mass_return_if_equal(bool(handler_this), false);
 
 		THandlerClass* clear_handler_tag = handler_this;
 		MAssIpcCall& ipc = TestabilityGlobalQt::Ipc();
-		ipc.AddHandler(handler_name, std::function<TRet(typename std::remove_reference<typename std::remove_cv<TArgs>::type>::type ...)>([=](TArgs&& ... args)
+		ipc.AddHandler(handler_name, std::function<Ret(typename std::remove_reference<typename std::remove_cv<Args>::type>::type ...)>([=](Args&& ... args)
 		{
 			if( !bool(handler_this) )
-				return TRet();
-			return (handler_this->*handler_proc)(std::forward<TArgs>(args)...);
+				return Ret();
+			return (handler_this->*handler_proc)(std::forward<Args>(args)...);
 		}
 		), clear_handler_tag);
 	}
 
 protected:
 
-	template<class THandlerClass, class THandlerThis, class TSigName, class TRet, class... TArgs>
-	static void BindHandlerClass(const TSigName& handler_name, TRet(THandlerClass::* handler_proc)(TArgs... args), THandlerThis handler_this)
+	template<class THandlerClass, class THandlerThis, class SigName, class Ret, class... Args>
+	static void BindHandlerClass(const SigName& handler_name, Ret(THandlerClass::* handler_proc)(Args... args), THandlerThis handler_this)
 	{
-		BindHandlerImpl<decltype(handler_proc), THandlerClass, THandlerThis, TSigName, TRet, TArgs...>(handler_name, handler_proc, handler_this);
+		BindHandlerImpl<decltype(handler_proc), THandlerClass, THandlerThis, SigName, Ret, Args...>(handler_name, handler_proc, handler_this);
 	}
 
-	template<class THandlerClass, class THandlerThis, class TSigName, class TRet, class... TArgs>
-	static void BindHandlerClass(const TSigName& handler_name, TRet(THandlerClass::* handler_proc)(TArgs... args) const, THandlerThis handler_this)
+	template<class THandlerClass, class THandlerThis, class SigName, class Ret, class... Args>
+	static void BindHandlerClass(const SigName& handler_name, Ret(THandlerClass::* handler_proc)(Args... args) const, THandlerThis handler_this)
 	{
-		BindHandlerImpl<decltype(handler_proc), THandlerClass, THandlerThis, TSigName, TRet, TArgs...>(handler_name, handler_proc, handler_this);
+		BindHandlerImpl<decltype(handler_proc), THandlerClass, THandlerThis, SigName, Ret, Args...>(handler_name, handler_proc, handler_this);
 	}
 
 public:

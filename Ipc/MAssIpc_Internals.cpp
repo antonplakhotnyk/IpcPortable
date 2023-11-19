@@ -2,10 +2,10 @@
 #include "MAssIpc_Macros.h"
 
 
-namespace MAssIpcCallInternal
+namespace MAssIpcImpl
 {
 
-static std::unique_ptr<MAssIpc_Data> CreateDataBuffer(const std::weak_ptr<MAssIpc_TransportShare>& weak_transport, MAssIpc_Data::TPacketSize packet_size)
+static std::unique_ptr<MAssIpc_Data> CreateDataBuffer(const std::weak_ptr<MAssIpc_TransportShare>& weak_transport, MAssIpc_Data::PacketSize packet_size)
 {
 	auto transport = weak_transport.lock();
 	mass_return_x_if_equal(bool(transport), false, {});
@@ -13,9 +13,9 @@ static std::unique_ptr<MAssIpc_Data> CreateDataBuffer(const std::weak_ptr<MAssIp
 }
 
 MAssIpc_DataStream CreateDataStream(const std::weak_ptr<MAssIpc_TransportShare>& weak_transport, 
-														 MAssIpc_Data::TPacketSize no_header_size, 
+														 MAssIpc_Data::PacketSize no_header_size, 
 														 MAssIpc_PacketParser::PacketType pt, 
-														 MAssIpc_PacketParser::TCallId respond_id)
+														 MAssIpc_PacketParser::CallId respond_id)
 {
 	if( respond_id!=MAssIpc_PacketParser::c_invalid_id )
 	{
@@ -33,19 +33,19 @@ MAssIpc_DataStream CreateDataStream(const std::weak_ptr<MAssIpc_TransportShare>&
 
 
 MAssIpc_DataStream CreateDataStreamInplace(std::unique_ptr<MAssIpc_Data> inplace_send_buffer,
-											  MAssIpc_Data::TPacketSize no_header_size,
+											  MAssIpc_Data::PacketSize no_header_size,
 											  MAssIpc_PacketParser::PacketType pt,
-											  MAssIpc_PacketParser::TCallId respond_id)
+											  MAssIpc_PacketParser::CallId respond_id)
 {
-	MAssIpc_Data::TPacketSize packet_size = no_header_size+MAssIpc_PacketParser::c_net_call_packet_header_size;
+	MAssIpc_Data::PacketSize packet_size = no_header_size+MAssIpc_PacketParser::c_net_call_packet_header_size;
 	mass_return_x_if_equal(inplace_send_buffer->Size() < packet_size, true, {});
 	MAssIpc_DataStream result(std::move(inplace_send_buffer));
-	MAssIpcCallInternal::MAssIpc_PacketParser::PacketHeaderWrite(result, no_header_size, MAssIpcCallInternal::MAssIpc_PacketParser::PacketType::pt_call, respond_id);
+	MAssIpcImpl::MAssIpc_PacketParser::PacketHeaderWrite(result, no_header_size, MAssIpcImpl::MAssIpc_PacketParser::PacketType::pt_call, respond_id);
 	return result;
 }
 
 std::unique_ptr<const MAssIpc_Data> SerializeReturn(const std::weak_ptr<MAssIpc_TransportShare>& transport,
-												   MAssIpc_PacketParser::TCallId respond_id)
+												   MAssIpc_PacketParser::CallId respond_id)
 {
 	if( respond_id == MAssIpc_PacketParser::c_invalid_id )
 		return {};
@@ -65,7 +65,7 @@ void ResultJob::Invoke(const std::weak_ptr<MAssIpc_TransportShare>& transport, s
 
 //-------------------------------------------------------
 
-MAssIpc_PacketParser::TCallId CallJob::CalcRespondId(bool send_return, MAssIpc_PacketParser::TCallId id)
+MAssIpc_PacketParser::CallId CallJob::CalcRespondId(bool send_return, MAssIpc_PacketParser::CallId id)
 {
 	return (send_return ? id : MAssIpc_PacketParser::c_invalid_id);
 }
@@ -77,7 +77,7 @@ void CallJob::Invoke()
 
 void CallJob::Invoke(const std::weak_ptr<MAssIpc_TransportShare>& transport, const std::weak_ptr<MAssIpc_Transthread>& inter_thread,
 					 MAssIpc_DataStream& call_info_data, std::shared_ptr<const InvokeRemoteBase> invoke_base,
-					 MAssIpc_PacketParser::TCallId respond_id)
+					 MAssIpc_PacketParser::CallId respond_id)
 {
 	auto result = invoke_base->Invoke(transport, respond_id, call_info_data);
 	
@@ -117,7 +117,7 @@ MAssIpcCall_EnumerateData ProcMap::EnumerateHandlers() const
 
 	for( const auto& it : m_name_procs)
 		if( auto invoke_base = it.second.call_info->IsInvokable() )
-			res.push_back({it.first.name.Std_String(), invoke_base->GetSignature_RetType().Std_String(), it.first.params_type.Std_String(), it.second.comment});
+			res.push_back({it.first.name.Std_String(), invoke_base->GetSignature_ReturnType().Std_String(), it.first.params_type.Std_String(), it.second.comment});
 
 	return res;
 }
@@ -200,6 +200,6 @@ std::shared_ptr<const ErrorOccured> ProcMap::GetErrorHandler() const
 	return m_OnInvalidRemoteCall;
 }
 
-}// namespace MAssIpcCallInternal;
+}// namespace MAssIpcImpl;
 
 

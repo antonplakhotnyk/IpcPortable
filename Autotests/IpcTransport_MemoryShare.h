@@ -28,9 +28,9 @@ public:
 
 	private:
 
-		MAssIpc_Data::TPacketSize Size() const override
+		MAssIpc_Data::PacketSize Size() const override
 		{
-			return MAssIpc_Data::TPacketSize(m_data.size());
+			return MAssIpc_Data::PacketSize(m_data.size());
 		}
 
 		uint8_t* Data() override
@@ -81,7 +81,7 @@ public:
 		return !m_read->cancel_wait_respond;
 	}
 
-	std::unique_ptr<MAssIpc_Data> Create(MAssIpc_Data::TPacketSize size) override
+	std::unique_ptr<MAssIpc_Data> Create(MAssIpc_Data::PacketSize size) override
 	{
 		return std::unique_ptr<MAssIpc_Data>(new MemoryPacket(size));
 	}

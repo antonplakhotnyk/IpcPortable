@@ -80,9 +80,9 @@ public:
 		{
 		public:
 			Check(bool interpret_as_cancel):interpret_as_cancel(interpret_as_cancel){};
-			virtual ~Check() = default;
+			virtual ~Check()=default;
 			virtual bool IsTriggeredLocked() const = 0;
-			virtual void ResetLocked(ResetType rt) = 0;
+			virtual void ResetLocked(ResetType rt)=0;
 			virtual const void* GetFilterId() const = 0;
 			
 			const bool interpret_as_cancel;

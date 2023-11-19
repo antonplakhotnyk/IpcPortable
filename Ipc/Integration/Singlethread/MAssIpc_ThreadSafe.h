@@ -18,7 +18,7 @@ public:
 
 	struct defer_lock_t
 	{ // indicates defer lock
-		explicit defer_lock_t() = default;
+		explicit defer_lock_t()=default;
 	};
 
 

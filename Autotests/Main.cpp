@@ -32,7 +32,7 @@ static constexpr const char* main_mark_before_include_functional_is_bind_express
 template<bool expect_t, class TDelegate>
 void AddHandler(const TDelegate& del)
 {
-	static_assert(MAssIpcCallInternal::Check_is_bind_expression<TDelegate>::value==expect_t, "bint NOT match");
+	static_assert(MAssIpcImpl::Check_is_bind_expression<TDelegate>::value==expect_t, "bint NOT match");
 }
 void before_include_functional_is_bind_expression_CheckCompile()
 {
@@ -56,7 +56,7 @@ static constexpr const char* main_mark_before_include_functional_is_bind_express
 #include "IpcTransthread_Memory.h"
 #include "TaskRunnerThread.h"
 
-// CheckCompilation_text_mark_begin
+class CheckCompilation_text_mark_begin;
 
 void CheckCompilation()
 { 
@@ -120,8 +120,8 @@ void CheckCompilation()
 	{
 		struct Handler
 		{
-			Handler() = default;
-			Handler(Handler&& other) = default;
+			Handler()=default;
+			Handler(Handler&& other)=default;
 
 			Handler(const Handler&) = delete;
 			Handler& operator= (const Handler&) = delete;
@@ -141,8 +141,8 @@ void CheckCompilation()
 	{
 		struct Handler
 		{
-			Handler() = default;
-			Handler(Handler&& other) = default;
+			Handler()=default;
+			Handler(Handler&& other)=default;
 
 			Handler(const Handler&) = delete;
 			Handler& operator= (const Handler&) = delete;
@@ -162,8 +162,8 @@ void CheckCompilation()
 	{
 		struct Handler
 		{
-			Handler() = default;
-			Handler(Handler&& other) = default;
+			Handler()=default;
+			Handler(Handler&& other)=default;
 
 			Handler(const Handler&) = delete;
 			Handler& operator= (const Handler&) = delete;
@@ -195,10 +195,10 @@ void CheckCompilation()
 		constexpr const MAssIpcCall::SigName<decltype(&Handler::StaticFunc)> sig_4 = {"sig_4"};
 		constexpr const MAssIpcCall::SigName<decltype(lambda_proc)> sig_5 = {"sig_5"};
 
-		static_assert(std::is_same<decltype(sig_1)::SigProc, decltype(sig_2)::SigProc>::value, "must be same type");
-		static_assert(std::is_same<decltype(sig_1)::SigProc, decltype(sig_3)::SigProc>::value, "must be same type");
-		static_assert(std::is_same<decltype(sig_1)::SigProc, decltype(sig_4)::SigProc>::value, "must be same type");
-		static_assert(std::is_same<decltype(sig_1)::SigProc, decltype(sig_5)::SigProc>::value, "must be same type");
+		static_assert(std::is_same<decltype(sig_1)::Signature, decltype(sig_2)::Signature>::value, "must be same type");
+		static_assert(std::is_same<decltype(sig_1)::Signature, decltype(sig_3)::Signature>::value, "must be same type");
+		static_assert(std::is_same<decltype(sig_1)::Signature, decltype(sig_4)::Signature>::value, "must be same type");
+		static_assert(std::is_same<decltype(sig_1)::Signature, decltype(sig_5)::Signature>::value, "must be same type");
 
 		auto call_info1 = call.AddCallInfo(sig_1);
 		auto call_info2 = call.AddHandler(sig_1, std::function<decltype(Handler::StaticFunc)>(&Handler::StaticFunc), {}, {}, {});
@@ -206,7 +206,7 @@ void CheckCompilation()
 	}
 }
 
-// CheckCompilation_text_mark_end
+class CheckCompilation_text_mark_end;
 
 void CheckAddHandler()
 {
@@ -272,7 +272,7 @@ class NoDefConstruct
 {
 public:
 	NoDefConstruct() = delete;
-	NoDefConstruct(const NoDefConstruct&) = default;
+	NoDefConstruct(const NoDefConstruct&)=default;
 	NoDefConstruct(uint32_t a)
 		:m_a(a)
 	{
@@ -656,8 +656,8 @@ public:
 constexpr const MAssIpcCall::SigName<std::string(std::string, uint32_t, double)> sig_Static_String_StringU32Double = {"Float_StringDouble"};
 constexpr const MAssIpcCall::SigName<decltype(&Static_String_StringU32Double)> sig2_Static_String_StringU32Double = {"Float_StringDouble"};
 constexpr const MAssIpcCall::SigName<decltype(&SigCheck::Static_String_StringU32Double)> sig3_Static_String_StringU32Double = {"Float_StringDouble"};
-static_assert(std::is_same<decltype(sig_Static_String_StringU32Double)::SigProc, decltype(sig2_Static_String_StringU32Double)::SigProc>::value, "must be same type");
-static_assert(std::is_same<decltype(sig_Static_String_StringU32Double)::SigProc, decltype(sig3_Static_String_StringU32Double)::SigProc>::value, "must be same type");
+static_assert(std::is_same<decltype(sig_Static_String_StringU32Double)::Signature, decltype(sig2_Static_String_StringU32Double)::Signature>::value, "must be same type");
+static_assert(std::is_same<decltype(sig_Static_String_StringU32Double)::Signature, decltype(sig3_Static_String_StringU32Double)::Signature>::value, "must be same type");
 
 void Main_IpcService(std::shared_ptr<IpcTransport_MemoryShare> transport_buffer)
 {
@@ -760,7 +760,7 @@ void ClientProc(uint8_t a, uint32_t b)
 //-------------------------------------------------------
 
 
-void StrProc(const MAssIpcCallInternal::MAssIpc_RawString& str)
+void StrProc(const MAssIpcImpl::MAssIpc_RawString& str)
 {
 }
 
