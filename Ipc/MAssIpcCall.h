@@ -43,26 +43,26 @@ private:
 		{
 		}
 
-		InvokeSetting(const MAssIpcImpl::MAssIpc_RawString& proc_name, std::unique_ptr<MAssIpc_Data> inplace_send_buffer)
+		InvokeSetting(const MAssIpcImpl::RawString& proc_name, std::unique_ptr<MAssIpc_Data> inplace_send_buffer)
 			:proc_name(proc_name)
 			, inplace_send_buffer(std::move(inplace_send_buffer))
 		{
 		}
 
-		InvokeSetting(const MAssIpcImpl::MAssIpc_RawString& proc_name, std::unique_ptr<MAssIpc_Data> inplace_send_buffer, ProcIn process_incoming_calls)
+		InvokeSetting(const MAssIpcImpl::RawString& proc_name, std::unique_ptr<MAssIpc_Data> inplace_send_buffer, ProcIn process_incoming_calls)
 			:proc_name(proc_name)
 			, inplace_send_buffer(std::move(inplace_send_buffer))
 			, process_incoming_calls(process_incoming_calls)
 		{
 		}
 
-		InvokeSetting(const MAssIpcImpl::MAssIpc_RawString& proc_name, ProcIn process_incoming_calls)
+		InvokeSetting(const MAssIpcImpl::RawString& proc_name, ProcIn process_incoming_calls)
 			:proc_name(proc_name)
 			, process_incoming_calls(process_incoming_calls)
 		{
 		}
 
-		MAssIpcImpl::MAssIpc_RawString proc_name;
+		MAssIpcImpl::RawString proc_name;
 		std::unique_ptr<MAssIpc_Data> inplace_send_buffer;
 		ProcIn process_incoming_calls = ProcIn::bydefault;
 	};
@@ -111,7 +111,7 @@ public:
             return {InvokeSetting{proc_name}};
         }
 
-        const MAssIpcImpl::MAssIpc_RawString proc_name;
+        const MAssIpcImpl::RawString proc_name;
     };
 
 public:
@@ -181,22 +181,22 @@ public:
 
 
 	template<class Ret, class... Args>
-	static MAssIpc_Data::PacketSize CalcCallSize(bool send_return, const MAssIpcImpl::MAssIpc_RawString& proc_name, const Args&... args);
+	static MAssIpc_Data::PacketSize CalcCallSize(bool send_return, const MAssIpcImpl::RawString& proc_name, const Args&... args);
 
 	template<class Delegate>
-	std::shared_ptr<const CallInfo> AddHandler(const MAssIpcImpl::MAssIpc_RawString& proc_name, Delegate&& del,
+	std::shared_ptr<const CallInfo> AddHandler(const MAssIpcImpl::RawString& proc_name, Delegate&& del,
 											   MAssIpc_TransthreadTarget::Id thread_id = MAssIpc_TransthreadTarget::CurrentThread());
 	template<class Delegate>
-	std::shared_ptr<const CallInfo> AddHandler(const MAssIpcImpl::MAssIpc_RawString& proc_name, Delegate&& del, const std::string& comment,
+	std::shared_ptr<const CallInfo> AddHandler(const MAssIpcImpl::RawString& proc_name, Delegate&& del, const std::string& comment,
 											   MAssIpc_TransthreadTarget::Id thread_id = MAssIpc_TransthreadTarget::CurrentThread());
 	template<class Delegate>
-	std::shared_ptr<const CallInfo> AddHandler(const MAssIpcImpl::MAssIpc_RawString& proc_name, Delegate&& del, const void* tag,
+	std::shared_ptr<const CallInfo> AddHandler(const MAssIpcImpl::RawString& proc_name, Delegate&& del, const void* tag,
 											   MAssIpc_TransthreadTarget::Id thread_id, const std::string& comment = {});
 	template<class Delegate>
-	std::shared_ptr<const CallInfo> AddHandler(const MAssIpcImpl::MAssIpc_RawString& proc_name, Delegate&& del, const void* tag);
+	std::shared_ptr<const CallInfo> AddHandler(const MAssIpcImpl::RawString& proc_name, Delegate&& del, const void* tag);
 
 	template<class Delegate>
-	std::shared_ptr<const CallInfo> AddHandler(const MAssIpcImpl::MAssIpc_RawString& proc_name, Delegate&& del, const std::string& comment,
+	std::shared_ptr<const CallInfo> AddHandler(const MAssIpcImpl::RawString& proc_name, Delegate&& del, const std::string& comment,
 											   MAssIpc_TransthreadTarget::Id thread_id, const void* tag);// obsolete
 
 
@@ -253,10 +253,10 @@ public:
 private:
 
 	template<class Ret, class... Args>
-	static void SerializeCallSignature(MAssIpc_DataStream& call_info, const MAssIpcImpl::MAssIpc_RawString& proc_name, bool send_return);
+	static void SerializeCallSignature(MAssIpc_DataStream& call_info, const MAssIpcImpl::RawString& proc_name, bool send_return);
 
 	template<class Ret, class... Args>
-	static void SerializeCall(MAssIpc_DataStream& call_info, const MAssIpcImpl::MAssIpc_RawString& proc_name, bool send_return, const Args&... args);
+	static void SerializeCall(MAssIpc_DataStream& call_info, const MAssIpcImpl::RawString& proc_name, bool send_return, const Args&... args);
 
 	template<class Ret, class... Args>
 	Ret WaitInvokeRetUnified(InvokeSetting& settings, const Args&... args) const;
@@ -314,10 +314,10 @@ private:
 
 	struct DeserializedFindCallInfo
 	{
-		MAssIpcImpl::MAssIpc_RawString name;
+		MAssIpcImpl::RawString name;
 		bool send_return;
-		MAssIpcImpl::MAssIpc_RawString return_type;
-		MAssIpcImpl::MAssIpc_RawString params_type;
+		MAssIpcImpl::RawString return_type;
+		MAssIpcImpl::RawString params_type;
 	};
 	static DeserializedFindCallInfo DeserializeNameSignature(MAssIpc_DataStream& call_info);
 
@@ -482,33 +482,33 @@ inline bool MAssIpcCall::IsProcessIncomingCalls(ProcIn process_incoming_calls) c
 //-------------------------------------------------------
 
 template<class Delegate>
-std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssIpcImpl::MAssIpc_RawString& proc_name, Delegate&& del, MAssIpc_TransthreadTarget::Id thread_id)
+std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssIpcImpl::RawString& proc_name, Delegate&& del, MAssIpc_TransthreadTarget::Id thread_id)
 {
 	return AddHandler(proc_name, std::forward<Delegate>(del), nullptr, thread_id, std::string());
 }
 
 template<class Delegate>
-std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssIpcImpl::MAssIpc_RawString& proc_name, Delegate&& del, const std::string& comment,
+std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssIpcImpl::RawString& proc_name, Delegate&& del, const std::string& comment,
 							 MAssIpc_TransthreadTarget::Id thread_id)
 {
 	return AddHandler(proc_name, std::forward<Delegate>(del), nullptr, thread_id, comment);
 }
 
 template<class Delegate>
-std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssIpcImpl::MAssIpc_RawString& proc_name, Delegate&& del, const void* tag)
+std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssIpcImpl::RawString& proc_name, Delegate&& del, const void* tag)
 {
 	return AddHandler(proc_name, std::forward<Delegate>(del), tag, MAssIpc_TransthreadTarget::CurrentThread(), std::string());
 }
 
 template<class Delegate>
-std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssIpcImpl::MAssIpc_RawString& proc_name, Delegate&& del, const std::string& comment,
+std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssIpcImpl::RawString& proc_name, Delegate&& del, const std::string& comment,
 										   MAssIpc_TransthreadTarget::Id thread_id, const void* tag)
 {
 	return AddHandler(proc_name, std::forward<Delegate>(del), tag, thread_id, comment);
 }
 
 template<class Delegate>
-std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssIpcImpl::MAssIpc_RawString& proc_name, Delegate&& del, const void* tag,
+std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssIpcImpl::RawString& proc_name, Delegate&& del, const void* tag,
 						 MAssIpc_TransthreadTarget::Id thread_id, const std::string& comment)
 {
 	static_assert(!MAssIpcImpl::Check_is_bind_expression<Delegate>::value, "can not deduce signature from bind_expression, use std::function<>(std::bind())");
@@ -518,7 +518,7 @@ std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssI
 }
 
 template<class Ret, class... Args>
-MAssIpc_Data::PacketSize MAssIpcCall::CalcCallSize(bool send_return, const MAssIpcImpl::MAssIpc_RawString& proc_name, const Args&... args)
+MAssIpc_Data::PacketSize MAssIpcCall::CalcCallSize(bool send_return, const MAssIpcImpl::RawString& proc_name, const Args&... args)
 {
 	MAssIpc_DataStream measure_size;
 	SerializeCall<Ret>(measure_size, proc_name, send_return, args...);
@@ -526,12 +526,12 @@ MAssIpc_Data::PacketSize MAssIpcCall::CalcCallSize(bool send_return, const MAssI
 }
 
 template<class Ret, class... Args>
-void MAssIpcCall::SerializeCallSignature(MAssIpc_DataStream& call_info, const MAssIpcImpl::MAssIpc_RawString& proc_name, bool send_return)
+void MAssIpcCall::SerializeCallSignature(MAssIpc_DataStream& call_info, const MAssIpcImpl::RawString& proc_name, bool send_return)
 {
 	// call_info<<proc_name<<send_return<<return_type<<params_type;
 
 	typedef Ret(*TreatProc)(Args...);
-	constexpr MAssIpcImpl::MAssIpc_RawString return_type(MAssIpcType<Ret>::NameValue(), MAssIpcType<Ret>::NameLength());
+	constexpr MAssIpcImpl::RawString return_type(MAssIpcType<Ret>::NameValue(), MAssIpcType<Ret>::NameLength());
 
 	proc_name.Write(call_info);
 	call_info<<send_return;
@@ -548,7 +548,7 @@ void MAssIpcCall::SerializeCallSignature(MAssIpc_DataStream& call_info, const MA
 }
 
 template<class Ret, class... Args>
-void MAssIpcCall::SerializeCall(MAssIpc_DataStream& call_info, const MAssIpcImpl::MAssIpc_RawString& proc_name, bool send_return, const Args&... args)
+void MAssIpcCall::SerializeCall(MAssIpc_DataStream& call_info, const MAssIpcImpl::RawString& proc_name, bool send_return, const Args&... args)
 {
 	MAssIpcCall::SerializeCallSignature<Ret, Args...>(call_info, proc_name, send_return);
 	MAssIpcImpl::SerializeArgs(call_info, args...);

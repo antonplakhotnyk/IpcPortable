@@ -96,7 +96,7 @@ void CallJob::Invoke(const std::weak_ptr<MAssIpc_TransportShare>& transport, con
 
 //-------------------------------------------------------
 
-ProcMap::FindCallInfoRes ProcMap::FindCallInfo(const MAssIpc_RawString& proc_name, const MAssIpc_RawString& params_type) const
+ProcMap::FindCallInfoRes ProcMap::FindCallInfo(const RawString& proc_name, const RawString& params_type) const
 {
 	MAssIpc_ThreadSafe::unique_lock<MAssIpc_ThreadSafe::mutex> lock(m_lock);
 
@@ -122,7 +122,7 @@ MAssIpcCall_EnumerateData ProcMap::EnumerateHandlers() const
 	return res;
 }
 
-std::shared_ptr<const CallInfo> ProcMap::AddProcSignature(const MAssIpc_RawString& proc_name, std::string params_type, 
+std::shared_ptr<const CallInfo> ProcMap::AddProcSignature(const RawString& proc_name, std::string params_type, 
 														  std::unique_ptr<InvokeRemoteBase> invoke, const std::string& comment)
 {
 	MAssIpc_ThreadSafe::unique_lock<MAssIpc_ThreadSafe::mutex> lock(m_lock);

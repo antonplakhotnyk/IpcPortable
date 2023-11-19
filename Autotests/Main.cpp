@@ -760,7 +760,7 @@ void ClientProc(uint8_t a, uint32_t b)
 //-------------------------------------------------------
 
 
-void StrProc(const MAssIpcImpl::MAssIpc_RawString& str)
+void StrProc(const MAssIpcImpl::RawString& str)
 {
 }
 

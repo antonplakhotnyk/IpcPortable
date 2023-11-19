@@ -56,10 +56,10 @@ MAssIpcCall::DeserializedFindCallInfo MAssIpcCall::DeserializeNameSignature(MAss
 	bool send_return = false;
 
 	// read sequence defined by packet format
-	MAssIpc_RawString name			= MAssIpc_RawString::Read(call_info);
+	RawString name			= RawString::Read(call_info);
 	call_info>>send_return;
-	MAssIpc_RawString return_type	= MAssIpc_RawString::Read(call_info);
-	MAssIpc_RawString params_type	= MAssIpc_RawString::Read(call_info);
+	RawString return_type	= RawString::Read(call_info);
+	RawString params_type	= RawString::Read(call_info);
 
 	return {name, send_return, return_type, params_type};
 }
@@ -119,7 +119,7 @@ MAssIpcCall::Internals::AnalizeInvokeDataRes MAssIpcCall::Internals::AnalizeInvo
 
 	if( find_call_info.return_type.Length()!=0 )
 	{
-		const MAssIpc_RawString return_type_call(find_res.invoke_base->GetSignature_ReturnType());
+		const RawString return_type_call(find_res.invoke_base->GetSignature_ReturnType());
 		if( find_call_info.return_type != return_type_call )
 			return ReportError_FindCallInfo(find_call_info, ErrorType::no_matching_call_return_type, find_res, inter_thread_nullable);
 	}

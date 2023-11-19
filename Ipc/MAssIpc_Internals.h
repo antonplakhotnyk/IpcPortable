@@ -176,14 +176,14 @@ MAssIpc_DataStream CreateDataStreamInplace(std::unique_ptr<MAssIpc_Data> inplace
 //-------------------------------------------------------
 
 template<typename Signature, typename = void>
-struct FuncSigSilent
+struct FuncSigQuiet
 {
 	using IsAssert = std::true_type;
 	using IsHandlerType = std::false_type;
 };
 
 template<typename Ret, typename... Args>
-struct FuncSigSilent< Ret(Args...)>
+struct FuncSigQuiet<Ret(Args...)>
 {
 	using IsAssert = std::false_type;
 
@@ -193,40 +193,40 @@ struct FuncSigSilent< Ret(Args...)>
 };
 
 template<typename Ret, typename... Args>
-struct FuncSigSilent<Ret(*)(Args...)>: public FuncSigSilent<Ret(Args...)>
+struct FuncSigQuiet<Ret(*)(Args...)>: public FuncSigQuiet<Ret(Args...)>
 {
 	using IsHandlerType = std::true_type;
 };
 
 template<typename Ret, typename... Args>
-struct FuncSigSilent<Ret(*const)(Args...)>: public FuncSigSilent<Ret(Args...)>
+struct FuncSigQuiet<Ret(*const)(Args...)>: public FuncSigQuiet<Ret(Args...)>
 {
 	using IsHandlerType=std::true_type;
 };
 
 template<typename Class, typename Ret, typename... Args>
-struct FuncSigSilent<Ret(Class::*)(Args...)>: public FuncSigSilent<Ret(Args...)>
+struct FuncSigQuiet<Ret(Class::*)(Args...)>: public FuncSigQuiet<Ret(Args...)>
 {
 	using IsHandlerType = std::false_type;
 };
 
 template<typename Class, typename Ret, typename... Args>
-struct FuncSigSilent<Ret(Class::*)(Args...) const>: public FuncSigSilent<Ret(Args...)>
+struct FuncSigQuiet<Ret(Class::*)(Args...) const>: public FuncSigQuiet<Ret(Args...)>
 {
 	using IsHandlerType = std::false_type;
 };
 
 template<typename Callable>
-struct FuncSigSilent<Callable, typename std::enable_if<std::is_member_function_pointer<decltype(&std::decay<Callable>::type::operator())>::value>::type>
-	: public FuncSigSilent<decltype(&std::decay<Callable>::type::operator())>
+struct FuncSigQuiet<Callable, typename std::enable_if<std::is_member_function_pointer<decltype(&std::decay<Callable>::type::operator())>::value>::type>
+	: public FuncSigQuiet<decltype(&std::decay<Callable>::type::operator())>
 {
 	using IsHandlerType = std::true_type;
 };
 
 template<typename Signature>
-struct FuncSig: FuncSigSilent<Signature>
+struct FuncSig: FuncSigQuiet<Signature>
 {
-	static_assert(!FuncSigSilent<Signature>::IsAssert::value, "specialization not found, Signature must be member or static function pointer like decltype(&Cls::Proc) or function like Ret(T1,T2) or callable with operator()");
+	static_assert(!FuncSigQuiet<Signature>::IsAssert::value, "specialization not found, Signature must be member or static function pointer like decltype(&Cls::Proc) or function like Ret(T1,T2) or callable with operator()");
 };
 
 template<class THandler>
@@ -248,7 +248,7 @@ class IsConvertible: public decltype(ConversionAvailable<From, To>(0)){};
 struct IsCallable
 {
 	template<class Delegate>
-	using FuncPtr = typename FuncSigSilent<Delegate>::FuncPtr;
+	using FuncPtr = typename FuncSigQuiet<Delegate>::FuncPtr;
 
 	template<class Delegate>
 	using IsPointer = std::is_convertible<Delegate, FuncPtr<Delegate>>;
@@ -347,13 +347,13 @@ public:
 	virtual std::unique_ptr<const MAssIpc_Data> Invoke(const std::weak_ptr<MAssIpc_TransportShare>& transport,
 													   MAssIpc_PacketParser::CallId respond_id,
 													   MAssIpc_DataStream& params) const = 0;
-	virtual MAssIpc_RawString GetSignature_ReturnType() const = 0;
+	virtual RawString GetSignature_ReturnType() const = 0;
 };
 
 class CallInfoImpl: public CallInfo
 {
 public:
-	CallInfoImpl(const MAssIpc_RawString& proc_name, std::string params_type)
+	CallInfoImpl(const RawString& proc_name, std::string params_type)
 		: m_name(proc_name.Std_String())
 		, m_params_type(std::move(params_type))
 	{
@@ -362,8 +362,8 @@ public:
 
 	struct SignatureKey
 	{
-		MAssIpc_RawString name;
-		MAssIpc_RawString params_type;
+		RawString name;
+		RawString params_type;
 
 		bool operator<(const SignatureKey& other) const
 		{
@@ -636,9 +636,9 @@ public:
 		std::shared_ptr<const ErrorOccured>			on_invalid_remote_call;
 	};
 
-	FindCallInfoRes FindCallInfo(const MAssIpc_RawString& proc_name, const MAssIpc_RawString& params_type) const;
+	FindCallInfoRes FindCallInfo(const RawString& proc_name, const RawString& params_type) const;
 	MAssIpcCall_EnumerateData EnumerateHandlers() const;
-	std::shared_ptr<const CallInfo> AddProcSignature(const MAssIpc_RawString& proc_name, std::string params_type, std::unique_ptr<InvokeRemoteBase> invoke, const std::string& comment);
+	std::shared_ptr<const CallInfo> AddProcSignature(const RawString& proc_name, std::string params_type, std::unique_ptr<InvokeRemoteBase> invoke, const std::string& comment);
 	void AddAllProcs(const ProcMap& other);
 	void ClearAllProcs();
 	void ClearProcsWithTag(const void* tag);
@@ -858,7 +858,7 @@ struct ParamsTypeHolder_string
 		m_value.reserve(reserve_size);
 	}
 
-	void AddType(const MAssIpc_RawString& string)
+	void AddType(const RawString& string)
 	{
 		m_value.append(string.C_String(), string.Length());
 		m_value.append(&separator, sizeof(separator));
@@ -870,7 +870,7 @@ struct ParamsTypeHolder_string
 
 struct ParamsTypeHolder_MAssIpcCallDataStream
 {
-	void AddType(const MAssIpc_RawString& string)
+	void AddType(const RawString& string)
 	{
 		m_value.WriteRawData(string.C_String(), string.Length());
 		m_value.WriteRawData(&separator, sizeof(separator));
@@ -881,7 +881,7 @@ struct ParamsTypeHolder_MAssIpcCallDataStream
 
 struct ParamsTypeHolder_PacketSize
 {
-	void AddType(const MAssIpc_RawString& string)
+	void AddType(const RawString& string)
 	{
 		m_size += string.Length();
 		m_size += sizeof(separator);
@@ -897,7 +897,7 @@ struct ProcSignature<Ret(*)(Args... args)>
 	template<class ParamsTypeHolder_T>
 	static inline void GetParams(ParamsTypeHolder_T* params_type)
 	{
-		int unpack[]{0,((params_type->AddType(MAssIpc_RawString(MAssIpcType<Args>::NameValue(), MAssIpcType<Args>::NameLength()))
+		int unpack[]{0,((params_type->AddType(RawString(MAssIpcType<Args>::NameValue(), MAssIpcType<Args>::NameLength()))
 #if !(_MSC_VER==1916)// Visual Studio 2017 compiler crashes trying compile this
 						 , CheckSeparatorInName<MAssIpcType<Args>::name_value>()
 #endif
@@ -964,7 +964,7 @@ private:
 		return IsCallable::Convertible(m_del);
 	}
 
-	MAssIpc_RawString GetSignature_ReturnType() const override
+	RawString GetSignature_ReturnType() const override
 	{
 		return {MAssIpcType<Ret>::NameValue(), MAssIpcType<Ret>::NameLength()};
 	}

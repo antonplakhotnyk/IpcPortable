@@ -6,12 +6,12 @@
 namespace MAssIpcImpl
 {
 
-class MAssIpc_RawString
+class RawString
 {
 public:
 
 	template<size_t N>
-	constexpr MAssIpc_RawString(const char(&str)[N])
+	constexpr RawString(const char(&str)[N])
 		:m_str(str)
 		, m_len(N-1)
 	{
@@ -19,25 +19,25 @@ public:
 	}
 
 	template<typename T, typename std::enable_if<!std::is_array<T>::value && std::is_convertible<T, const char*>::value, bool>::type = true>
-	MAssIpc_RawString(const T str)
-		:MAssIpc_RawString(str, ConvertCheckStrLen(strlen(str)))
+	RawString(const T str)
+		:RawString(str, ConvertCheckStrLen(strlen(str)))
 	{
 	}
 
-	MAssIpc_RawString(const std::string& str)
-		:MAssIpc_RawString(str.data(), ConvertCheckStrLen(str.length()))
+	RawString(const std::string& str)
+		:RawString(str.data(), ConvertCheckStrLen(str.length()))
 	{
 	}
 
-	constexpr MAssIpc_RawString(const char* str, MAssIpc_Data::PacketSize len)
+	constexpr RawString(const char* str, MAssIpc_Data::PacketSize len)
 		: m_str(str)
 		, m_len(len)
 	{
 	}
 
-	constexpr MAssIpc_RawString(const MAssIpc_RawString& other)=default;
+	constexpr RawString(const RawString& other)=default;
 
-	static MAssIpc_RawString Read(MAssIpc_DataStream& stream);
+	static RawString Read(MAssIpc_DataStream& stream);
 	void Write(MAssIpc_DataStream& stream) const;
 
 	constexpr const char* C_String() const
@@ -55,7 +55,7 @@ public:
 		return m_len;
 	}
 
-	inline bool operator== (const MAssIpc_RawString& other) const
+	inline bool operator== (const RawString& other) const
 	{
 		if( m_len != other.m_len )
 			return false;
@@ -63,12 +63,12 @@ public:
 		return memcmp(m_str, other.m_str, m_len)==0;
 	}
 
-	inline bool operator!= (const MAssIpc_RawString& other) const
+	inline bool operator!= (const RawString& other) const
 	{
 		return !(operator==)(other);
 	}
 
-	inline bool operator< (const MAssIpc_RawString& other) const
+	inline bool operator< (const RawString& other) const
 	{
 		return std::lexicographical_compare(m_str, m_str+m_len, other.m_str, other.m_str+other.m_len);
 	}
