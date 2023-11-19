@@ -198,6 +198,12 @@ struct FuncSigSilent<Ret(*)(Args...)>: public FuncSigSilent<Ret(Args...)>
 	using IsHandlerType = std::true_type;
 };
 
+template<typename Ret, typename... Args>
+struct FuncSigSilent<Ret(*const)(Args...)>: public FuncSigSilent<Ret(Args...)>
+{
+	using IsHandlerType=std::true_type;
+};
+
 template<typename Class, typename Ret, typename... Args>
 struct FuncSigSilent<Ret(Class::*)(Args...)>: public FuncSigSilent<Ret(Args...)>
 {
@@ -229,6 +235,7 @@ struct IsHandlerTypeCompatible: FuncSig<THandler>::IsHandlerType
 };
 
 //-------------------------------------------------------
+
 template<class From, class To>
 auto ConversionAvailable(int) -> decltype(To(std::declval<From>()), std::true_type{});
 
@@ -236,42 +243,25 @@ template<class, class>
 auto ConversionAvailable(...) -> std::false_type;
 
 template<class From, class To>
-class IsConvertible: public decltype(ConversionAvailable<From, To>(0))
-{
-};
+class IsConvertible: public decltype(ConversionAvailable<From, To>(0)){};
 
-
-template<typename T>
-auto IsConvertibleToFunctionPointer_Available(int) -> typename std::is_convertible<T, typename FuncSigSilent<T>::FuncPtr>;
-
-template<typename T>
-auto IsConvertibleToFunctionPointer_Available(...) -> std::false_type;
-
-template<typename T>
-struct IsConvertibleToFunctionPointer: public decltype(IsConvertibleToFunctionPointer_Available<T>(0)){};
-
-
-
-struct IsCallable_Check
+struct IsCallable
 {
 	template<class Delegate>
-	static inline bool ToBool(Delegate& del){return bool(del);}
-};
+	using FuncPtr = typename FuncSigSilent<Delegate>::FuncPtr;
 
-struct IsCallable_True
-{
 	template<class Delegate>
-	static constexpr bool ToBool(Delegate&& del)
-	{
-		return true;
-	}
-};
+	using IsPointer = std::is_convertible<Delegate, FuncPtr<Delegate>>;
 
-template<class Delegate>
-static inline bool IsBoolConvertible_Callable(Delegate& del)
-{
-	return std::conditional<IsConvertible<Delegate, bool>::value && !IsConvertibleToFunctionPointer<Delegate>::value, IsCallable_Check, IsCallable_True>::type::ToBool(del);
-}
+    template<class Delegate, typename std::enable_if<IsConvertible<Delegate, bool>::value && !IsPointer<Delegate>::value, bool>::type=true>
+    static constexpr bool Convertible(Delegate& del) {return bool(del);}
+
+    template<class Delegate, typename std::enable_if<IsPointer<Delegate>::value, bool>::type=true>
+    static constexpr bool Convertible(Delegate& del) {return !(FuncPtr<Delegate>(del)==nullptr);}
+
+    template<class Delegate, typename std::enable_if<!IsConvertible<Delegate, bool>::value && !IsPointer<Delegate>::value, bool>::type=true>
+    static constexpr bool Convertible(Delegate& del) {return true;}
+};
 
 //-------------------------------------------------------
 
@@ -518,7 +508,7 @@ public:
 
 	bool IsCallable() const override
 	{
-		return IsBoolConvertible_Callable(m_del);
+		return IsCallable::Convertible(m_del);
 	}
 
 private:
@@ -585,7 +575,7 @@ public:
 
 	bool IsCallable() const override
 	{
-		return IsBoolConvertible_Callable(m_del);
+		return IsCallable::Convertible(m_del);
 	}
 
 private:
@@ -684,12 +674,6 @@ private:
 	std::shared_ptr<const ErrorOccured>			m_OnInvalidRemoteCall;
 };
 
-
-template<class TDelProc>
-class Sig_ReturnVoidNo;
-
-template<class TDelProc>
-class Sig_ReturnVoid;
 
 //-------------------------------------------------------
 
@@ -940,105 +924,65 @@ std::unique_ptr<const MAssIpc_Data> SerializeReturn(const Ret& ret, const std::w
 	return result_stream.DetachWrite();
 }
 
-template<class... Args>
-class Sig_ReturnVoid<void(*)(Args...)>
+
+template<class Delegate, class Signature>
+class InvokeRemoteImpl;
+
+template<class Delegate, class Ret, class... Args>
+class InvokeRemoteImpl<Delegate, Ret(*)(Args...)>: public InvokeRemoteBase
 {
+private:
+	mutable typename std::decay<Delegate>::type m_del;
+
+private:
+
+	template<bool is_void, typename std::enable_if<!is_void, bool>::type=true>
+	std::unique_ptr<const MAssIpc_Data> MakeCallSerializeReturn(const std::weak_ptr<MAssIpc_TransportShare>& transport, MAssIpc_PacketParser::CallId respond_id, std::tuple<Args...>& args) const
+	{
+		Ret ret=ExpandTupleCall<Delegate, Ret>(m_del, args);
+		return SerializeReturn(ret, transport, respond_id);
+	}
+
+	template<bool is_void, typename std::enable_if<is_void, bool>::type=true>
+	std::unique_ptr<const MAssIpc_Data> MakeCallSerializeReturn(const std::weak_ptr<MAssIpc_TransportShare>& transport, MAssIpc_PacketParser::CallId respond_id, std::tuple<Args...>& args) const
+	{
+		ExpandTupleCall<Delegate, void>(m_del, args);
+		return SerializeReturn(transport, respond_id);
+	}
+
+
+	std::unique_ptr<const MAssIpc_Data> Invoke(const std::weak_ptr<MAssIpc_TransportShare>& transport, 
+										MAssIpc_PacketParser::CallId respond_id,
+										MAssIpc_DataStream& params) const override
+	{
+		std::tuple<Args...> args = DeserializeArgs<Args...>(params, typename make_indexes<Args...>::type());
+		return MakeCallSerializeReturn<std::is_same<Ret, void>::value>(transport, respond_id, args);
+	}
+
+	bool IsCallable() const override
+	{
+		return IsCallable::Convertible(m_del);
+	}
+
+	MAssIpc_RawString GetSignature_ReturnType() const override
+	{
+		return {MAssIpcType<Ret>::NameValue(), MAssIpcType<Ret>::NameLength()};
+	}
+
 public:
 
-	template<class Delegate>
-	class Imp: public InvokeRemoteBase
+	InvokeRemoteImpl(Delegate&& del, MAssIpc_TransthreadTarget::Id thread_id, const void* tag)
+		:InvokeRemoteBase(thread_id, tag)
+		, m_del(std::move(del))
 	{
-	private:
-
-		mutable typename std::decay<Delegate>::type m_del;
-
-	private:
-
-		std::unique_ptr<const MAssIpc_Data> Invoke(const std::weak_ptr<MAssIpc_TransportShare>& transport, 
-											MAssIpc_PacketParser::CallId respond_id,
-											MAssIpc_DataStream& params) const override
-		{
-			std::tuple<Args...> args = DeserializeArgs<Args...>(params, typename make_indexes<Args...>::type());
-			ExpandTupleCall<Delegate, void>(m_del, args);
-
-			return SerializeReturn(transport, respond_id);
-		}
-
-		bool IsCallable() const override
-		{
-			return IsBoolConvertible_Callable(m_del);
-		}
-
-		MAssIpc_RawString GetSignature_ReturnType() const override
-		{
-			return {MAssIpcType<void>::NameValue(), MAssIpcType<void>::NameLength()};
-		}
-
-	public:
-
-		Imp(Delegate&& del, MAssIpc_TransthreadTarget::Id thread_id, const void* tag)
-			:InvokeRemoteBase(thread_id, tag)
-			, m_del(std::move(del))
-		{
-		};
 	};
 };
 
-template<class Ret, class... Args>
-class Sig_ReturnVoidNo<Ret(*)(Args...)>
-{
-public:
-
-	template<class Delegate>
-	class Imp: public InvokeRemoteBase
-	{
-	private:
-
-		mutable typename std::decay<Delegate>::type m_del;
-
-	private:
-
-		std::unique_ptr<const MAssIpc_Data> Invoke(const std::weak_ptr<MAssIpc_TransportShare>& transport, 
-											MAssIpc_PacketParser::CallId respond_id,
-											MAssIpc_DataStream& params) const override
-		{
-			std::tuple<Args...> args = DeserializeArgs<Args...>(params, typename make_indexes<Args...>::type());
-			Ret ret = ExpandTupleCall<Delegate, Ret>(m_del, args);
-
-			return SerializeReturn(ret, transport, respond_id);
-		}
-
-		bool IsCallable() const override
-		{
-			return IsBoolConvertible_Callable(m_del);
-		}
-
-		MAssIpc_RawString GetSignature_ReturnType() const override
-		{
-			return {MAssIpcType<Ret>::NameValue(), MAssIpcType<Ret>::NameLength()};
-		}
-
-	public:
-
-		Imp(Delegate&& del, MAssIpc_TransthreadTarget::Id thread_id, const void* tag)
-			:InvokeRemoteBase(thread_id, tag)
-			, m_del(std::move(del))
-		{
-		};
-	};
-
-};
 
 template<class Delegate>
-class Impl_Selector
+struct Impl_Selector
 {
-	using FuncPtr = typename FuncSig<Delegate>::FuncPtr;
-public:
-
-	using Res = typename std::conditional<std::is_same<typename FuncSig<Delegate>::FuncRet,void>::value,
-		
-		Sig_ReturnVoid<FuncPtr>, Sig_ReturnVoidNo<FuncPtr> >::type
-		::template Imp<Delegate>;
+	using Res=InvokeRemoteImpl<Delegate, typename FuncSig<Delegate>::FuncPtr>;
 };
 
 //-------------------------------------------------------

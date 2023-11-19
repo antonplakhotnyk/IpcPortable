@@ -31,6 +31,11 @@ private:
 	{
 	};
 
+	template<typename Ret, typename... Args>
+	struct GetFunctionSignature<Ret(*const)(Args...)>: public GetFunctionSignature<Ret(Args...)>
+	{
+	};
+
 	template<typename Class, typename Ret, typename... Args>
 	struct GetFunctionSignature<Ret(Class::*)(Args...)>: public GetFunctionSignature<Ret(Args...)>
 	{
