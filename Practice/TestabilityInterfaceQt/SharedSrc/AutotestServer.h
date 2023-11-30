@@ -31,8 +31,7 @@ private:
 		template<class... Args>
 		ClientPrivate(Args&&... args):AutotestServer_Client(args...){};
 
-		using AutotestServer_Client::AddNewConnection;
-		using AutotestServer_Client::RemoveConnection;
+//		using AutotestServer_Client::RemoveConnectionLocked;
 	};
 
 
@@ -62,8 +61,10 @@ private:
 		void OnConnected(std::weak_ptr<IpcQt_TransporTcp> transport) override;
 		void OnDisconnected(std::weak_ptr<IpcQt_TransporTcp> transport) override;
 
-		const decltype(AutotestServer::ServerInternals::m_clients) RemoveExpiredClients();
+		void AddNewConnection(const std::weak_ptr<IpcQt_TransporTcp>& transport, std::shared_ptr<AutotestClient_Internals::SutConnection> connection);
+		void RemoveConnection(const std::weak_ptr<IpcQt_TransporTcp>& transport);
 
+		const decltype(AutotestServer::ServerInternals::m_clients) RemoveExpiredClients();
 	};
 
 	void Background_Main(const Params& params);

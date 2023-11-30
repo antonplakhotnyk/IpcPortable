@@ -67,6 +67,7 @@ public:
         {
             wait_next_after_trigger,
             wait_next_after_reset,
+			wait_next_after_zero,
         };
 
 		enum struct InitialCount: MAssIpcCall::CallInfo::TCounter
@@ -82,10 +83,29 @@ public:
 			Check(bool interpret_as_cancel):interpret_as_cancel(interpret_as_cancel){};
 			virtual ~Check()=default;
 			virtual bool IsTriggeredLocked() const = 0;
-			virtual void ResetLocked(ResetType rt)=0;
+			virtual void ResetLocked(ResetType wait_next_after)=0;
 			virtual const void* GetFilterId() const = 0;
 			
 			const bool interpret_as_cancel;
+
+		protected:
+
+			template<class TCounter, class Func_GetCallCount>
+			static void ResetLocked(ResetType wait_next_after, TCounter* wait_start_count, const Func_GetCallCount& func_GetCallCount)
+			{
+				switch( wait_next_after )
+				{
+					case ResetType::wait_next_after_reset:
+						(*wait_start_count)=TCounter{func_GetCallCount()};
+						break;
+					case ResetType::wait_next_after_trigger:
+						(*wait_start_count)++;
+						break;
+					case ResetType::wait_next_after_zero:
+						(*wait_start_count)=0;
+						break;
+				}
+			}
 		};
 
 		Event(const std::shared_ptr<ConditionWaitLock>& cwl)
@@ -107,13 +127,13 @@ public:
 				m_cwl->condition_events.notify_all();
 		}
 
-		void ResetTriggered(ResetType rt = ResetType::wait_next_after_trigger)
+		void ResetTriggered(ResetType wait_next_after = ResetType::wait_next_after_trigger)
 		{
 			std::unique_lock<std::mutex> lock(m_cwl->lock_events);
 			for( auto& check: *m_checks )
                 if( check->IsTriggeredLocked() )
 					if( !check->interpret_as_cancel )
-						check->ResetLocked(rt);
+						check->ResetLocked(wait_next_after);
 		}
 
 		template<class _Rep, class _Period>
@@ -244,20 +264,15 @@ public:
 				return false;
 			}
 
-			void ResetLocked(ResetType rt) override
+			void ResetLocked(ResetType wait_next_after) override
 			{
-				if( auto call_info = m_call_info.lock() )
-                {
-                    switch( rt )
-                    {
-                        case ResetType::wait_next_after_reset:
-                            m_wait_start_call_count = call_info->GetCallCount();
-                            break;
-                        case ResetType::wait_next_after_trigger:
-                            m_wait_start_call_count++;
-                            break;
-                    }
-                }
+				Check::ResetLocked(wait_next_after, &m_wait_start_call_count, [this]()
+				{
+					if( auto call_info=m_call_info.lock() )
+						return call_info->GetCallCount();
+					else
+						return decltype(m_wait_start_call_count)(0);
+				});
 			}
 
 
@@ -367,17 +382,12 @@ public:
 				return false;
 			}
 
-			void ResetLocked(ResetType rt) override
+			void ResetLocked(ResetType wait_next_after) override
 			{
-                switch( rt )
-                {
-                    case ResetType::wait_next_after_reset:
-                        m_wait_start_count = m_actual_counters->conters[size_t(m_signal_state)];
-                        break;
-                    case ResetType::wait_next_after_trigger:
-                        m_wait_start_count++;
-                        break;
-                }
+				Check::ResetLocked(wait_next_after, &m_wait_start_count, [this]()
+				{
+					return m_actual_counters->conters[size_t(m_signal_state)];
+				});
 			}
 
 			const void* GetFilterId() const override
@@ -451,6 +461,98 @@ public:
 	};
 
 //-------------------------------------------------------
+
+	class CounterEvent: public MAssIpcWaiter::Event
+	{
+	private:
+
+		struct Change: public Event::Check
+		{
+			Change(bool interpret_as_cancel)
+				: Event::Check(interpret_as_cancel)
+			{
+			}
+
+			bool IsTriggeredLocked() const override
+			{
+				return (m_actual_count - m_wait_start_count) > 0;
+			}
+
+			void ResetLocked(ResetType wait_next_after) override
+			{
+				Check::ResetLocked(wait_next_after, &m_wait_start_count, [this]()
+				{
+					return m_actual_count;
+				});
+			}
+
+			const void* GetFilterId() const override
+			{
+				return this;
+			}
+
+			MAssIpcCall::CallInfo::TCounter m_actual_count=0;
+			MAssIpcCall::CallInfo::TCounter m_wait_start_count=0;
+		};
+
+	public:
+
+		class Signaling
+		{
+		public:
+			Signaling(const std::shared_ptr<MAssIpcWaiter::ConditionWaitLock>& cwl, const std::shared_ptr<Change>& change)
+				: m_cwl(cwl)
+				, m_change(change)
+			{
+			}
+
+			void Increment()
+			{
+				std::unique_lock<std::mutex> lock(m_cwl->lock_events);
+				IncrementLocked();
+			}
+
+		protected:
+
+			void IncrementLocked()
+			{
+				m_change->m_actual_count++;
+				m_cwl->condition_events.notify_all();
+			}
+
+		private:
+			const std::shared_ptr<MAssIpcWaiter::ConditionWaitLock> m_cwl;
+			const std::shared_ptr<Change> m_change;
+		};
+
+		static std::shared_ptr<Signaling> MakeSignaling(MAssIpcWaiter::Event* base, const std::shared_ptr<MAssIpcWaiter::ConditionWaitLock>& cwl, bool interpret_as_cancel)
+		{
+			auto change=std::make_shared<Change>(interpret_as_cancel);
+			auto signaling=std::make_shared<Signaling>(cwl, change);
+			base->BindCheck(change, change->GetFilterId());
+			return signaling;
+		}
+
+		
+	public:
+		CounterEvent(const std::shared_ptr<MAssIpcWaiter::ConditionWaitLock>& cwl, bool interpret_as_cancel)
+			: MAssIpcWaiter::Event(cwl)
+			, m_signaling{MakeSignaling(this, cwl, interpret_as_cancel)}
+		{
+		}
+
+		std::shared_ptr<Signaling> GetSignaling()
+		{
+			return m_signaling;
+		}
+
+	private:
+
+		const std::shared_ptr<Signaling> m_signaling;
+	};
+
+//-------------------------------------------------------
+
 
 private:
 
