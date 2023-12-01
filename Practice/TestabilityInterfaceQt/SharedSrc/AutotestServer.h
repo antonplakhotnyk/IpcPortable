@@ -22,6 +22,7 @@ public:
 
 	std::shared_ptr<AutotestServer_Client> CreateClient();
  	void		Stop();
+	size_t		GetConnectionsCount() const;
 
 private:
 
@@ -30,6 +31,12 @@ private:
 	public:
 		template<class... Args>
 		ClientPrivate(Args&&... args):AutotestServer_Client(args...){};
+
+		void SetOnConnectedSut(std::weak_ptr<SutConnection> connection)
+		{
+			std::unique_lock<std::recursive_mutex> lock(m_client_internals->m_connections_mutex);
+			SetConnectionLocked(SutIndexId::on_connected_sut, connection);
+		}
 
 //		using AutotestServer_Client::RemoveConnectionLocked;
 	};
@@ -45,7 +52,7 @@ private:
 		{
 		}
 
-		void AddClient(const std::weak_ptr<ClientPrivate>& new_client);
+		void AddClient(const std::shared_ptr<ClientPrivate>& new_client);
 
 	private:
 

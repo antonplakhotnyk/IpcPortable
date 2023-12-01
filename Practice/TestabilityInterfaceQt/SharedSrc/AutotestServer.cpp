@@ -40,9 +40,15 @@ const decltype(AutotestServer::ServerInternals::m_clients) AutotestServer::Serve
 	return m_clients;
 }
 
-void AutotestServer::ServerInternals::AddClient(const std::weak_ptr<ClientPrivate>& new_client)
+void AutotestServer::ServerInternals::AddClient(const std::shared_ptr<ClientPrivate>& new_client)
 {
 	RemoveExpiredClients();
+
+	if( auto client_internals=m_client_internals.lock() )
+	{
+		std::unique_lock<std::recursive_mutex> lock(client_internals->m_connections_mutex);
+		new_client->SetOnConnectedSut(client_internals->m_on_connected_sut);
+	}
 
 	std::unique_lock<std::recursive_mutex> lock(m_clients_mutex);
 	m_clients.push_back(new_client);
@@ -60,11 +66,6 @@ void AutotestServer::ServerInternals::OnConnected(std::weak_ptr<IpcQt_TransporTc
 		m_sut_handler = std::make_unique<SutHandlerThread>(connection, m_autotest_container);
 
 	AddNewConnection(transport_weak, connection);
-
-	const decltype(m_clients) clients=RemoveExpiredClients();
-	for( auto client:clients )
-		if( std::shared_ptr<ClientPrivate> client_lock=client.lock() )
-			client_lock->Connections_SetIpcUse(transport_weak, AutotestServer_Client::SutIndexId::on_connected_sut);
 
 	client_internals->m_connection_signaling->SignalChangeState(MAssIpcWaiter::ConnectionEvent::State::on_connected);
 }
@@ -86,7 +87,13 @@ void AutotestServer::ServerInternals::AddNewConnection(const std::weak_ptr<IpcQt
 	{
 		std::unique_lock<std::recursive_mutex> lock(client_internals->m_connections_mutex);
 		client_internals->m_connections.insert(std::make_pair(transport, AutotestClient_Internals::ConnectionState{connection}));
+		client_internals->m_on_connected_sut=connection;
 	}
+
+	const decltype(m_clients) clients=RemoveExpiredClients();
+	for( auto client:clients )
+		if( std::shared_ptr<ClientPrivate> client_lock=client.lock() )
+			client_lock->SetOnConnectedSut(connection);
 }
 
 void AutotestServer::ServerInternals::RemoveConnection(const std::weak_ptr<IpcQt_TransporTcp>& transport)
@@ -121,4 +128,11 @@ std::shared_ptr<AutotestServer_Client> AutotestServer::CreateClient(/*const Auto
 void		AutotestServer::Stop()
 {
 	m_background_thread.Stop();
+}
+
+size_t		AutotestServer::GetConnectionsCount() const
+{
+	if( auto client_internals=m_client_internals.lock() )
+		return client_internals->GetConnectionsCount();
+	return 0;
 }

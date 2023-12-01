@@ -59,9 +59,12 @@ public:
 
 	void SetReady()
 	{
-		std::unique_lock<std::mutex> lock(m_mutex);
-		m_ready = true;
-		m_condition.notify_all();
+		if( !m_ready )
+		{
+			std::unique_lock<std::mutex> lock(m_mutex);
+			m_ready=true;
+			m_condition.notify_all();
+		}
 	}
 };
 

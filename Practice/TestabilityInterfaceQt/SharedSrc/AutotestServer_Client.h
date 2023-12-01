@@ -62,8 +62,15 @@ public:
 
 public:
 
+	std::weak_ptr<SutConnection> m_on_connected_sut;
 	std::map<std::weak_ptr<IpcQt_TransporTcp>, ConnectionState, std::owner_less<std::weak_ptr<IpcQt_TransporTcp>> >	m_connections;
 	mutable std::recursive_mutex			m_connections_mutex;
+
+	size_t GetConnectionsCount() const
+	{
+		std::unique_lock<std::recursive_mutex> lock(m_connections_mutex);
+		return m_connections.size();
+	}
 
 	const std::shared_ptr<MAssIpcWaiter>		m_waiter = std::make_shared<MAssIpcWaiter>();
 	const std::shared_ptr<MAssIpcWaiter::ConnectionEvent::Signaling> m_connection_signaling = m_waiter->CreateSignaling<MAssIpcWaiter::ConnectionEvent>();
@@ -221,7 +228,7 @@ protected:
 	}
 
 
-	bool SetConnectionLocked(SutIndexId sut_id, std::shared_ptr<SutConnection> connection);
+	bool SetConnectionLocked(SutIndexId sut_id, std::weak_ptr<SutConnection> connection);
 
 // 	void RemoveConnectionLocked(std::shared_ptr<SutConnection> connection)
 // 	{
