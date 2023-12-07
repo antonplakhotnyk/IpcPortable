@@ -122,5 +122,8 @@
     <ClInclude Include="..\Ipc\MAssIpcWaiter.h">
       <Filter>Ipc</Filter>
     </ClInclude>
+    <ClInclude Include="..\Ipc\MAssIpc_Packet.h">
+      <Filter>Ipc</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

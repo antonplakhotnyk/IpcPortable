@@ -1,12 +1,13 @@
 #pragma once
 
 #include <stdint.h>
+#include "MAssIpc_Packet.h"
 
 class MAssIpc_Data
 {
 public:
 
-	typedef uint32_t PacketSize;
+	using PacketSize=MAssIpcImpl::MAssIpc_Packet::PacketSize;
 
 	virtual ~MAssIpc_Data()=default;
 

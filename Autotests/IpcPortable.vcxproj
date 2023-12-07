@@ -188,6 +188,7 @@
     <ClInclude Include="..\Ipc\MAssIpc_DataStream.h" />
     <ClInclude Include="..\Ipc\MAssIpc_Internals.h" />
     <ClInclude Include="..\Ipc\MAssIpc_Macros.h" />
+    <ClInclude Include="..\Ipc\MAssIpc_Packet.h" />
     <ClInclude Include="..\Ipc\MAssIpc_PacketParser.h" />
     <ClInclude Include="..\Ipc\MAssIpc_RawString.h" />
     <ClInclude Include="..\Ipc\MAssIpc_Transport.h" />

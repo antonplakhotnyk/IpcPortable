@@ -16,39 +16,37 @@ MAssIpc_PacketParser::~MAssIpc_PacketParser()
 {
 }
 
+bool MAssIpc_PacketParser::ReadDataIsAvailable(const std::shared_ptr<MAssIpc_TransportCopy>& in_data, uint8_t* buffer, PacketSize incoming_packet_data_size)
+{
+	const size_t available=in_data->ReadBytesAvailable();
+	if( available > 0 )
+	{
+		const auto read_size{PacketSize(std::min(size_t(m_incoming_packet.need_size), available))};
+		if( read_size!=0 )
+		{
+			const auto read_offset{incoming_packet_data_size - m_incoming_packet.need_size};
+			in_data->Read(buffer+ read_offset, read_size);
+			m_incoming_packet.need_size-=read_size;
+		}
+
+		return true;
+	}
+
+	return false;
+}
+
 size_t MAssIpc_PacketParser::ReadNeededDataSize(const std::shared_ptr<MAssIpc_TransportCopy>& in_data, std::unique_ptr<const MAssIpc_Data>* packet_data)
 {
 	if( m_incoming_packet.data_size == c_invalid_packet_size )
 	{
-		const size_t available = in_data->ReadBytesAvailable();
-		if( available > 0 )
-		{
-			const size_t read_size = std::min(size_t(m_incoming_packet.need_size), available);
-			if( read_size!=0 )
-			{
-				const size_t read_offset = c_net_call_packet_header_size - m_incoming_packet.need_size;
-				in_data->Read(m_incoming_packet.raw_header_buffer+read_offset, read_size);
-				m_incoming_packet.need_size -= read_size;
-			}
-
-			if( m_incoming_packet.need_size==0 )
-				ReceiveReadHeader(in_data);
-		}
+		const bool is_available = ReadDataIsAvailable(in_data, m_incoming_packet.raw_header_buffer, c_net_call_packet_header_size);
+		if( is_available && (m_incoming_packet.need_size==0) )
+			ReceiveReadHeader(in_data);
 	}
 
 	if( (m_incoming_packet.data_size != c_invalid_packet_size) )
 	{
-		const size_t available = in_data->ReadBytesAvailable();
-		if( available > 0 )
-		{
-			const size_t read_size = std::min(size_t(m_incoming_packet.need_size), available);
-			if( read_size!=0 )
-			{
-				const size_t read_offset = m_incoming_packet.data_size - m_incoming_packet.need_size;
-				in_data->Read(m_incoming_packet_header_data->Data()+c_net_call_packet_header_size+read_offset, read_size);
-				m_incoming_packet.need_size -= read_size;
-			}
-		}
+		ReadDataIsAvailable(in_data, m_incoming_packet_header_data->Data()+c_net_call_packet_header_size, m_incoming_packet.data_size);
 
 		if( m_incoming_packet.need_size==0 )
 		{
@@ -86,11 +84,11 @@ MAssIpc_PacketParser::Header MAssIpc_PacketParser::ReadHeader(MAssIpc_DataStream
 }
 
 void MAssIpc_PacketParser::PacketHeaderWrite(MAssIpc_DataStream& packet_data,
-											   MAssIpc_Data::PacketSize no_header_size,
+											   PacketSize no_header_size,
 											   MAssIpc_PacketParser::PacketType pt,
 											   MAssIpc_PacketParser::CallId id)
 {
-	packet_data<<MAssIpc_Data::PacketSize(no_header_size)<<std::underlying_type<PacketType>::type(pt)<<CallId(id);
+	packet_data<<PacketSize(no_header_size)<<std::underlying_type<PacketType>::type(pt)<<CallId(id);
 }
 
 }
