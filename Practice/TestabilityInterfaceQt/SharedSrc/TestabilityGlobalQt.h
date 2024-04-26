@@ -7,6 +7,7 @@
 #include "Sut.h"
 
 #include <QtCore/QObject>
+#include <QtCore/QPointer>
 #include <QtCore/QCoreApplication>
 
 class TestabilityGlobalQt: public Sut

@@ -82,6 +82,7 @@ private:
 	IpcQt_TransthreadCaller						m_transthread_caller;
 	std::weak_ptr<AutotestClient_Internals>		m_client_internals;
 	std::weak_ptr<ServerInternals>				m_server_internals;
+	std::shared_ptr<MAssIpcWaiter>              m_waiter;
 
 	TestabilityThreadQt							m_background_thread;
 };

@@ -20,6 +20,7 @@ void AutotestServer::Background_Main(const Params& params)
 
 	m_client_internals = client_internals;
 	m_server_internals = transport_tcp_server;
+	m_waiter = client_internals->m_waiter;
 	m_int_ready.SetReady();
 
 	transport_tcp_server->ListenRestart();
@@ -27,7 +28,7 @@ void AutotestServer::Background_Main(const Params& params)
 	event_loop.exec();
 
 	transport_tcp_server->Server()->close();
-	client_internals->m_waiter->CancelAllWaits();
+	m_waiter->CancelAllWaits();
 }
 
 const decltype(AutotestServer::ServerInternals::m_clients) AutotestServer::ServerInternals::RemoveExpiredClients()
@@ -127,6 +128,8 @@ std::shared_ptr<AutotestServer_Client> AutotestServer::CreateClient(/*const Auto
 
 void		AutotestServer::Stop()
 {
+	if( m_waiter )
+		m_waiter->CancelAllWaits();
 	m_background_thread.Stop();
 }
 
