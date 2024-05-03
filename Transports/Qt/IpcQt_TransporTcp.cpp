@@ -76,6 +76,8 @@ void	IpcQt_TransporTcp::Read(uint8_t* data, size_t size)
 	mass_return_if_equal(m_connection.data(), nullptr);
 	mass_return_if_not_equal(m_connection->thread(), QThread::currentThread());
 	m_connection->read(reinterpret_cast<char*>(data), size);
+	if( m_connection->bytesAvailable()>0 )
+		QMetaObject::invokeMethod(this, &IpcQt_TransporTcp::OnReadyRead, Qt::QueuedConnection);
 }
 
 void	IpcQt_TransporTcp::Write(const uint8_t* data, size_t size)
