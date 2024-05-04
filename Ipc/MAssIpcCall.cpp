@@ -38,17 +38,20 @@ void MAssIpcCall::SetTransport(const std::weak_ptr<MAssIpc_TransportShare>& tran
 
 void MAssIpcCall::AddAllHandlers(const MAssIpcCall& other)
 {
-	m_int.load()->m_proc_map.AddAllProcs(other.m_int.load()->m_proc_map);
+	if( auto internals = m_int.load() )
+		internals->m_proc_map.AddAllProcs(other.m_int.load()->m_proc_map);
 }
 
 void MAssIpcCall::ClearAllHandlers()
 {
-	m_int.load()->m_proc_map.ClearAllProcs();
+	if( auto internals = m_int.load() )
+		internals->m_proc_map.ClearAllProcs();
 }
 
 void MAssIpcCall::ClearHandlersWithTag(const void* tag)
 {
-	m_int.load()->m_proc_map.ClearProcsWithTag(tag);
+	if( auto internals = m_int.load() )
+		internals->m_proc_map.ClearProcsWithTag(tag);
 }
 
 MAssIpcCall::DeserializedFindCallInfo MAssIpcCall::DeserializeNameSignature(MAssIpc_DataStream& call_info)

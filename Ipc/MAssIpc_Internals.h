@@ -49,6 +49,11 @@ template <typename T>
 class AtomicSharedPtr
 {
 public:
+	~AtomicSharedPtr()
+	{
+		store({});
+	}
+
 	AtomicSharedPtr(std::shared_ptr<T> initial = std::shared_ptr<T>()): m_atomic_ptr(initial)
 	{
 	}
@@ -103,6 +108,11 @@ template <typename T>
 class AtomicSharedPtr
 {
 public:
+	~AtomicSharedPtr()
+	{
+		store({});
+	}
+
 	AtomicSharedPtr(std::shared_ptr<T> initial = std::shared_ptr<T>()): m_ptr(initial)
 	{
 	}
@@ -137,7 +147,7 @@ public:
 		return *this;
 	}
 
-	void ltore(const std::shared_ptr<T>& desired)
+	void store(const std::shared_ptr<T>& desired)
 	{
 		std::atomic_store(&m_ptr, desired);
 	}

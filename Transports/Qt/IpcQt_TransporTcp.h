@@ -41,6 +41,8 @@ private:
 	void OnError(QAbstractSocket::SocketError er);
 	void OnConnectionTimeout();
 
+//     size_t ReadBytesAvailableNotify();
+
 private:
 
 	std::weak_ptr<IpcQt_TransporTcp> m_self_transport;
@@ -48,6 +50,7 @@ private:
 
 private:
 
+//     bool    m_ready_read_notify_pending = false;
 // 	int						m_wait_respound;
 };
 

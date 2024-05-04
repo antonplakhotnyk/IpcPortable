@@ -76,9 +76,21 @@ void	IpcQt_TransporTcp::Read(uint8_t* data, size_t size)
 	mass_return_if_equal(m_connection.data(), nullptr);
 	mass_return_if_not_equal(m_connection->thread(), QThread::currentThread());
 	m_connection->read(reinterpret_cast<char*>(data), size);
-	if( m_connection->bytesAvailable()>0 )
-		QMetaObject::invokeMethod(this, &IpcQt_TransporTcp::OnReadyRead, Qt::QueuedConnection);
 }
+
+// size_t IpcQt_TransporTcp::ReadBytesAvailableNotify()
+// {
+//     qint64 available = m_connection->bytesAvailable();
+//     if( available<0 )
+//         return 0;
+// 
+//     if( (available>0) && (!m_ready_read_notify_pending) )
+//     {
+//         m_ready_read_notify_pending = true;
+//         QMetaObject::invokeMethod(this, &IpcQt_TransporTcp::OnReadyRead, Qt::QueuedConnection);
+//     }
+//     return size_t(std::min(uint64_t(available), uint64_t(std::numeric_limits<size_t>::max())));
+// }
 
 void	IpcQt_TransporTcp::Write(const uint8_t* data, size_t size)
 {
@@ -108,7 +120,12 @@ void IpcQt_TransporTcp::OnDisconnected()
 
 void IpcQt_TransporTcp::OnReadyRead()
 {
-	HandlerProcessTransport();
+    HandlerProcessTransport();
+
+    // transport must alarm until no data available to guarantee not stuck
+    auto available = m_connection->bytesAvailable();
+    if( available>0 )
+        QMetaObject::invokeMethod(this, &IpcQt_TransporTcp::OnReadyRead, Qt::QueuedConnection);
 }
 
 void IpcQt_TransporTcp::OnError(QAbstractSocket::SocketError er)
