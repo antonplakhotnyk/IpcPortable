@@ -60,7 +60,7 @@ private:
 	template<class A1, class A2>
 	static constexpr bool Check_is_signame_and_handler_describe_same_call_signatures(A1, A2, ...)
 	{
-		static_assert(std::is_same<A1, A2>::value, "A1 and A2 must be same types");
+		static_assert(std::is_same<A1, A2>::value, "Handler function signature mismatch A1 and A2 must be same types");
 		return false;
 	};
 

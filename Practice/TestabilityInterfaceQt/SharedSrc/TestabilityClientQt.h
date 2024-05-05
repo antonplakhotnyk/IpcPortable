@@ -30,7 +30,7 @@ private:
 
 		void StartConnection();
 
-		std::atomic<bool>	m_is_connected;
+		std::atomic<bool>	m_is_connected = {false};
 		IpcQt_NetClient		m_ipc_net;
 
 	private:
