@@ -146,14 +146,14 @@ public:
 	void SetProcessIncomingCalls(bool process_incoming_calls_default);
 
 	template<class Ret, class... Args>
-	Ret WaitInvokeRet(InvokeSetting settings, const Args&... args) const;
+	Ret WaitInvokeRet(InvokeSetting settings, Args&&... args) const;
 	template<class... Args>
-	void WaitInvoke(InvokeSetting settings, const Args&... args) const;
+	void WaitInvoke(InvokeSetting settings, Args&&... args) const;
 
     template<class Ret_Check, class... Args_Check, class... Args_Local>
-    Ret_Check WaitInvoke(TInvokeSetting<SigName<Ret_Check(Args_Check...)>> settings, Args_Local... args) const
+    Ret_Check WaitInvoke(TInvokeSetting<SigName<Ret_Check(Args_Check...)>> settings, Args_Local&&... args) const
     {
-        return ConvertArgs<Ret_Check(Args_Check...)>::InvokeUnified(this, settings, args...);
+        return ConvertArgs<Ret_Check(Args_Check...)>::InvokeUnified(this, settings, std::forward<Args_Local>(args)...);
     }
 
 	template<class Ret_Check, class... Args_Check, class... Args_Local>
@@ -164,12 +164,12 @@ public:
 
 
 	template<class... Args>
-	void AsyncInvoke(InvokeSetting settings, const Args&... args) const;
+	void AsyncInvoke(InvokeSetting settings, Args&&... args) const;
 
 	template<class Ret_Check, class... Args_Check, class... Args_Local>
-	void AsyncInvoke(TInvokeSetting<SigName<Ret_Check(Args_Check...)>> settings, Args_Local... args) const
+	void AsyncInvoke(TInvokeSetting<SigName<Ret_Check(Args_Check...)>> settings, Args_Local&&... args) const
 	{
-		ConvertArgs<Ret_Check(Args_Check...)>::AsyncInvokeUnified(this, settings, args...);
+		ConvertArgs<Ret_Check(Args_Check...)>::AsyncInvokeUnified(this, settings, std::forward<Args_Local>(args)...);
 	}
 
 	template<class Ret_Check, class... Args_Check, class... Args_Local>
@@ -181,7 +181,7 @@ public:
 
 
 	template<class Ret, class... Args>
-	static MAssIpc_Data::PacketSize CalcCallSize(bool send_return, const MAssIpcImpl::RawString& proc_name, const Args&... args);
+	static MAssIpc_Data::PacketSize CalcCallSize(bool send_return, const MAssIpcImpl::RawString& proc_name, Args&&... args);
 
 	template<class Delegate>
 	std::shared_ptr<const CallInfo> AddHandler(const MAssIpcImpl::RawString& proc_name, Delegate&& del,
@@ -256,13 +256,12 @@ private:
 	static void SerializeCallSignature(MAssIpc_DataStream& call_info, const MAssIpcImpl::RawString& proc_name, bool send_return);
 
 	template<class Ret, class... Args>
-	static void SerializeCall(MAssIpc_DataStream& call_info, const MAssIpcImpl::RawString& proc_name, bool send_return, const Args&... args);
+	static void SerializeCall(MAssIpc_DataStream& call_info, const MAssIpcImpl::RawString& proc_name, bool send_return, Args&&... args);
 
 	template<class Ret, class... Args>
-	Ret WaitInvokeRetUnified(InvokeSetting& settings, const Args&... args) const;
+	Ret WaitInvokeRetUnified(InvokeSetting& settings, Args&&... args) const;
 	template<class Ret, class... Args>
-	void InvokeUnified(InvokeSetting& settings, MAssIpc_DataStream* result_buf_wait_return,
-					   const Args&... args) const;
+	void InvokeUnified(InvokeSetting& settings, MAssIpc_DataStream* result_buf_wait_return, Args&&... args) const;
 	void InvokeRemote(MAssIpc_DataStream& call_info_data, MAssIpc_DataStream* result_buf_wait_return,
 					  MAssIpcImpl::MAssIpc_PacketParser::CallId wait_response_id,
 					  bool process_incoming_calls) const;
@@ -288,7 +287,7 @@ private:
 		template<class... Args_Local>
 		static Ret_Check AsyncInvokeUnified(const MAssIpcCall* self, InvokeSetting& settings, Args_Local... args_local)
 		{
-			static_assert(sizeof(Ret_Check)>=0, "Async invoke can not return value, must be void");
+			static_assert(sizeof(Ret_Check)<0, "Async invoke can not return value, must be void");
 			return {};
 		}
 	};
@@ -300,14 +299,13 @@ private:
         static void InvokeUnified(const MAssIpcCall* self, InvokeSetting& settings, Args_Local... args_local)
         {
             MAssIpc_DataStream result_buf_wait_return;
-            self->InvokeUnified<void,Args_Check...>(settings, &result_buf_wait_return, args_local...);
+            self->InvokeUnified<void,Args_Check...>(settings, &result_buf_wait_return, std::forward<Args_Local>(args_local)...);
         }
 
 		template<class... Args_Local>
-		static void AsyncInvokeUnified(const MAssIpcCall* self, InvokeSetting& settings,
-								  Args_Local... args_local)
+		static void AsyncInvokeUnified(const MAssIpcCall* self, InvokeSetting& settings, Args_Local... args_local)
 		{
-			self->InvokeUnified<void, Args_Check...>(settings, nullptr, args_local...);
+			self->InvokeUnified<void, Args_Check...>(settings, nullptr, std::forward<Args_Local>(args_local)...);
 		}
 	};
 
@@ -518,10 +516,10 @@ std::shared_ptr<const MAssIpcCall::CallInfo> MAssIpcCall::AddHandler(const MAssI
 }
 
 template<class Ret, class... Args>
-MAssIpc_Data::PacketSize MAssIpcCall::CalcCallSize(bool send_return, const MAssIpcImpl::RawString& proc_name, const Args&... args)
+MAssIpc_Data::PacketSize MAssIpcCall::CalcCallSize(bool send_return, const MAssIpcImpl::RawString& proc_name, Args&&... args)
 {
 	MAssIpc_DataStream measure_size;
-	SerializeCall<Ret>(measure_size, proc_name, send_return, args...);
+	SerializeCall<Ret>(measure_size, proc_name, send_return, std::forward<Args>(args)...);
 	return measure_size.GetWritePos()+MAssIpcImpl::MAssIpc_PacketParser::c_net_call_packet_header_size;
 }
 
@@ -548,20 +546,19 @@ void MAssIpcCall::SerializeCallSignature(MAssIpc_DataStream& call_info, const MA
 }
 
 template<class Ret, class... Args>
-void MAssIpcCall::SerializeCall(MAssIpc_DataStream& call_info, const MAssIpcImpl::RawString& proc_name, bool send_return, const Args&... args)
+void MAssIpcCall::SerializeCall(MAssIpc_DataStream& call_info, const MAssIpcImpl::RawString& proc_name, bool send_return, Args&&... args)
 {
 	MAssIpcCall::SerializeCallSignature<Ret, Args...>(call_info, proc_name, send_return);
-	MAssIpcImpl::SerializeArgs(call_info, args...);
+	MAssIpcImpl::SerializeArgs(call_info, std::forward<Args>(args)...);
 }
 
 template<class Ret, class... Args>
-void MAssIpcCall::InvokeUnified(InvokeSetting& settings, MAssIpc_DataStream* result_buf_wait_return,
-								const Args&... args) const
+void MAssIpcCall::InvokeUnified(InvokeSetting& settings, MAssIpc_DataStream* result_buf_wait_return, Args&&... args) const
 {
 	auto new_id = NewCallId();
 
 	MAssIpc_DataStream measure_size;
-	SerializeCall<Ret>(measure_size, settings.proc_name, (result_buf_wait_return!=nullptr), args...);
+	SerializeCall<Ret>(measure_size, settings.proc_name, (result_buf_wait_return!=nullptr), std::forward<Args>(args)...);
 
 	MAssIpc_DataStream call_info;
 	if( settings.inplace_send_buffer )
@@ -569,19 +566,20 @@ void MAssIpcCall::InvokeUnified(InvokeSetting& settings, MAssIpc_DataStream* res
 	else
 		call_info = CreateDataStream(m_int.load()->m_transport, measure_size.GetWritePos(), MAssIpcImpl::MAssIpc_PacketParser::PacketType::pt_call, new_id);
 
-	SerializeCall<Ret>(call_info, settings.proc_name, (result_buf_wait_return!=nullptr), args...);
+	SerializeCall<Ret>(call_info, settings.proc_name, (result_buf_wait_return!=nullptr), std::forward<Args>(args)...);
 
 	const bool process_incoming_calls = IsProcessIncomingCalls(settings.process_incoming_calls);
 	InvokeRemote(call_info, result_buf_wait_return, new_id, process_incoming_calls);
 }
 
 template<class Ret, class... Args>
-Ret MAssIpcCall::WaitInvokeRetUnified(InvokeSetting& settings, const Args&... args) const
+Ret MAssIpcCall::WaitInvokeRetUnified(InvokeSetting& settings, Args&&... args) const
 {
 	static_assert(!std::is_same<Ret,void>::value, "can not be implicit void use function call explicitely return void");
+	static_assert(MAssIpcImpl::is_deserializable<Ret>::value, "return type not deserializable");
 
 	MAssIpc_DataStream result;
-	InvokeUnified<Ret>(settings, &result, args...);
+	InvokeUnified<Ret>(settings, &result, std::forward<Args>(args)...);
 	{
 		if( result.IsReadBufferPresent() )
 			return MAssIpcImpl::ReadFromStream<Ret>(result);
@@ -592,22 +590,22 @@ Ret MAssIpcCall::WaitInvokeRetUnified(InvokeSetting& settings, const Args&... ar
 //-------------------------------------------------------
 
 template<class Ret, class... Args>
-Ret MAssIpcCall::WaitInvokeRet(InvokeSetting settings, const Args&... args) const
+Ret MAssIpcCall::WaitInvokeRet(InvokeSetting settings, Args&&... args) const
 {
-	return WaitInvokeRetUnified<Ret>(settings, args...);
+	return WaitInvokeRetUnified<Ret>(settings, std::forward<Args>(args)...);
 }
 
 template<class... Args>
-void MAssIpcCall::WaitInvoke(InvokeSetting settings, const Args&... args) const
+void MAssIpcCall::WaitInvoke(InvokeSetting settings, Args&&... args) const
 {
 	MAssIpc_DataStream result_buf;
-	InvokeUnified<void>(settings, &result_buf, args...);
+	InvokeUnified<void>(settings, &result_buf, std::forward<Args>(args)...);
 }
 
 template<class... Args>
-void MAssIpcCall::AsyncInvoke(InvokeSetting settings, const Args&... args) const
+void MAssIpcCall::AsyncInvoke(InvokeSetting settings, Args&&... args) const
 {
-	InvokeUnified<void>(settings, nullptr, args...);
+	InvokeUnified<void>(settings, nullptr, std::forward<Args>(args)...);
 }
 
 //-------------------------------------------------------

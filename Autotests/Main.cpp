@@ -578,6 +578,12 @@ void Ipc_UniquePtr1(std::unique_ptr<DataStruct1> data)
 {
 }
 
+uint32_t Ipc_UniquePtr3(std::unique_ptr<DataStruct1> data)
+{
+	return data->a + data->b + data->c;
+}
+
+
 MASS_IPC_TYPE_SIGNATURE(std::unique_ptr<DataStruct1>)
 
 MAssIpc_DataStream& operator<<(MAssIpc_DataStream& stream, const std::unique_ptr<DataStruct1>& v)
@@ -659,6 +665,9 @@ constexpr const MAssIpcCall::SigName<decltype(&SigCheck::Static_String_StringU32
 static_assert(std::is_same<decltype(sig_Static_String_StringU32Double)::Signature, decltype(sig2_Static_String_StringU32Double)::Signature>::value, "must be same type");
 static_assert(std::is_same<decltype(sig_Static_String_StringU32Double)::Signature, decltype(sig3_Static_String_StringU32Double)::Signature>::value, "must be same type");
 
+constexpr const MAssIpcCall::SigName<void(std::unique_ptr<DataStruct1> data)> sig_UniquePtr1 = {"sig_UniquePtr1"};
+constexpr const MAssIpcCall::SigName<uint32_t(std::unique_ptr<DataStruct1> data)> sig_UniquePtr3 = {"sig_UniquePtr3"};
+
 void Main_IpcService(std::shared_ptr<IpcTransport_MemoryShare> transport_buffer)
 {
 	std::shared_ptr<MAssCallThreadTransport_Stub> thread_transport(new MAssCallThreadTransport_Stub);
@@ -683,6 +692,7 @@ void Main_IpcService(std::shared_ptr<IpcTransport_MemoryShare> transport_buffer)
 	call.AddHandler("Ipc_Proc1", std::function<std::string(uint8_t, std::string, uint32_t)>(&Ipc_Proc1));
 	call.AddHandler("Ipc_Proc3", std::function<void(uint8_t, std::string, uint32_t)>(&Ipc_Proc3));
 	call.AddHandler("Ipc_UniquePtr1", std::function<void(std::unique_ptr<DataStruct1>)>(&Ipc_UniquePtr1));
+	call.AddHandler(sig_UniquePtr3, [](std::unique_ptr<DataStruct1> data)->uint32_t{return Ipc_UniquePtr3(std::move(data));}, nullptr);
 	call.AddHandler("Ipc_UniquePtr2", std::function<void(DataStruct2*)>(&Ipc_Ptr2));
 	call.AddHandler("CallCountChanged_BeforeInvoke",&CallCountChanged_BeforeInvoke);
 	//	call.AddHandler("IsLinkUp_Sta", std::function<void(uint8_t, std::string, uint32_t)>(&Ipc_Proc3));
@@ -823,6 +833,8 @@ void Main_IpcClient()
 	std::string str = call.WaitInvoke(sig_Static_String_StringU32Double, "str:", uint8_t(2), double(123.5));
 	mass_return_if_not_equal(str, "str:247");
 
+	// call.AsyncInvoke(sig_Static_String_StringU32Double, std::string("str:"), uint8_t(2), double(123.5));// compiler error async return_must be void
+
 
 	c = 654321;
 	const char* string_pointer_Ipc_Proc1 = "Ipc_Proc1";
@@ -860,6 +872,16 @@ void Main_IpcClient()
 	DataStruct2* ds2 = new DataStruct2({4,5,6});
 	call.WaitInvoke("Ipc_UniquePtr1", ds1);
 	call.WaitInvoke("Ipc_UniquePtr2", ds2);
+	call.WaitInvoke(MAssIpcCall::SigName<uint32_t(DataStruct2*)>{"NotExist"}, ds2);
+	call.AsyncInvoke(MAssIpcCall::SigName<void(DataStruct2*)>{"NotExist"}, ds2);
+	call.AsyncInvoke(sig_UniquePtr1, std::move(ds1));
+	ds1.reset(new DataStruct1({4,5,6}));
+	call.WaitInvoke(sig_UniquePtr1, std::move(ds1));
+	ds1.reset(new DataStruct1({7,8,9}));
+	uint32_t u32r = call.WaitInvoke(sig_UniquePtr3, std::move(ds1));
+	mass_return_if_not_equal(u32r, 7+8+9);
+	// call.AsyncInvoke(sig_UniquePtr3, std::move(ds1));// compiler error async invoke must return void
+
 
 	std::vector<uint8_t> 	val_uint8_t  = call.WaitInvokeRet <std::vector<uint8_t> >("VectorU8", MakeVectorT<uint8_t>());
 	std::vector<uint16_t>	val_uint16_t = call.WaitInvokeRet<std::vector<uint16_t>	>("VectorU16", MakeVectorT<uint16_t>());

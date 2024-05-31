@@ -8,7 +8,7 @@
 template<class Type>
 struct MAssIpcType
 {
-	static_assert(sizeof(Type)!=sizeof(Type), "custom MAssIpcType must be defined for type Type use MASS_IPC_TYPE_SIGNATURE");
+	static_assert((sizeof(Type)<0), "custom MAssIpcType must be defined for type Type use MASS_IPC_TYPE_SIGNATURE");
 	static constexpr const char name_value[1] = "";
 };
 
@@ -247,7 +247,7 @@ MASS_IPC_TYPE_SIGNATURE(std::vector<int64_t>);
 // usage of std::unique_ptr
 // 
 // MAssIpc_DataStream& operator<<(MAssIpc_DataStream& stream, const std::unique_ptr<NoDefConstruct>& v);
-// std::unique_ptr<NoDefConstruct> operator>>(MAssIpc_DataStream& stream, const MAssIpc_DataStream_Create<std::unique_ptr<NoDefConstruct>>& v);
+// std::unique_ptr<NoDefConstruct> operator>>(MAssIpc_DataStream& stream, const MAssIpc_DataStream_Create<std::unique_ptr<NoDefConstruct>>&);
 // MASS_IPC_TYPE_SIGNATURE(std::unique_ptr<NoDefConstruct>);
 
 

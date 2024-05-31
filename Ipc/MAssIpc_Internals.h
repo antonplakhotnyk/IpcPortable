@@ -729,6 +729,20 @@ Ret ExpandTupleCall(Func& pf, std::tuple<Args...>& tup)
 template<class...>
 using void_t = void;
 
+template<class T> struct PrintAssertType: std::false_type
+{
+};
+
+template<typename TypeNotImplemented, typename = void>
+struct is_deserializable_stream: std::false_type
+{
+	static_assert((sizeof(TypeNotImplemented)<0) || PrintAssertType<TypeNotImplemented>::value, "deserializer for type TypeNotImplemented not implemented");
+};
+
+template<typename T>
+struct is_deserializable_stream<T, void_t<decltype(T{}), decltype(std::declval<MAssIpc_DataStream&>() >> std::declval<T&>())>>: std::true_type
+{
+};
 
 template <typename TCheckedType, typename = void>
 struct IsReadStreamCreating: std::false_type
@@ -756,6 +770,7 @@ struct Deserialize_DefConstruct
 	template<class T>
 	static inline T Do(MAssIpc_DataStream& call_info)
 	{
+		static_assert(is_deserializable_stream<T>::value, "not deserializable");
 		T t{};
 		call_info>>t;
 		return t;
@@ -794,10 +809,36 @@ static inline T MakeDefault()
 }
 
 //-------------------------------------------------------
+template<typename TypeNotImplemented, typename = void>
+struct is_serializable: std::false_type
+{
+	static_assert((sizeof(TypeNotImplemented)<0) || PrintAssertType<TypeNotImplemented>::value, "serializer for type TypeNotImplemented not implemented");
+};
+
+template<typename T>
+struct is_serializable<T, void_t<decltype(std::declval<MAssIpc_DataStream&>() << std::declval<T>())>>: std::true_type
+{
+};
+
+template<typename TypeNotImplemented, typename = void>
+struct is_deserializable: std::false_type
+{
+	static_assert((sizeof(TypeNotImplemented)<0) || PrintAssertType<TypeNotImplemented>::value, "deserializer for type TypeNotImplemented not implemented");
+};
+
+template<typename T>
+struct is_deserializable<T, void_t<decltype(&ReadFromStream<T>)>>: std::true_type
+{
+};
+//-------------------------------------------------------
+
 
 template<class... Args, size_t... Indexes>
 static inline std::tuple<Args...> DeserializeArgs(MAssIpc_DataStream& call_info, index_tuple< Indexes... >)
 {
+	int unpack[]{0,(is_deserializable<Args>(), 0)...};
+	static_assert(sizeof(unpack) > 0, "disable warning local variable is initialized but not referenced");
+
 	std::tuple<Args...> tup{(ReadFromStream<typename std::tuple_element<Indexes, std::tuple<Args...>>::type>(call_info))...};
 	static_assert(sizeof(tup)>0, "disable warning local variable is initialized but not referenced");
 	return tup;
@@ -807,7 +848,7 @@ static inline std::tuple<Args...> DeserializeArgs(MAssIpc_DataStream& call_info,
 template<class... Args>
 static inline void SerializeArgs(MAssIpc_DataStream& call_info, const Args&... args)
 {
-	int unpack[]{0,((call_info<<args),0)...};
+	int unpack[]{0,(is_serializable<Args>(), (call_info<<args),0)...};
 	static_assert(sizeof(unpack) > 0, "disable warning local variable is initialized but not referenced");
 }
 
@@ -907,9 +948,10 @@ struct ProcSignature<Ret(*)(Args... args)>
 	template<class ParamsTypeHolder_T>
 	static inline void GetParams(ParamsTypeHolder_T* params_type)
 	{
-		int unpack[]{0,((params_type->AddType(RawString(MAssIpcType<Args>::NameValue(), MAssIpcType<Args>::NameLength()))
+		int unpack[]{0,((params_type->AddType(RawString(MAssIpcType<typename std::remove_reference<Args>::type>::NameValue(),
+														MAssIpcType<typename std::remove_reference<Args>::type>::NameLength()))
 #if !(_MSC_VER==1916)// Visual Studio 2017 compiler crashes trying compile this
-						 , CheckSeparatorInName<MAssIpcType<Args>::name_value>()
+						 , CheckSeparatorInName<MAssIpcType<typename std::remove_reference<Args>::type>::name_value>()
 #endif
 						 ),0)...};
 		static_assert(sizeof(unpack) > 0, "disable warning local variable is initialized but not referenced");
