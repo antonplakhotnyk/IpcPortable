@@ -44,9 +44,10 @@ public:
 
 	enum struct ConnectionUsage
 	{
-		newly_connected,
-		not_used,
-		use_ipc_call,
+		newly_connected = 1<<0,
+		not_used		= 1<<1,
+		use_ipc_call	= 1<<2,
+		not_use_ipc_call= std::underlying_type<ConnectionUsage>::type(newly_connected)|std::underlying_type<ConnectionUsage>::type(not_used),
 	};
 
 	struct ConnectionState
@@ -146,6 +147,20 @@ public:
 				it->second.usage = ConnectionUsage::use_ipc_call;
 	}
 
+	void Connections_SetUsed(ConnectionId connection_id)
+	{
+		std::unique_lock<std::recursive_mutex> lock(m_client_internals->m_connections_mutex);
+
+		auto it = m_client_internals->m_connections.find(connection_id);
+		if( it == m_client_internals->m_connections.end() )
+			return;// not valid disconnected
+		if( it->second.usage == ConnectionUsage::use_ipc_call )
+			return;// already used
+
+		it->second.usage = ConnectionUsage::use_ipc_call;
+	}
+
+
 	void Connections_SetNotUsed(ConnectionId connection_id)
 	{
 		std::unique_lock<std::recursive_mutex> lock(m_client_internals->m_connections_mutex);
@@ -178,7 +193,7 @@ public:
 
 		std::vector<ConnectionId> filtered_connections;
 		for( const auto& entry : m_client_internals->m_connections )
-			if( entry.second.usage == usage )
+			if( (std::underlying_type<ConnectionUsage>::type(entry.second.usage)&std::underlying_type<ConnectionUsage>::type(usage)) != 0 )
 				filtered_connections.push_back(entry.first);
 
 		return filtered_connections;
