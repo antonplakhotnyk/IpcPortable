@@ -4,8 +4,9 @@
 #include <QtCore/QThread>
 #include "IpcQt_NetClient.h"
 #include "TestabilityThreadQt.h"
+#include "TestabilityWaitReady.h"
 
-class TestabilityClientQt: public QThread
+class TestabilityClientQt
 {
 public:
 

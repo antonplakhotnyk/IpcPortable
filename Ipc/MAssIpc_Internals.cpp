@@ -8,7 +8,7 @@ namespace MAssIpcImpl
 static std::unique_ptr<MAssIpc_Data> CreateDataBuffer(const std::weak_ptr<MAssIpc_TransportShare>& weak_transport, MAssIpc_Data::PacketSize packet_size)
 {
 	auto transport = weak_transport.lock();
-	mass_return_x_if_equal(bool(transport), false, {});
+	return_x_if_equal_mass_ipc(bool(transport), false, {});
 	return transport->Create(packet_size);
 }
 
@@ -38,7 +38,7 @@ MAssIpc_DataStream CreateDataStreamInplace(std::unique_ptr<MAssIpc_Data> inplace
 											  MAssIpc_PacketParser::CallId respond_id)
 {
 	MAssIpc_Data::PacketSize packet_size = no_header_size+MAssIpc_PacketParser::c_net_call_packet_header_size;
-	mass_return_x_if_equal(inplace_send_buffer->Size() < packet_size, true, {});
+	return_x_if_equal_mass_ipc(inplace_send_buffer->Size() < packet_size, true, {});
 	MAssIpc_DataStream result(std::move(inplace_send_buffer));
 	MAssIpcImpl::MAssIpc_PacketParser::PacketHeaderWrite(result, no_header_size, MAssIpcImpl::MAssIpc_PacketParser::PacketType::pt_call, respond_id);
 	return result;
@@ -57,9 +57,9 @@ std::unique_ptr<const MAssIpc_Data> SerializeReturn(const std::weak_ptr<MAssIpc_
 
 void ResultJob::Invoke(const std::weak_ptr<MAssIpc_TransportShare>& transport, std::unique_ptr<const MAssIpc_Data>& result)
 {
-	mass_return_if_equal(result->Size()>=MAssIpc_PacketParser::c_net_call_packet_header_size, false);
+	return_if_equal_mass_ipc(result->Size()>=MAssIpc_PacketParser::c_net_call_packet_header_size, false);
 	auto transport_strong = transport.lock();
-	mass_return_if_equal(bool(transport_strong), false);
+	return_if_equal_mass_ipc(bool(transport_strong), false);
 	transport_strong->Write(std::move(result));
 }
 
@@ -137,7 +137,7 @@ std::shared_ptr<const CallInfo> ProcMap::AddProcSignature(const RawString& proc_
 	}
 	else
 	{
-		mass_return_x_if_equal(bool(it_name_params->second.call_info->IsInvokable()) && invoke_callable, true, {});// add or override currently actual invoke
+		return_x_if_equal_mass_ipc(bool(it_name_params->second.call_info->IsInvokable()) && invoke_callable, true, {});// add or override currently actual invoke
 		it_name_params->second = CallData{it_name_params->second.call_info, comment};
 		result_call_info = it_name_params->second.call_info;
 	}

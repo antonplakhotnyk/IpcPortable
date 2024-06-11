@@ -64,17 +64,18 @@ public:
 		return m_read->data.size();
 	}
 
-	void	Read(uint8_t* data, size_t size) override
+	bool	Read(uint8_t* data, size_t size) override
 	{
 		std::lock_guard<std::mutex> lock(m_read->lock);
 		SyncData& sync = *m_read;
 		if( sync.on_read )
 			sync.on_read();// it not necessary but ipc must survive this
 		if( sync.data.size()<size )
-			return;// unexpected
+			return false;// unexpected
 		std::copy(sync.data.begin(), sync.data.begin()+size, data);
 		sync.data.erase(sync.data.begin(), sync.data.begin()+size);
 		sync.incoming_data = false;
+		return true;
 	}
 
 	void	Write(const uint8_t* data, size_t size) override

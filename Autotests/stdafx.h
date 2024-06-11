@@ -5,4 +5,4 @@
 #include <vector>
 
 #include "CompilerSpecific.h"
-
+#include "MAssIpc_Macros.h"

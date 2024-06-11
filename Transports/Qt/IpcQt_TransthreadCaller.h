@@ -2,164 +2,119 @@
 
 #include <QtCore/QThread>
 #include <QtCore/QEvent>
-#include "MAssIpc_TransthreadTarget.h"
+#include <QtCore/QCoreApplication>
+
+#include "MAssIpc_TransthreadCaller.h"
+#include "MAssIpc_Transthread.h"
 #include "IpcQtBind_TransthreadCaller.h"
-#include <memory>
-#include <mutex>
-#include <condition_variable>
-#include <set>
+#include "MAssIpc_Macros.h"
 
-class IpcQt_TransthreadCaller: public IpcQtBind_TransthreadCaller
+
+class IpcQt_TransthreadCaller: public MAssIpc_TransthreadCaller, public MAssIpc_Transthread, public IpcQtBind_TransthreadCaller
 {
-	class CallWaiterPrivate;
-
-public:
-	IpcQt_TransthreadCaller();
-	~IpcQt_TransthreadCaller();
-
-	static MAssIpc_TransthreadTarget::Id	AddTargetThread(QThread* sender_or_receiver);
-
-	static void CancelDisableWaitingCall(MAssIpc_TransthreadTarget::Id thread_waiting_call);
-
-	class CallEvent;
-	class CallWaiter;
-
-	std::shared_ptr<CallWaiter> CallFromThread(MAssIpc_TransthreadTarget::Id receiver_thread_id, std::unique_ptr<CallEvent> call);
-
 public:
 
-	class CallWaiter
+	IpcQt_TransthreadCaller()
 	{
-	public:
+		CreateInternals<InternalsImpl>();
+		AddTargetThread(QThread::currentThread());
+	}
 
-		virtual ~CallWaiter() = default;
+	~IpcQt_TransthreadCaller()
+	{
+	}
 
-		enum CallState: uint8_t
-		{
-			cs_no_call,
-			cs_inprogress,
-			cs_canceled,
-			cs_done,
-			cs_receiver_thread_finished
-		};
+	static MAssIpc_TransthreadTarget::Id	AddTargetThread(QThread* sender_or_receiver)
+	{
+		MAssIpc_TransthreadTarget::Id thread_id = IpcQtBind_TransthreadCaller::GetId(sender_or_receiver);
+		return MAssIpc_TransthreadCaller::AddTargetThreadId(thread_id);
+	}
 
-		virtual CallState WaitProcessing()
-		{
-			return cs_no_call;
-		}
+	struct CallEvent: QObject, QEvent, MAssIpc_TransthreadCaller::Call
+	{
+		CallEvent(): QEvent(QEvent::User){}
 	};
 
-	class CallEvent: public QEvent
+	std::shared_ptr<MAssIpc_TransthreadCaller::CallWaiter>			CallFromThread(MAssIpc_TransthreadTarget::Id thread_id, std::unique_ptr<CallEvent> call)
 	{
-	public:
-
-		CallEvent():QEvent(QEvent::User)
-		{
-		}
-
-		void ProcessCallFromTargetThread();
-
-		void SetCallWaiter(std::shared_ptr<CallWaiterPrivate> call_waiter);
-
-	protected:
-		virtual void CallFromTargetThread() = 0;
-
-	protected:
-
-		std::shared_ptr<CallWaiterPrivate> m_call_waiter;
-	};
-
-protected:
-
-	static void ProcessCalls();
+		return MAssIpc_TransthreadCaller::CallFromThread(thread_id, std::move(call));
+	}
 
 private:
 
-	struct WaitSync
+	void			CallFromThread(MAssIpc_TransthreadTarget::Id thread_id, std::unique_ptr<Job> job) override
 	{
-		void ProcessIncomingCall();
+		std::unique_ptr<JobEvent> call(std::make_unique<JobEvent>(std::move(job)));
+		MAssIpc_TransthreadCaller::CallFromThread(thread_id, std::move(call));
+	}
 
-		bool process_incoming_call = false;
-		std::condition_variable_any	condition;
-		std::recursive_mutex mutex_sync;
+	MAssIpc_TransthreadTarget::Id	GetResultSendThreadId() override
+	{
+		return MAssIpc_TransthreadTarget::DirectCallPseudoId();
+	}
+
+
+
+	struct InternalsImpl: MAssIpc_TransthreadCaller::Internals
+	{
+		void PostEvent(const std::shared_ptr<ThreadCallReceiver>& receiver, std::unique_ptr<Call> call) override
+		{
+			std::unique_ptr<CallEvent> call_qevent{dynamic_cast_unique_ptr<CallEvent>(std::move(call))};
+			std::shared_ptr<Receiver> reciver_qobject = std::dynamic_pointer_cast<Receiver>(receiver);
+			return_if_equal_msg_mass_ipc(bool(call_qevent), false, assert_msg_unexpected);
+			return_if_equal_msg_mass_ipc(bool(reciver_qobject), false, assert_msg_unexpected);
+			QCoreApplication::postEvent(reciver_qobject.get(), call_qevent.release());
+		}
+
+		void ProcessReceiver(const std::shared_ptr<ThreadCallReceiver>& receiver) override
+		{
+			std::shared_ptr<Receiver> reciver_qobject = std::dynamic_pointer_cast<Receiver>(receiver);
+			return_if_equal_msg_mass_ipc(bool(reciver_qobject), false, assert_msg_unexpected);
+			QCoreApplication::sendPostedEvents(reciver_qobject.get());
+		}
+
+		std::shared_ptr<ThreadCallReceiver> CreateReceiver(MAssIpc_TransthreadTarget::Id sender_or_receiver_id) override
+		{
+			QThread* thread_sender_or_receiver = IpcQtBind_TransthreadCaller::GetQThread(sender_or_receiver_id);
+			std::shared_ptr<Receiver> sender_or_receiver = std::make_shared<Receiver>();
+			QObject::connect(thread_sender_or_receiver, &QThread::finished, sender_or_receiver.get(), &Receiver::OnFinished_ReceiverThread);
+			sender_or_receiver->moveToThread(thread_sender_or_receiver);
+			return sender_or_receiver;
+		}
 	};
 
-	class CallWaiterPrivate: public CallWaiter
+private:
+
+	struct Receiver:QObject, ThreadCallReceiver
 	{
-	public:
-
-		CallWaiterPrivate(std::shared_ptr<std::set<CallWaiterPrivate*> > sender_calls,
-						  std::shared_ptr<std::set<CallWaiterPrivate*> > receiver_calls,
-						  std::shared_ptr<WaitSync> wait_return_processing_calls,
-						  const std::shared_ptr<std::recursive_mutex>& lock_threads)
-			:m_wait_return_processing_calls(wait_return_processing_calls)
-			, m_sender_calls(sender_calls)
-			, m_receiver_calls(receiver_calls)
-			, lock_threads(lock_threads)
+		void OnFinished_ReceiverThread()
 		{
-			std::unique_lock<std::recursive_mutex> lock(*this->lock_threads.get());
-			if( m_sender_calls )
-				m_sender_calls->insert(this);
-			if( m_receiver_calls )
-				m_receiver_calls->insert(this);
+			ThreadCallReceiver::OnFinished_ReceiverThread();
 		}
 
-		~CallWaiterPrivate()
+
+		void customEvent(QEvent* event) override
 		{
-			std::unique_lock<std::recursive_mutex> lock(*this->lock_threads.get());
-			if( m_sender_calls )
-				m_sender_calls->erase(this);
-			if( m_receiver_calls )
-				m_receiver_calls->erase(this);
+			CallEvent* ev = dynamic_cast<CallEvent*>(event);
+			return_if_equal_msg_mass_ipc(ev, nullptr, assert_msg_unexpected);
+			ev->ProcessCallFromTargetThread();
 		}
+	};
 
-		CallState WaitProcessing() override;
-
-		void CallDone();
-		void CallCancel();
-		void SetReceiverThreadFinished();
-
+	struct JobEvent: CallEvent
+	{
+		JobEvent(std::unique_ptr<MAssIpc_Transthread::Job> job)
+			: m_job(std::move(job))
+		{
+		}
 	private:
-		CallState m_call_state = cs_inprogress;
-		std::shared_ptr<WaitSync> m_wait_return_processing_calls;
-
-		const std::shared_ptr<std::set<CallWaiterPrivate*> > m_sender_calls;
-		const std::shared_ptr<std::set<CallWaiterPrivate*> > m_receiver_calls;
-		const std::shared_ptr<std::recursive_mutex>	lock_threads;
-	};
-
-
-
-private:
-
-
-	struct ThreadCallReceiver:public QObject
-	{
-		void customEvent(QEvent* event) override;
-		void OnFinished_ReceiverThread();
-
-		std::shared_ptr<WaitSync> GetWaitCallSync() const;
-
-		std::shared_ptr<std::set<CallWaiterPrivate*> > m_call_waiters_sender = std::make_shared<std::set<CallWaiterPrivate*>>();
-		std::shared_ptr<std::set<CallWaiterPrivate*> > m_call_waiters_receiver = std::make_shared<std::set<CallWaiterPrivate*>>();
-
+		void CallFromTargetThread() override
+		{
+			m_job->Invoke();
+		}
 	private:
-		const std::shared_ptr<WaitSync> m_sender_wait_return_receiver_processing_calls = std::make_shared<WaitSync>();
+		std::unique_ptr<MAssIpc_Transthread::Job> m_job;
 	};
 
-	struct Internals
-	{
-		const std::shared_ptr<std::recursive_mutex>	lock_threads = std::make_shared<std::recursive_mutex>();
-		std::map<MAssIpc_TransthreadTarget::Id, std::shared_ptr<ThreadCallReceiver> > threads;
-	};
 
-	static std::shared_ptr<Internals> GetInternals();
-	decltype(Internals::threads)::iterator MakeFindThread(MAssIpc_TransthreadTarget::Id receiver_thread_id);
-
-private:
-
-	std::shared_ptr<Internals> m_int;
-	static std::weak_ptr<Internals> s_int_inter_thread;
-	static std::recursive_mutex	s_lock_int_inter_thread;
 };
-

@@ -1,8 +1,7 @@
 #include "MAssIpc_DataStream.h"
 #include <cstring>
-#include "MAssIpc_Macros.h"
 #include <limits>
-
+#include "MAssIpc_Macros.h"
 
 MAssIpc_DataStream::MAssIpc_DataStream(std::unique_ptr<const MAssIpc_Data> data_read)
 	:m_read(std::move(data_read))
@@ -45,7 +44,7 @@ MAssIpc_Data* MAssIpc_DataStream::GetDataWrite() const
 
 bool MAssIpc_DataStream::CheckAssert(bool assert)
 {
-	mass_return_x_if_equal(assert, true, assert);
+	return_x_if_equal_mass_ipc(assert, true, assert);
 	return assert;
 }
 
@@ -62,7 +61,7 @@ uint8_t* MAssIpc_DataStream::WriteRawData(MAssIpc_Data::PacketSize len)
 	if( m_write )
 	{
 		MAssIpc_Data::PacketSize size = m_write->Size();
-		mass_return_x_if_equal((m_write_pos<(std::numeric_limits<MAssIpc_Data::PacketSize>::max()-len))&&(size < m_write_pos+len), true, nullptr);
+		return_x_if_equal_mass_ipc((m_write_pos<(std::numeric_limits<MAssIpc_Data::PacketSize>::max()-len))&&(size < m_write_pos+len), true, nullptr);
 
 		bytes = m_write->Data()+m_write_pos;
 	}
@@ -74,7 +73,7 @@ uint8_t* MAssIpc_DataStream::WriteRawData(MAssIpc_Data::PacketSize len)
 
 const uint8_t* MAssIpc_DataStream::ReadRawData(MAssIpc_Data::PacketSize len)
 {
-	mass_return_x_if_equal(IsReadAvailable(len), false, nullptr);
+	return_x_if_equal_mass_ipc(IsReadAvailable(len), false, nullptr);
 	const uint8_t* pos = m_read->Data()+m_read_pos;
 	m_read_pos += len;
 	return pos;
@@ -283,10 +282,12 @@ MAssIpc_DataStream& operator>>(MAssIpc_DataStream& stream, std::string& v)
 {
 	uint32_t length = 0;
 	stream>>length;
-	v.resize(length/sizeof(char));
+	const MAssIpc_Data::PacketSize read_raw_size = length*sizeof(std::string::value_type);
+ 	return_x_if_not_equal_mass_ipc(stream.IsReadAvailable(read_raw_size), true, stream);
+	v.resize(length/sizeof(std::string::value_type));
 	char* raw_data = &v[0];
 	if( length!=0 )
-		stream.ReadRawData(reinterpret_cast<uint8_t*>(raw_data), length/sizeof(char));
+		stream.ReadRawData(reinterpret_cast<uint8_t*>(raw_data), read_raw_size);
 	return stream;
 }
 

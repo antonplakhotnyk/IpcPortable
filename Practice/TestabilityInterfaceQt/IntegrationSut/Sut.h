@@ -8,7 +8,7 @@ class Sut
 private:
 
 	template<class TStub>
-	struct DeclareStaticVariable
+	struct DeclareStaticMap
 	{
 		static std::weak_ptr<EventHandlerMap> s_sut_event_map;
 	};
@@ -23,10 +23,57 @@ protected:
 
 	static std::weak_ptr<EventHandlerMap>* GetEventHandlerMap()
 	{
-		return &DeclareStaticVariable<void>::s_sut_event_map;
+		return &DeclareStaticMap<void>::s_sut_event_map;
 	}
 
 public:
+
+	static constexpr uint16_t c_default_autotest_server_port = 2233;
+	static constexpr char c_arg_autotest_server[] = "-autotest-server";
+	static constexpr char c_arg_autotest_server_port[] = "-autotest-server-port";
+
+	struct Addr
+	{
+		std::string host_name;
+		uint16_t target_port;
+
+		operator bool() const
+		{
+			return !host_name.empty();
+		}
+	};
+
+protected:
+
+	template<class TSpecificSut>
+	struct DeleterStorage
+	{
+		DeleterStorage(const Sut::Addr& connect_to_address, std::weak_ptr<EventHandlerMap>* sut_event_map)
+			:specific_sut(connect_to_address, sut_event_map)
+		{
+		}
+
+		TSpecificSut specific_sut;
+	};
+
+	template<class TSpecificSut>
+	struct DeclareStaticInst
+	{
+		static std::weak_ptr<DeleterStorage<TSpecificSut>> s_sut_inst;
+	};
+
+	template<class TSpecificSut>
+	static std::shared_ptr<DeleterStorage<TSpecificSut>> InitClient(const Addr& addr)
+	{
+		std::shared_ptr<DeleterStorage<TSpecificSut>> sut_inst(new DeleterStorage<TSpecificSut>(addr, Sut::GetEventHandlerMap()));
+		DeclareStaticInst<TSpecificSut>::s_sut_inst = sut_inst;
+		return sut_inst;
+	}
+
+
+
+public:
+
 
 	// float a;
 	// int b = 0;
@@ -108,4 +155,7 @@ public:
 
 //-------------------------------------------------------
 template<class TStub>
-std::weak_ptr<EventHandlerMap> Sut::DeclareStaticVariable<TStub>::s_sut_event_map;
+std::weak_ptr<EventHandlerMap> Sut::DeclareStaticMap<TStub>::s_sut_event_map;
+
+template<class TSpecificSut>
+std::weak_ptr<Sut::DeleterStorage<TSpecificSut>> Sut::DeclareStaticInst<TSpecificSut>::s_sut_inst;

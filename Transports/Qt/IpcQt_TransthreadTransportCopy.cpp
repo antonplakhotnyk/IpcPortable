@@ -17,27 +17,27 @@ void IpcQt_TransthreadTransportCopy::CallFromThread(std::function<void()> invoke
 		invoke_proc();
 	else
 	{
-		std::unique_ptr<Call> call(std::make_unique<Call>(m_transport, invoke_proc));
-		if(std::shared_ptr<IpcQt_TransthreadCaller::CallWaiter> call_waiter = m_inter_thread->CallFromThread(m_transport_thread_id, std::move(call)))
+		std::unique_ptr<CallProc> call(std::make_unique<CallProc>(m_transport, invoke_proc));
+		if(std::shared_ptr<MAssIpc_TransthreadCaller::CallWaiter> call_waiter = m_inter_thread->CallFromThread(m_transport_thread_id, std::move(call)))
 			call_waiter->WaitProcessing();
 	}
 }
 
 bool	IpcQt_TransthreadTransportCopy::WaitRespond(size_t expected_size)
 {
-	std::shared_ptr<bool> result(std::make_shared<bool>(false));
+	std::shared_ptr<std::atomic<bool>> result(std::make_shared<std::atomic<bool>>(false));
 	auto invoke_proc = [=, result = result, transport = m_transport]()
 	{
-		*result.get() = transport->WaitRespond(expected_size);
+		result->store(transport->WaitRespond(expected_size));
 	};
 
 	CallFromThread(invoke_proc);
-	return *result.get();
+	return result->load();
 }
 
 size_t	IpcQt_TransthreadTransportCopy::ReadBytesAvailable()
 {
-	std::shared_ptr<std::atomic<size_t> > result(std::make_shared<std::atomic<size_t> >(false));
+	std::shared_ptr<std::atomic<size_t> > result(std::make_shared<std::atomic<size_t> >(0));
 	auto invoke_proc = [result, transport = m_transport]()
 	{
 		result->store(transport->ReadBytesAvailable());
@@ -47,14 +47,16 @@ size_t	IpcQt_TransthreadTransportCopy::ReadBytesAvailable()
 	return result->load();
 }
 
-void	IpcQt_TransthreadTransportCopy::Read(uint8_t* data, size_t size)
+bool	IpcQt_TransthreadTransportCopy::Read(uint8_t* data, size_t size)
 {
-	auto invoke_proc = [=, transport = m_transport]()
+	std::shared_ptr<std::atomic<bool>> result(std::make_shared<std::atomic<bool>>(false));
+	auto invoke_proc = [=, result = result, transport = m_transport]()
 	{
-		transport->Read(data, size);
+		result->store(transport->Read(data, size));
 	};
 
 	CallFromThread(invoke_proc);
+	return result->load();
 }
 
 void	IpcQt_TransthreadTransportCopy::Write(const uint8_t* data, size_t size)

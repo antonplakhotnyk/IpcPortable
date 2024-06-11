@@ -31,7 +31,7 @@ private:
 	bool	WaitRespond(size_t expected_size) override;
 
 	size_t	ReadBytesAvailable() override;
-	void	Read(uint8_t* data, size_t size) override;
+	bool	Read(uint8_t* data, size_t size) override;
 	void	Write(const uint8_t* data, size_t size) override;
 
 

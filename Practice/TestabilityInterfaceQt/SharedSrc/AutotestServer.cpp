@@ -1,5 +1,4 @@
 #include "AutotestServer.h"
-#include "MAssIpc_Macros.h"
 
 AutotestServer::AutotestServer(const Params& params)
 	:m_background_thread(nullptr, [this, params](){Background_Main(params);})
@@ -21,10 +20,10 @@ void AutotestServer::Background_Main(const Params& params)
 	m_client_internals = client_internals;
 	m_server_internals = transport_tcp_server;
 	m_waiter = client_internals->m_waiter;
-	m_int_ready.SetReady();
 
 	transport_tcp_server->ListenRestart();
 
+	m_int_ready.SetReady();
 	event_loop.exec();
 
 	transport_tcp_server->Server()->close();
@@ -119,7 +118,7 @@ void AutotestServer::ServerInternals::RemoveConnection(const std::weak_ptr<IpcQt
 std::shared_ptr<AutotestServer_Client> AutotestServer::CreateClient(/*const AutotestServer_Client::Handlers& handlers*/)
 {
 	auto server_internals = m_server_internals.lock();
-	mass_return_x_if_equal(bool(server_internals), false, {});
+	return_x_if_equal_mass_ipc(bool(server_internals), false, {});
 
 	std::shared_ptr<AutotestServer::ClientPrivate> new_client{new AutotestServer::ClientPrivate(/*handlers,*/ m_client_internals)};
 	server_internals->AddClient(new_client);

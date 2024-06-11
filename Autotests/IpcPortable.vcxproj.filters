@@ -54,6 +54,9 @@
     <ClCompile Include="Main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\Ipc\MAssIpc_TransthreadCaller.cpp">
+      <Filter>Ipc</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h">
@@ -78,9 +81,6 @@
       <Filter>Ipc</Filter>
     </ClInclude>
     <ClInclude Include="..\Ipc\MAssIpc_Internals.h">
-      <Filter>Ipc</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Ipc\MAssIpc_Macros.h">
       <Filter>Ipc</Filter>
     </ClInclude>
     <ClInclude Include="..\Ipc\MAssIpc_PacketParser.h">
@@ -124,6 +124,15 @@
     </ClInclude>
     <ClInclude Include="..\Ipc\MAssIpc_Packet.h">
       <Filter>Ipc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Ipc\MAssIpc_TransthreadCaller.h">
+      <Filter>Ipc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Ipc\Integration\MAssIpc_Macros.h">
+      <Filter>Ipc\Integration</Filter>
+    </ClInclude>
+    <ClInclude Include="IpcIntegration\MAssIpc_Macros.h">
+      <Filter>IpcIntegration</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

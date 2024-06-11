@@ -6,6 +6,7 @@
 #include "MAssIpcWaiter.h"
 #include "TestabilityThreadQt.h"
 #include "IpcQt_TransportTcpServer.h"
+#include "TestabilityWaitReady.h"
 
 class AutotestServer
 {

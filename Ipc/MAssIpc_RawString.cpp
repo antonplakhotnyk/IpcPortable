@@ -24,7 +24,7 @@ void RawString::Write(MAssIpc_DataStream& stream) const
 MAssIpc_Data::PacketSize RawString::ConvertCheckStrLen(size_t str_len)
 {
 	MAssIpc_Data::PacketSize res = MAssIpc_Data::PacketSize(str_len);
-	mass_return_x_if_not_equal(res, str_len, 0);
+	return_x_if_not_equal_mass_ipc(res, str_len, 0);
 	return res;
 }
 

@@ -13,58 +13,48 @@
 class TestabilityGlobalQt: public Sut
 {
 public:
-	struct Addr;
+	using Sut::Addr;
+
 private:
 
 	template<class TSpecificSut>
-	struct DeleterStorage: public QObject
+	struct DeleterStorageQt: QObject
 	{
-		DeleterStorage(QObject* parent, const TestabilityGlobalQt::Addr& connect_to_address, std::weak_ptr<EventHandlerMap>* sut_event_map)
+		DeleterStorageQt(QObject* parent, std::shared_ptr<DeleterStorage<TSpecificSut>> sut_inst)
 			:QObject(parent)
-			, specific_sut(connect_to_address, sut_event_map)
+			, sut_inst(sut_inst)
 		{
 		}
 
-		TSpecificSut specific_sut;
+		std::shared_ptr<DeleterStorage<TSpecificSut>> sut_inst;
 	};
 
-	template<class TSpecificSut>
-	struct DeclareStaticVariable
+	template<class TStub>
+	struct DeclareStaticIpc
 	{
-		static QPointer<DeleterStorage<TSpecificSut>> s_sut_inst;
+		static MAssIpcCall s_ipc_global;
 	};
 
 public:
 
-	static constexpr uint16_t c_default_autotest_server_port = 2233;
-	static constexpr char c_arg_autotest_server[] = "-autotest-server";
-	static constexpr char c_arg_autotest_server_port[] = "-autotest-server-port";
-
-	struct Addr
-	{
-		QString host_name;
-		uint16_t target_port;
-
-		operator bool() const
-		{
-			return !host_name.isEmpty();
-		}
-	};
-
 	static Addr GetArgServerAddr(const QStringList& args);
 
-	static class MAssIpcCall& Ipc();
 
 	template<class TSpecificSut>
 	static void InitClient(const QStringList& args, QObject* sut_deleter_parent = QCoreApplication::instance())
 	{
-		if( !DeclareStaticVariable<TSpecificSut>::s_sut_inst )
+		if( !DeclareStaticInst<TSpecificSut>::s_sut_inst.lock() )
 			if( Addr addr = GetArgServerAddr(args) )
 			{
 				sut_deleter_parent = InitCheckDeleterParent(sut_deleter_parent);
 				if( sut_deleter_parent )
-					DeclareStaticVariable<TSpecificSut>::s_sut_inst = new DeleterStorage<TSpecificSut>(sut_deleter_parent, addr, Sut::GetEventHandlerMap());
+					new DeleterStorageQt<TSpecificSut>(sut_deleter_parent, Sut::InitClient<TSpecificSut>(addr));
 			}
+	}
+
+	static class MAssIpcCall& Ipc()
+	{
+		return DeclareStaticIpc<void>::s_ipc_global;
 	}
 
 private:
@@ -74,5 +64,5 @@ private:
 	static QString GetArgParam_String(const QStringList& args, const char* arg);
 };
 
-template<class TSpecificSut>
-QPointer<TestabilityGlobalQt::DeleterStorage<TSpecificSut>> TestabilityGlobalQt::DeclareStaticVariable<TSpecificSut>::s_sut_inst;
+template<class TStub>
+MAssIpcCall TestabilityGlobalQt::DeclareStaticIpc<TStub>::s_ipc_global({});

@@ -1,5 +1,4 @@
 #include "IpcQt_TransportTcpServer.h"
-#include "MAssIpc_Macros.h"
 
 
 IpcQt_TransportTcpServer::IpcQt_TransportTcpServer(uint16_t listen_port)
@@ -34,7 +33,7 @@ void IpcQt_TransportTcpServer::NewConnection()
 void IpcQt_TransportTcpServer::ClearConnection(std::weak_ptr<IpcQt_TransporTcp> transport)
 {
  	auto connection_transport = transport.lock();
-	mass_return_if_equal(bool(connection_transport), false);
+	return_if_equal(bool(connection_transport), false);
 	m_connection_transports.erase(connection_transport);
 }
 

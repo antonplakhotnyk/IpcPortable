@@ -31,7 +31,14 @@ public:
 
 private:
 	void ReceiveReadHeader(const std::shared_ptr<MAssIpc_TransportCopy>& in_data);
-	bool ReadDataIsAvailable(const std::shared_ptr<MAssIpc_TransportCopy>& in_data, uint8_t* buffer, PacketSize incoming_packet_data_size);
+	
+	enum struct ReadDataStatus
+	{
+		available,
+		nodata,
+		failed,
+	};
+	ReadDataStatus ReadDataIsAvailable(const std::shared_ptr<MAssIpc_TransportCopy>& in_data, uint8_t* buffer, PacketSize incoming_packet_data_size);
 
 
 private:

@@ -33,20 +33,6 @@ void TestabilityClientQt::Background_Main(MAssIpcCall& ipc_connection, const Tes
 
 	internals->StartConnection();
 
-	//	m_ipc_net.Ipc().AddHandler("AutotestServerConnected", std::function<void()>(&AutotestServerConnected));
-
-// 	{// Connection logic should be more sophisticated
-// 		while( true )
-// 		{
-// 			internals->m_ipc_net.GetIpcClientTcpTransport().StartConnection(connect_to_address);
-// 			if( internals->m_ipc_net.GetIpcClientTcpTransport().WaitConnection() )
-// 				break;
-// 			QThread::sleep(5);// retry connect after 5 secconds
-// 		}
-// 	}
-
-	// 	m_ipc_net.Ipc().WaitInvoke("TestProc");
-
 	event_loop.exec();
 }
 

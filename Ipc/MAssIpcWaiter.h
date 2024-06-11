@@ -155,7 +155,7 @@ public:
 
 		void BindCheck(const std::shared_ptr<Check>& check, const void* filter_id)
 		{
-			mass_return_if_equal(bool(check), false);
+			return_if_equal_mass_ipc(bool(check), false);
 			std::unique_lock<std::mutex> lock(m_cwl->lock_events);
 
 			InsertSharedCheckLocked(check, filter_id);
@@ -165,8 +165,8 @@ public:
 
 		void BindEvent(Event* other_shared_checks)
 		{
-			mass_return_if_equal(bool(other_shared_checks), false);
-			mass_return_if_not_equal(other_shared_checks->m_cwl.get(), m_cwl.get());
+			return_if_equal_mass_ipc(bool(other_shared_checks), false);
+			return_if_not_equal_mass_ipc(other_shared_checks->m_cwl.get(), m_cwl.get());
 
 			std::unique_lock<std::mutex> lock(m_cwl->lock_events);
 	
@@ -328,7 +328,7 @@ public:
 					  bool interpret_as_cancel = false)
 		{
 			auto event_id = check_event_id.lock();
-			mass_return_if_equal(bool(event_id), false);
+			return_if_equal_mass_ipc(bool(event_id), false);
 			
 			static_assert(InitialCount::zero == InitialCount(0));
 			MAssIpcCall::CallInfo::TCounter wait_start_call_count = (initial_count==InitialCount::current) ? event_id->GetCallCount() : MAssIpcCall::CallInfo::TCounter(initial_count);
@@ -415,7 +415,7 @@ public:
 
 			void SignalChangeState(State es)
 			{
-				mass_return_if_equal(es<State::undefined_enum_count, false);
+				return_if_equal_mass_ipc(es<State::undefined_enum_count, false);
 				std::unique_lock<std::mutex> lock(m_cwl->lock_events);
 				m_actual_counters->conters[size_t(es)]++;
 				m_cwl->condition_events.notify_all();
@@ -437,8 +437,8 @@ public:
 
 		void BindConnect(State signal_state, const std::shared_ptr<Signaling>& signaling_actual_state, InitialCount initial_count = InitialCount::current, bool interpret_as_cancel=false)
 		{
-			mass_return_if_not_equal(signaling_actual_state->m_cwl, m_cwl);
-			mass_return_if_equal(signal_state<State::undefined_enum_count, false);
+			return_if_not_equal_mass_ipc(signaling_actual_state->m_cwl, m_cwl);
+			return_if_equal_mass_ipc(signal_state<State::undefined_enum_count, false);
 			const void* connection_filter_id = signaling_actual_state.get();
 
 			ActualCounters::TCounter wait_start_count;

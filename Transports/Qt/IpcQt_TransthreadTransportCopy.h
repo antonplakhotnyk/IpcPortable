@@ -16,17 +16,17 @@ public:
 	bool	WaitRespond(size_t expected_size) override;
 
 	size_t	ReadBytesAvailable() override;
-	void	Read(uint8_t* data, size_t size) override;
+	bool	Read(uint8_t* data, size_t size) override;
 	void	Write(const uint8_t* data, size_t size) override;
 
 private:
 
 	void CallFromThread(std::function<void()> invoke_proc);
 
-	class Call: public IpcQt_TransthreadCaller::CallEvent
+	class CallProc: public IpcQt_TransthreadCaller::CallEvent
 	{
 	public:
-		Call(std::shared_ptr<MAssIpc_TransportCopy> transport, std::function<void()> invoke_proc)
+		CallProc(std::shared_ptr<MAssIpc_TransportCopy> transport, std::function<void()> invoke_proc)
 			:m_invoke_proc(invoke_proc)
 		{
 		}

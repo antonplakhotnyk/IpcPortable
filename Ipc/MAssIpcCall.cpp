@@ -1,6 +1,6 @@
 #include "MAssIpcCall.h"
-#include "MAssIpc_Macros.h"
 #include "MAssIpc_TransportProxy.h"
+#include "MAssIpc_Macros.h"
 
 using namespace MAssIpcImpl;
 
@@ -140,7 +140,7 @@ void MAssIpcCall::Internals::StoreReturnFailCall(MAssIpc_DataStream* result_str,
 void MAssIpcCall::Internals::InvokeLocal(MAssIpc_DataStream& call_info_data, MAssIpcImpl::MAssIpc_PacketParser::CallId id) const
 {
 	std::shared_ptr<MAssIpc_TransportShare> transport = m_transport.lock();
-	mass_return_if_equal(bool(transport), false);
+	return_if_equal_mass_ipc(bool(transport), false);
 
 	const std::shared_ptr<MAssIpc_Transthread> inter_thread_nullable = m_inter_thread_nullable.lock();
 
@@ -192,9 +192,9 @@ void MAssIpcCall::Internals::InvokeLocal(MAssIpc_DataStream& call_info_data, MAs
 				if( data )
 					transport->Write(std::move(data));
 			}
-		}
+		}			
 		else
-			mass_assert_msg("unexpected fail without error_arg");
+			assert_msg_mass_ipc("unexpected fail without error_arg");
 	}
 }
 
@@ -323,7 +323,7 @@ MAssIpc_DataStream MAssIpcCall::ProcessTransportResponse(MAssIpcImpl::MAssIpc_Pa
 
 void MAssIpcCall::LockCurrentThreadId::lock()
 {
-	mass_assert_if_not_equal(m_locked_id, MAssIpc_ThreadSafe::id());
+	assert_if_not_equal_mass_ipc(m_locked_id, MAssIpc_ThreadSafe::id());
 	m_locked_id = MAssIpc_ThreadSafe::get_id();
 }
 
@@ -352,7 +352,7 @@ void MAssIpcCall::InvokeRemote(MAssIpc_DataStream& call_info_data, MAssIpc_DataS
 {
 	{
 		auto transport = m_int.load()->m_transport.lock();
-		mass_return_if_equal(bool(transport), false);
+		return_if_equal_mass_ipc(bool(transport), false);
 		auto data(call_info_data.DetachWrite());
 		if( data )
 			transport->Write(std::move(data));
@@ -397,7 +397,7 @@ MAssIpc_DataStream MAssIpcCall::Internals::ProcessBuffer(CallDataBuffer buffer) 
 		break;
 		case MAssIpc_PacketParser::PacketType::pt_enumerate:
 		{
-			mass_return_x_if_not_equal(buffer.header.size, 0, {});// invalid packet
+			return_x_if_not_equal_mass_ipc(buffer.header.size, 0, {});// invalid packet
 			MAssIpcCall_EnumerateData res = m_proc_map.EnumerateHandlers();
 
 			MAssIpc_DataStream measure_size;
@@ -406,14 +406,14 @@ MAssIpc_DataStream MAssIpcCall::Internals::ProcessBuffer(CallDataBuffer buffer) 
 			MAssIpc_DataStream respond_str(CreateDataStream(m_transport, measure_size.GetWritePos(), MAssIpc_PacketParser::PacketType::pt_return_enumerate, buffer.header.id));
 			respond_str<<res;
 			std::shared_ptr<MAssIpc_TransportShare> transport = m_transport.lock();
-			mass_return_x_if_equal(bool(transport), false, {});
+			return_x_if_equal_mass_ipc(bool(transport), false, {});
 			auto data(respond_str.DetachWrite());
 			if( data )
 				transport->Write(std::move(data));
 		}
 		break;
 		default:
-			mass_return_x({});// invalid packet
+			assert_msg_mass_ipc("invalid packet");
 			break;
 	}
 

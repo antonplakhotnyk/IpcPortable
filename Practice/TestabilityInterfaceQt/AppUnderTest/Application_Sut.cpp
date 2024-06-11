@@ -1,7 +1,6 @@
 #include "Application_Sut.h"
 #include "IpcQt_Serializers.h"
 #include "TestabilityGlobalQt.h"
-#include "MAssIpc_Macros.h"
 
 
 Application_Sut::Application_Sut(const TestabilityGlobalQt::Addr& connect_to_address, std::weak_ptr<EventHandlerMap>* sut_event_map)
@@ -49,7 +48,7 @@ void Application_Sut::Unregister(QObject* obj)
 
 bool Application_Sut::OpenFile(const QByteArray& file_data)
 {
-	mass_return_x_if_equal(bool(m_application), false, false);
+	return_x_if_equal(bool(m_application), false, false);
 
 	TestabilityGlobalQt::Ipc().AsyncInvoke("Checkpoint");
 

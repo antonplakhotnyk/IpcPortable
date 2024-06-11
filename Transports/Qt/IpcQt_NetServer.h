@@ -2,7 +2,6 @@
 
 #include "MAssIpcCall.h"
 #include "IpcQt_TransportTcpServer.h"
-#include "IpcQt_Transthread.h"
 #include "IpcQt_TransthreadTransportCopy.h"
 #include "IpcQt_Net.h"
 

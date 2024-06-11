@@ -261,7 +261,7 @@ public:
 			: MAssIpcWaiter::Event(cwl)
 			, m_internals{internals}
 		{
-			mass_return_if_equal(bool(m_internals), false);
+			return_if_equal_mass_ipc(bool(m_internals), false);
 
 			if( !skip_canceling_by_disconnect )
 			{
@@ -293,7 +293,7 @@ public:
 				}
 				break;
 			default:
-				mass_assert();
+				assert_mass_ipc();
 			    break;
 			}
 		}

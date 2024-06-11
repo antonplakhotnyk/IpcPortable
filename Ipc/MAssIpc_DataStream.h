@@ -1,8 +1,9 @@
 #pragma once
 
+#include "MAssIpc_Transport.h"
+
 #include <stdint.h>
 #include <string>
-#include "MAssIpc_Transport.h"
 #include <vector>
 
 template<class Type>

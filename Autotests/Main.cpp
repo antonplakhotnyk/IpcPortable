@@ -21,6 +21,7 @@ static constexpr const char* general_includes_end_mark = {};// help generating p
 
 static constexpr const char* main_start_mark = {};// help generating preprocessed to file cpp
 
+#include "MAssIpc_Assert.h"
 #include "MAssIpcCall.h"
 #include "MAssIpc_Macros.h"
 
@@ -411,7 +412,7 @@ void TestThreads_Sender(std::shared_ptr<IpcTransport_MemoryShare> transport_buff
 			c += 10;
 
 			std::string res = call.WaitInvokeRet<std::string>({"TestThreads_HandlerWithCallBack",MAssIpcCall::ProcIn::now});
-			mass_return_if_not_equal(res, "TestThreads_SenderCallBack");
+			return_if_not_equal_mass_ipc(res, "TestThreads_SenderCallBack");
 		}
 
 		for(size_t i=0; i<5; i++)
@@ -422,7 +423,7 @@ void TestThreads_Sender(std::shared_ptr<IpcTransport_MemoryShare> transport_buff
 			std::string res = call.WaitInvokeRet<std::string>("TestThreads_Proc3", a, b, c);
 			std::stringstream res_expect;
 			res_expect<<a<<b<<c;
-			mass_return_if_not_equal(res, res_expect.str());
+			return_if_not_equal_mass_ipc(res, res_expect.str());
 		}
 
 		a += 1;
@@ -563,7 +564,7 @@ template<typename TVal>
 void CheckVectorT(const std::vector<TVal>& val)
 {
 	for( size_t i = 0; i<val.size(); i++ )
-		mass_return_if_not_equal(val[i], TVal(10-i));
+		return_if_not_equal_mass_ipc(val[i], TVal(10-i));
 }
 
 struct DataStruct1
@@ -630,7 +631,7 @@ static std::mutex s_calls_access;
 void CallCountChanged_BeforeInvoke()
 {
 	std::unique_lock<std::mutex> lock(s_calls_access, std::try_to_lock);
-	mass_return_if_not_equal(lock.owns_lock(), true);
+	return_if_not_equal_mass_ipc(lock.owns_lock(), true);
 	s_calls.push_back("CallCountChanged_BeforeInvoke");
 }
 
@@ -641,7 +642,7 @@ void CallCountChanged(const std::shared_ptr<const MAssIpcCall::CallInfo>& call_i
 //	std::unique_lock<std::mutex> lock(s_calls_access);
 
 	std::unique_lock<std::mutex> lock(s_calls_access, std::try_to_lock);
-	mass_return_if_not_equal(lock.owns_lock(), true);
+	return_if_not_equal_mass_ipc(lock.owns_lock(), true);
 	s_calls.push_back(call_data);
 }
 
@@ -683,7 +684,7 @@ void Main_IpcService(std::shared_ptr<IpcTransport_MemoryShare> transport_buffer)
 	
 	auto call_info1 = call.AddCallInfo(sig_Static_String_StringU32Double);
 	auto call_info2 = call.AddHandler(sig_Static_String_StringU32Double, std::function<decltype(Static_String_StringU32Double)>(&Static_String_StringU32Double), {}, {}, {});
-	mass_return_if_not_equal(call_info1, call_info2);
+	return_if_not_equal_mass_ipc(call_info1, call_info2);
 	// call.AddHandler(sig_Static_String_StringU32Double, std::function<std::string(std::string, uint32_t, float)>(&Static_String_StringU32Double), {}, {}, {});// compile error
 
 	// 	call.AddHandler("Ipc_Proc1", DelegateW<std::string(uint8_t, std::string, uint32_t)>().BindS(&Ipc_Proc1));
@@ -807,11 +808,11 @@ void Main_IpcClient()
 	{
 		NoDefConstruct s(123);
 		NoDefConstruct r{call.WaitInvokeRet<NoDefConstruct>("Proc_NoDefConstruct", s)};
-		mass_return_if_not_equal(r.m_a, s.m_a*2);
+		return_if_not_equal_mass_ipc(r.m_a, s.m_a*2);
 
 		std::unique_ptr<NoDefConstruct> us(new NoDefConstruct(123));
 		std::unique_ptr<NoDefConstruct> ur{call.WaitInvokeRet<std::unique_ptr<NoDefConstruct>>("Proc_NoDefConstruct_unique_ptr", us)};
-		mass_return_if_not_equal(ur->m_a, us->m_a*4);
+		return_if_not_equal_mass_ipc(ur->m_a, us->m_a*4);
 	}
 
 
@@ -822,16 +823,16 @@ void Main_IpcClient()
 	br2 = br2;
 	s_state_error_et = MAssIpcCall::ErrorType::unknown_error;
 	std::string res2 = call.WaitInvokeRet<std::string>("Ipc_Proc1",a, b, c);
-	mass_return_if_not_equal(res2, "Ipc_Proc1 result 123456789012345");
-	mass_return_if_not_equal(s_state_error_et, MAssIpcCall::ErrorType::unknown_error);
+	return_if_not_equal_mass_ipc(res2, "Ipc_Proc1 result 123456789012345");
+	return_if_not_equal_mass_ipc(s_state_error_et, MAssIpcCall::ErrorType::unknown_error);
 	{
 		std::unique_lock<std::mutex> lock(s_calls_access, std::try_to_lock);
-		mass_return_if_not_equal(lock.owns_lock(), true);
-		mass_return_if_not_equal(s_calls.empty(), false);
+		return_if_not_equal_mass_ipc(lock.owns_lock(), true);
+		return_if_not_equal_mass_ipc(s_calls.empty(), false);
 	}
 
 	std::string str = call.WaitInvoke(sig_Static_String_StringU32Double, "str:", uint8_t(2), double(123.5));
-	mass_return_if_not_equal(str, "str:247");
+	return_if_not_equal_mass_ipc(str, "str:247");
 
 	// call.AsyncInvoke(sig_Static_String_StringU32Double, std::string("str:"), uint8_t(2), double(123.5));// compiler error async return_must be void
 
@@ -839,20 +840,20 @@ void Main_IpcClient()
 	c = 654321;
 	const char* string_pointer_Ipc_Proc1 = "Ipc_Proc1";
 	res2 = call.WaitInvokeRet<std::string>(string_pointer_Ipc_Proc1, a, b, c);
-	mass_return_if_not_equal(res2, "Ipc_Proc1 result 1234567654321");
-	mass_return_if_not_equal(s_state_error_et, MAssIpcCall::ErrorType::unknown_error);
+	return_if_not_equal_mass_ipc(res2, "Ipc_Proc1 result 1234567654321");
+	return_if_not_equal_mass_ipc(s_state_error_et, MAssIpcCall::ErrorType::unknown_error);
 	{
 		std::unique_lock<std::mutex> lock(s_calls_access, std::try_to_lock);
-		mass_return_if_not_equal(lock.owns_lock(), true);
-		mass_return_if_not_equal(s_calls[s_calls.size()-1], "CallCountChanged:2 Ipc_Proc1");
+		return_if_not_equal_mass_ipc(lock.owns_lock(), true);
+		return_if_not_equal_mass_ipc(s_calls[s_calls.size()-1], "CallCountChanged:2 Ipc_Proc1");
 	}
 
 	s_state_error_et = MAssIpcCall::ErrorType::unknown_error;
 	std::string res3 = call.WaitInvokeRet<std::string>("NotExistProc", a, b, c);
-	mass_return_if_not_equal(s_state_error_et, MAssIpcCall::ErrorType::respond_no_matching_call_name_parameters);
+	return_if_not_equal_mass_ipc(s_state_error_et, MAssIpcCall::ErrorType::respond_no_matching_call_name_parameters);
 	s_state_error_et = MAssIpcCall::ErrorType::unknown_error;
 	int res4 = call.WaitInvokeRet<int>("Ipc_Proc1", a, b, c);
-	mass_return_if_not_equal(s_state_error_et, MAssIpcCall::ErrorType::respond_no_matching_call_return_type);
+	return_if_not_equal_mass_ipc(s_state_error_et, MAssIpcCall::ErrorType::respond_no_matching_call_return_type);
 	res4 = res4;
 	call.AsyncInvoke("NotExistProc", a, b, c);
 	uint8_t& a1 = a;
@@ -879,7 +880,7 @@ void Main_IpcClient()
 	call.WaitInvoke(sig_UniquePtr1, std::move(ds1));
 	ds1.reset(new DataStruct1({7,8,9}));
 	uint32_t u32r = call.WaitInvoke(sig_UniquePtr3, std::move(ds1));
-	mass_return_if_not_equal(u32r, 7+8+9);
+	return_if_not_equal_mass_ipc(u32r, 7+8+9);
 	// call.AsyncInvoke(sig_UniquePtr3, std::move(ds1));// compiler error async invoke must return void
 
 
@@ -905,9 +906,9 @@ void Main_IpcClient()
 		std::string expect_calls_1 = std::string("CallCountChanged:") + std::to_string(i) + std::string(" CallCountChanged_BeforeInvoke");
 		s_calls.clear();
 		call.WaitInvoke("CallCountChanged_BeforeInvoke");
-		mass_return_if_not_equal(s_calls.size(), 2);
-		mass_return_if_not_equal(s_calls[0], expect_calls_1);
-		mass_return_if_not_equal(s_calls[1], "CallCountChanged_BeforeInvoke");
+		return_if_not_equal_mass_ipc(s_calls.size(), 2);
+		return_if_not_equal_mass_ipc(s_calls[0], expect_calls_1);
+		return_if_not_equal_mass_ipc(s_calls[1], "CallCountChanged_BeforeInvoke");
 	}
 	
 

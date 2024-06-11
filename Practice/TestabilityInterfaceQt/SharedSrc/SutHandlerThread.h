@@ -1,7 +1,6 @@
 #pragma once
 
 #include "AutotestBase.h"
-#include "IpcQt_Transthread.h"
 #include "AutotestServer_Client.h"
 
 class SutHandlerThread: public QThread
@@ -12,7 +11,7 @@ public:
 		:m_autotest_container(autotest_container)
 		, m_autotest_client_connection(autotest_client_connection)
 	{
-		IpcQt_Transthread::AddTargetThread(this);
+		IpcQt_TransthreadCaller::AddTargetThread(this);
 		start();
 	}
 
